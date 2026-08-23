@@ -276,6 +276,28 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
     if (core.proxyGroups.isEmpty) {
       return current;
     }
+    final catalogGroups = ref.read(proxyCatalogProvider).groups;
+    if (catalogGroups.isNotEmpty) {
+      final runtimeNodes = <String, ProxyNode>{
+        for (final group in core.proxyGroups)
+          for (final node in group.nodes) node.id: node,
+      };
+      final groups = [
+        for (final group in catalogGroups)
+          group.copyWith(
+            nodes: [
+              for (final node in group.nodes)
+                node.copyWith(latencyMs: runtimeNodes[node.id]?.latencyMs),
+            ],
+          ),
+      ];
+      final selectedGroupId = current.selectedGroup?.id;
+      final index = groups.indexWhere((group) => group.id == selectedGroupId);
+      return current.copyWith(
+        groups: groups,
+        selectedGroupIndex: index >= 0 ? index : 0,
+      );
+    }
     final selectedGroupId = current.selectedGroup?.id;
     final groups = List<ProxyGroup>.of(core.proxyGroups);
     final index = groups.indexWhere((group) => group.id == selectedGroupId);

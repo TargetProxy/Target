@@ -51,7 +51,7 @@ class AppStoragePaths {
       final path = providerDir.path.trim();
       if (path.isNotEmpty) {
         // `path_provider` already returns an app-scoped directory:
-        // - Windows: %APPDATA%/top.loafman.target
+        // - Windows: %APPDATA%/top.loafman/target
         // - macOS: ~/Library/Application Support/top.loafman.target
         // - Linux: $XDG_DATA_HOME/top.loafman.target or ~/.local/share
         // Use it directly to honour platform conventions.
@@ -84,7 +84,8 @@ class AppStoragePaths {
     if (Platform.isWindows) {
       final roaming = Platform.environment['APPDATA'];
       if (roaming != null && roaming.trim().isNotEmpty) {
-        return '$roaming$separator${AppIdentity.storageDirectoryName}';
+        return '$roaming$separator${AppIdentity.companyName}'
+            '$separator${AppIdentity.storageDirectoryName}';
       }
     }
     if (Platform.isMacOS) {

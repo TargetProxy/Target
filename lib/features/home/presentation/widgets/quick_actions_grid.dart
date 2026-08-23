@@ -78,8 +78,8 @@ class QuickActionsGrid extends StatelessWidget {
                 Expanded(
                   child: _QuickAction(
                     icon: Icons.sync,
-                    label: 'Update Sub',
-                    onTap: () => context.go(AppRoute.subscriptions.path),
+                    label: 'Manage Profiles',
+                    onTap: () => context.go(AppRoute.proxies.path),
                   ),
                 ),
                 const SizedBox(width: AppSpacing.smallGap),

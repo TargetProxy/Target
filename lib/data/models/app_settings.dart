@@ -28,7 +28,7 @@ enum ProxyMode {
   tun;
 
   String get label => switch (this) {
-    ProxyMode.mixed => 'System proxy',
+    ProxyMode.mixed => 'Mixed',
     ProxyMode.tun => 'TUN',
   };
 }

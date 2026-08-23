@@ -81,7 +81,6 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   Future<void> _refreshTargetLibService() async {
-    TargetLibServiceManager.invalidateStatus();
     await _checkTargetLibService();
   }
 

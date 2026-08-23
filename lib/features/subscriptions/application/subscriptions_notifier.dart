@@ -80,6 +80,20 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
       try {
         final snapshot = await gateway.listSubscriptions();
         final remote = snapshot.subscriptions;
+        var activeId = snapshot.activeId;
+        if (activeId == null) {
+          RuntimeSubscription? fallback;
+          for (final item in remote) {
+            if (item.enabled) {
+              fallback = item;
+              break;
+            }
+          }
+          if (fallback != null) {
+            activeId = fallback.id;
+            unawaited(_activateFallback(gateway, fallback.id));
+          }
+        }
         final previous = {
           for (final item in state.subscriptions) item.id: item,
         };
@@ -89,7 +103,7 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
         ];
         state = state.copyWith(
           subscriptions: subscriptions,
-          activeId: snapshot.activeId,
+          activeId: activeId,
           busy: subscriptions.any(
             (item) => item.updateStatus == SubscriptionUpdateStatus.updating,
           ),
@@ -97,7 +111,7 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
         );
         RuntimeSubscription? active;
         for (final item in remote) {
-          if (item.id == snapshot.activeId) {
+          if (item.id == activeId) {
             active = item;
             break;
           }
@@ -116,6 +130,16 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
       }
     });
     return _operationTail;
+  }
+
+  Future<void> _activateFallback(SubscriptionGateway gateway, String id) async {
+    try {
+      await gateway.activateSubscription(id);
+    } on Object catch (error) {
+      state = state.copyWith(
+        lastError: 'Failed to activate subscription: $error',
+      );
+    }
   }
 
   Future<bool> addSubscription(String url, {String? name}) async {
@@ -148,21 +172,39 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
           ...subscription.headers,
           'User-Agent': subscription.userAgent,
         },
-        activate: true,
-        updateNow: true,
+        activate: false,
+        updateNow: false,
       );
+      final added = _subscriptionFromRuntime(created, subscription);
       state = state.copyWith(
         subscriptions: [
-          ...state.subscriptions,
-          _subscriptionFromRuntime(created, subscription),
+          for (final item in state.subscriptions)
+            if (item.id != added.id) item,
+          added,
         ],
         clearError: true,
       );
+      unawaited(_activateAndUpdateAddedSubscription(created.id));
       return true;
     } on Object catch (error) {
       state = state.copyWith(lastError: 'Failed to add subscription: $error');
       return false;
     }
+  }
+
+  Future<void> _activateAndUpdateAddedSubscription(String id) async {
+    final gateway = _gateway;
+    if (gateway == null) return;
+    try {
+      await gateway.activateSubscription(id);
+      state = state.copyWith(activeId: id, clearError: true);
+    } on Object catch (error) {
+      state = state.copyWith(
+        lastError: 'Subscription was added but could not be activated: $error',
+      );
+      return;
+    }
+    await updateSubscription(id);
   }
 
   Future<void> removeSubscription(String id) async {

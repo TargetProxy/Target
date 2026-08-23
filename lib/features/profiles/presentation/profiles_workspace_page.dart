@@ -1,13 +1,12 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../../app/router.dart';
 import '../../../core/utils/format_bytes.dart';
 import '../../../data/models/subscription.dart';
 import '../../proxies/application/proxies_notifier.dart';
 import '../../settings/application/settings_notifier.dart';
 import '../../subscriptions/application/subscriptions_notifier.dart';
+import '../../subscriptions/presentation/widgets/add_subscription_sheet.dart';
 
 enum _ProfileSection { overview, proxies, configuration }
 
@@ -34,7 +33,7 @@ class _ProfilesWorkspacePageState extends ConsumerState<ProfilesWorkspacePage> {
       return Scaffold(
         appBar: AppBar(title: const Text('Profiles')),
         body: selected == null
-            ? _EmptyWorkspace(onAdd: _openSubscriptions)
+            ? _EmptyWorkspace(onAdd: _showAddSubscription)
             : _ProfileDetail(
                 profile: selected,
                 section: _section,
@@ -50,7 +49,7 @@ class _ProfilesWorkspacePageState extends ConsumerState<ProfilesWorkspacePage> {
                 setState(() => _selectedId = id);
                 Navigator.pop(context);
               },
-              onAdd: _openSubscriptions,
+              onAdd: _showAddSubscription,
               onRefresh: _refreshSelected,
             ),
           ),
@@ -67,14 +66,14 @@ class _ProfilesWorkspacePageState extends ConsumerState<ProfilesWorkspacePage> {
             selectedId: selected?.id,
             busy: subscriptions.busy,
             onSelected: (id) => setState(() => _selectedId = id),
-            onAdd: _openSubscriptions,
+            onAdd: _showAddSubscription,
             onRefresh: _refreshSelected,
           ),
         ),
         const VerticalDivider(width: 1),
         Expanded(
           child: selected == null
-              ? _EmptyWorkspace(onAdd: _openSubscriptions)
+              ? _EmptyWorkspace(onAdd: _showAddSubscription)
               : _ProfileDetail(
                   profile: selected,
                   section: _section,
@@ -99,7 +98,28 @@ class _ProfilesWorkspacePageState extends ConsumerState<ProfilesWorkspacePage> {
     );
   }
 
-  void _openSubscriptions() => context.go(AppRoute.subscriptions.path);
+  Future<void> _showAddSubscription() async {
+    final result = await showModalBottomSheet<Map<String, String>>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => const AddSubscriptionSheet(),
+    );
+    if (result == null || !mounted) return;
+    final url = result['url']?.trim();
+    if (url == null || url.isEmpty) return;
+
+    final notifier = ref.read(subscriptionsProvider.notifier);
+    final added = await notifier.addSubscription(url, name: result['name']);
+    if (!mounted || added) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          ref.read(subscriptionsProvider).lastError ??
+              'Subscription was not added.',
+        ),
+      ),
+    );
+  }
 
   Future<void> _refreshSelected() async {
     final profiles = ref.read(subscriptionsProvider).subscriptions;
@@ -288,15 +308,6 @@ class _ProfileDetail extends ConsumerWidget {
                 icon: const Icon(Icons.refresh),
                 tooltip: 'Update',
               ),
-              PopupMenuButton<String>(
-                itemBuilder: (_) => const [
-                  PopupMenuItem(
-                    value: 'manage',
-                    child: Text('Manage subscription'),
-                  ),
-                ],
-                onSelected: (_) => context.go(AppRoute.subscriptions.path),
-              ),
             ],
           ),
         ),
@@ -432,7 +443,7 @@ class _Configuration extends ConsumerWidget {
             ('Listen address', settings.listenAddress),
             ('Mixed port', '${settings.mixedPort}'),
             ('IPv6', settings.ipv6 ? 'Enabled' : 'Disabled'),
-            ('System proxy', settings.systemProxy ? 'Enabled' : 'Disabled'),
+            if (settings.systemProxy) ('System proxy', 'Enabled'),
           ],
         ),
         const _SectionTitle(icon: Icons.code, title: 'Configuration source'),
@@ -652,14 +663,16 @@ class _InfoCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  rows[i].$1,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                Expanded(
+                  child: Text(
+                    rows[i].$1,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
-                const Spacer(),
-                Flexible(child: Text(rows[i].$2, textAlign: TextAlign.right)),
+                const SizedBox(width: 24),
+                Expanded(child: Text(rows[i].$2, textAlign: TextAlign.left)),
               ],
             ),
             if (i != rows.length - 1)

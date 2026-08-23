@@ -13,6 +13,8 @@ commands, and logs.
 - Runtime metrics, connections, events, and outbound groups: available
 - Active URLTest triggering and refreshed latency results: available
 - TargetLib logs: streamed through the authenticated gRPC command server
+- Single-instance desktop launch: repeat launches restore and focus the running
+  window on Windows, macOS, and Linux
 - GitHub Actions: intentionally removed
 
 ## Architecture

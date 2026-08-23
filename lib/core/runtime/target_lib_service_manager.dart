@@ -23,15 +23,7 @@ class TargetLibServiceManager {
   /// the daemon uses with kardianos/service (verified via `sc.exe query`).
   static const String _windowsServiceName = 'TargetLib';
 
-  static TargetLibServiceStatus? _cachedStatus;
-  static String? _cachedBasePath;
-
   final String? _executablePath;
-
-  static void invalidateStatus() {
-    _cachedStatus = null;
-    _cachedBasePath = null;
-  }
 
   Future<String> resolveExecutable() async {
     final exeSuffix = Platform.isWindows ? '.exe' : '';
@@ -72,7 +64,10 @@ class TargetLibServiceManager {
       final temporary = File('${target.path}.new');
       await source.copy(temporary.path);
       try {
-        if (await target.exists()) await target.delete();
+        if (await target.exists()) {
+          await _releaseWindowsTarget(target.path);
+          await target.delete();
+        }
         await temporary.rename(target.path);
         await stamp.writeAsString(expectedStamp, flush: true);
       } catch (_) {
@@ -84,6 +79,41 @@ class TargetLibServiceManager {
     return target.path;
   }
 
+  /// A previous daemon instance can survive service removal and keep the
+  /// cached executable open. Stop only processes whose executable path is
+  /// exactly the cache target before replacing it.
+  Future<void> _releaseWindowsTarget(String path) async {
+    if (!Platform.isWindows) return;
+    final escaped = path.replaceAll("'", "''");
+    final result = await Process.run('powershell.exe', [
+      '-NoProfile',
+      '-NonInteractive',
+      '-Command',
+      "Get-CimInstance Win32_Process | Where-Object { \$_.ExecutablePath -eq '$escaped' } | Select-Object -ExpandProperty ProcessId",
+    ]);
+    final pids = result.stdout
+        .toString()
+        .split(RegExp(r'\s+'))
+        .where((value) => value.isNotEmpty)
+        .map(int.tryParse)
+        .whereType<int>();
+    for (final pid in pids) {
+      await Process.run('taskkill.exe', ['/PID', '$pid', '/T', '/F']);
+    }
+    if (pids.isNotEmpty) {
+      for (var i = 0; i < 10 && await File(path).exists(); i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        try {
+          final handle = await File(path).open(mode: FileMode.append);
+          await handle.close();
+          break;
+        } on Object {
+          // The process may need a few milliseconds to release its handle.
+        }
+      }
+    }
+  }
+
   Future<TargetLibServiceResult> run(
     String action, {
     required String basePath,
@@ -92,21 +122,12 @@ class TargetLibServiceManager {
     String locale = '',
     bool elevated = true,
   }) async {
-    if (action == 'status' &&
-        _cachedStatus != null &&
-        _cachedBasePath == basePath) {
-      AppLogger.debug(
-        'Using cached service status: ${_cachedStatus!.name}',
-        source: 'TargetLib',
-      );
-      return TargetLibServiceResult(_cachedStatus!);
-    }
     // Querying status never needs admin rights. On Windows the daemon's own
     // `status` opens the service with START/STOP access and gets rejected
     // non-elevated, so use `sc.exe query` instead. Elsewhere the daemon's
     // status is queried without elevation.
     if (action == 'status' && Platform.isWindows) {
-      return _queryStatusWindows(basePath);
+      return _queryStatusWindows();
     }
     final effectiveElevated = action == 'status' ? false : elevated;
     final stopwatch = Stopwatch()..start();
@@ -151,19 +172,6 @@ class TargetLibServiceManager {
       final status = action == 'status'
           ? _parseStatus(output)
           : TargetLibServiceStatus.unknown;
-      if (action == 'status') {
-        _cachedStatus = status;
-        _cachedBasePath = basePath;
-      } else if (action == 'start') {
-        _cachedStatus = TargetLibServiceStatus.running;
-        _cachedBasePath = basePath;
-      } else if (action == 'stop') {
-        _cachedStatus = TargetLibServiceStatus.stopped;
-        _cachedBasePath = basePath;
-      } else if (action == 'uninstall') {
-        _cachedStatus = TargetLibServiceStatus.notInstalled;
-        _cachedBasePath = basePath;
-      }
       return TargetLibServiceResult(status, output: output);
     } on Object catch (error, stackTrace) {
       AppLogger.error(
@@ -233,8 +241,6 @@ class TargetLibServiceManager {
           result.exitCode,
         );
       }
-      _cachedStatus = TargetLibServiceStatus.running;
-      _cachedBasePath = basePath;
       return TargetLibServiceResult(
         TargetLibServiceStatus.running,
         output: output,
@@ -298,7 +304,8 @@ class TargetLibServiceManager {
     final argList = _powershellQuote(
       '-NoProfile -NonInteractive -EncodedCommand $encodedCommand',
     );
-    final outerScript = "try { "
+    final outerScript =
+        "try { "
         "\$process = Start-Process -FilePath 'powershell.exe' "
         "-ArgumentList $argList "
         "-Verb RunAs -Wait -PassThru; "
@@ -396,7 +403,7 @@ class TargetLibServiceManager {
     return Process.run('sudo', ['/bin/sh', '-c', script]);
   }
 
-  Future<TargetLibServiceResult> _queryStatusWindows(String basePath) async {
+  Future<TargetLibServiceResult> _queryStatusWindows() async {
     final stopwatch = Stopwatch()..start();
     AppLogger.info(
       'Querying service status via sc.exe (no elevation required)',
@@ -416,8 +423,6 @@ class TargetLibServiceManager {
       } else {
         status = TargetLibServiceStatus.unknown;
       }
-      _cachedStatus = status;
-      _cachedBasePath = basePath;
       AppLogger.info(
         'Service status resolved: ${status.name} '
         '(elapsedMs=${stopwatch.elapsedMilliseconds})',

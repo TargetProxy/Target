@@ -11,8 +11,10 @@ import '../features/settings/application/settings_notifier.dart';
 import '../features/settings/data/settings_store.dart';
 import '../features/subscriptions/application/subscriptions_notifier.dart';
 import 'app_identity.dart';
+import 'desktop_single_instance.dart';
 import 'desktop_tray_controller.dart';
 import 'router.dart';
+import '../l10n/app_localizations.dart';
 
 class TargetApp extends StatelessWidget {
   const TargetApp({
@@ -53,7 +55,7 @@ class _TargetAppViewState extends ConsumerState<_TargetAppView> {
   late final AppRouter _appRouter = AppRouter();
   late final DesktopTrayController _trayController = DesktopTrayController(
     onToggleConnection: _toggleConnection,
-    onExit: _stopCore,
+    onExit: _prepareExit,
   );
 
   @override
@@ -82,6 +84,18 @@ class _TargetAppViewState extends ConsumerState<_TargetAppView> {
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: _themeModeFor(settings.themeMode),
+      localizationsDelegates: [
+        AppLocalizations.delegate,
+        ...GlobalMaterialLocalizations.delegates,
+      ],
+      supportedLocales: AppLocalizations.supportedLocales,
+      localeResolutionCallback: (locale, supportedLocales) {
+        if (locale == null) return const Locale('en');
+        for (final supported in supportedLocales) {
+          if (supported.languageCode == locale.languageCode) return supported;
+        }
+        return const Locale('en');
+      },
       routerConfig: _appRouter.router,
     );
   }
@@ -107,6 +121,14 @@ class _TargetAppViewState extends ConsumerState<_TargetAppView> {
     final core = ref.read(coreProvider);
     if (core.running || core.busy) {
       await ref.read(coreProvider.notifier).stop();
+    }
+  }
+
+  Future<void> _prepareExit() async {
+    try {
+      await _stopCore();
+    } finally {
+      await DesktopSingleInstance.release();
     }
   }
 }

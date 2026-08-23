@@ -1,0 +1,10 @@
+{
+  "@@locale": "en",
+  "appTitle": "Target",
+  "workspace": "WORKSPACE",
+  "dashboard": "Dashboard",
+  "profiles": "Profiles",
+  "connections": "Connections",
+  "traffic": "Traffic",
+  "logs": "Logs"
+}

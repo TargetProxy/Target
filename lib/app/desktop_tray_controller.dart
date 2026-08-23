@@ -39,7 +39,7 @@ class DesktopTrayController with tray.TrayListener, window.WindowListener {
       await tray.trayManager.setIcon(
         Platform.isWindows
             ? 'windows/runner/resources/app_icon.ico'
-            : 'macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_32.png',
+            : 'assets/TargetAppIcon.png',
       );
       await tray.trayManager.setToolTip(AppIdentity.displayName);
       _initialized = true;

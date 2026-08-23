@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:ui';
 
 import 'package:material_ui/material_ui.dart';
 
+import 'app/desktop_single_instance.dart';
 import 'app/target_app.dart';
 import 'core/logging/app_logger.dart';
 import 'data/storage/app_storage_paths.dart';
@@ -33,6 +35,10 @@ Future<void> main() async {
         );
         return true;
       };
+
+      if (!await DesktopSingleInstance.acquire()) {
+        exit(0);
+      }
 
       AppLogger.info('Target initialization started');
       final paths = await AppStoragePaths.resolve();

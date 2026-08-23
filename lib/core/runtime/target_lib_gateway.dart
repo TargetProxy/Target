@@ -46,6 +46,8 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
   final Map<String, ProxyGroup> _groups = {};
   final Map<String, CoreConnection> _connections = {};
   final List<StreamSubscription<Object?>> _subscriptions = [];
+  final List<StreamSubscription<Object?>> _runtimeSubscriptions = [];
+  Future<void> _runtimeStreamTail = Future<void>.value();
 
   AppSettings _settings = const AppSettings();
   String? _rawConfig;
@@ -193,17 +195,19 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
   }
 
   @override
-  Future<RuntimeSubscriptionSnapshot> listSubscriptions() => _serialize(() async {
-    await _ensureConnected();
-    final result = await _manager!.listSubscriptions(
-      Empty(),
-      options: _callOptions,
-    );
-    return RuntimeSubscriptionSnapshot(
-      subscriptions: result.subscriptions.map(_runtimeSubscription).toList(),
-      activeId: result.activeId.isEmpty ? null : result.activeId,
-    );
-  });
+  Future<RuntimeSubscriptionSnapshot> listSubscriptions() => _serialize(
+    () async {
+      await _ensureConnected();
+      final result = await _manager!.listSubscriptions(
+        Empty(),
+        options: _callOptions,
+      );
+      return RuntimeSubscriptionSnapshot(
+        subscriptions: result.subscriptions.map(_runtimeSubscription).toList(),
+        activeId: result.activeId.isEmpty ? null : result.activeId,
+      );
+    },
+  );
 
   @override
   Future<RuntimeSubscription> addSubscription({
@@ -261,7 +265,9 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
         await _ensureConnected();
         final result = await _manager!.updateSubscription(
           targetlib_pb.SubscriptionId(id: id),
-          options: _callOptions,
+          options: (_callOptions ?? CallOptions()).mergedWith(
+            CallOptions(timeout: const Duration(seconds: 45)),
+          ),
         );
         return RuntimeSubscriptionUpdate(
           subscription: _runtimeSubscription(result.subscription),
@@ -611,7 +617,33 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
     if (_manager != null) return;
     _ensureAvailable();
     await _ensureCore();
-    await _connectCommandServer();
+    try {
+      await _connectCommandServer();
+    } on Object catch (firstError, stackTrace) {
+      // A daemon terminated outside the app can leave its Unix socket file
+      // behind. _ensureCore treats an existing socket as a service-owned
+      // endpoint, so recover once by removing the stale endpoint and starting
+      // the bundled daemon ourselves.
+      if (_daemonProcess != null || _socketPath == null) rethrow;
+      AppLogger.warning(
+        'Existing TargetLib command socket is unreachable; restarting daemon',
+        source: 'TargetLib',
+        error: firstError,
+        stackTrace: stackTrace,
+      );
+      final socket = File(_socketPath!);
+      if (await socket.exists()) await socket.delete();
+      final baseDir = await _resolveBaseDirectory();
+      final workingPath = await _resolveWorkingPath();
+      final tempPath = await _resolveTempPath();
+      _daemonProcess = await _serviceManager.launch(
+        basePath: baseDir.path,
+        workingPath: workingPath,
+        tempPath: tempPath,
+        locale: _settings.serviceLocale,
+      );
+      await _connectCommandServer();
+    }
   }
 
   Future<void> _connectCommandServer() async {
@@ -647,7 +679,9 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
     } on Object {
       // Preserve the handshake error, which is the useful failure here.
     }
-    throw StateError('TargetLib command server did not become ready: $lastError');
+    throw StateError(
+      'TargetLib command server did not become ready: $lastError',
+    );
   }
 
   void _subscribeCommandStreams() {
@@ -657,43 +691,81 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
     _listen(
       manager.subscribeState(Empty(), options: options),
       _applyManagerState,
+      label: 'SubscribeState',
     );
     _listen(
       manager.subscribeSubscriptionEvents(Empty(), options: options),
       (_) => _subscriptionChanges.add(null),
+      label: 'SubscribeSubscriptionEvents',
     );
-    _listen(daemon.subscribeLog(Empty(), options: options), _applyLogs);
+    _listen(
+      daemon.subscribeLog(Empty(), options: options),
+      _applyLogs,
+      label: 'SubscribeLog',
+    );
     _listen(
       daemon.subscribeStatus(
         daemon_pb.SubscribeStatusRequest(interval: Int64(1000)),
         options: options,
       ),
       _applyStatus,
-    );
-    _listen(daemon.subscribeGroups(Empty(), options: options), _applyGroups);
-    _listen(
-      daemon.subscribeConnections(
-        daemon_pb.SubscribeConnectionsRequest(interval: Int64(1000)),
-        options: options,
-      ),
-      _applyConnections,
+      label: 'SubscribeStatus',
     );
   }
 
-  void _listen<T>(Stream<T> stream, void Function(T) onData) {
+  void _setRuntimeStreamsEnabled(bool enabled) {
+    _runtimeStreamTail = _runtimeStreamTail.then<void>((_) async {
+      final previous = List<StreamSubscription<Object?>>.of(
+        _runtimeSubscriptions,
+      );
+      _runtimeSubscriptions.clear();
+      for (final subscription in previous) {
+        _subscriptions.remove(subscription);
+        await subscription.cancel();
+      }
+      if (!enabled || _manager == null || _daemon == null || _disposed) return;
+      final daemon = _daemon!;
+      final options = _callOptions;
+      _runtimeSubscriptions.add(
+        _listen(
+          daemon.subscribeGroups(Empty(), options: options),
+          _applyGroups,
+          label: 'SubscribeGroups',
+        ),
+      );
+      _runtimeSubscriptions.add(
+        _listen(
+          daemon.subscribeConnections(
+            daemon_pb.SubscribeConnectionsRequest(interval: Int64(1000)),
+            options: options,
+          ),
+          _applyConnections,
+          label: 'SubscribeConnections',
+        ),
+      );
+    });
+  }
+
+  StreamSubscription<Object?> _listen<T>(
+    Stream<T> stream,
+    void Function(T) onData, {
+    required String label,
+  }) {
     final subscription = stream.listen(
       onData,
       onError: (Object error, StackTrace stackTrace) {
         if (_manager != null && !_disposed) {
           AppLogger.warning(
-            'TargetLib gRPC stream failed',
+            'TargetLib gRPC stream failed: $label',
             error: error,
             stackTrace: stackTrace,
           );
         }
       },
     );
-    _subscriptions.add(subscription as StreamSubscription<Object?>);
+    final tracked = subscription as StreamSubscription<Object?>;
+    _subscriptions.add(tracked);
+    return tracked;
   }
 
   void _applyManagerState(targetlib_pb.ServiceState status) {
@@ -708,6 +780,7 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
         CoreLifecycle.failed,
       _ => CoreLifecycle.stopped,
     };
+    _setRuntimeStreamsEnabled(lifecycle == CoreLifecycle.running);
     _publish(
       _copyCurrent(
         lifecycle: lifecycle,
@@ -812,6 +885,7 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
   }
 
   Future<void> _shutdownTransport() async {
+    _runtimeSubscriptions.clear();
     final subscriptions = List<StreamSubscription<Object?>>.of(_subscriptions);
     _subscriptions.clear();
     for (final subscription in subscriptions) {

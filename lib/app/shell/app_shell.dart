@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../app_identity.dart';
 import '../router.dart';
+import '../../l10n/app_localizations.dart';
 
 class AppShell extends StatelessWidget {
   const AppShell({required this.location, required this.child, super.key});
@@ -54,33 +55,36 @@ class AdaptiveScaffold extends StatelessWidget {
   final ValueChanged<int> onDestinationSelected;
   final Widget child;
 
-  static const _destinations = [
-    NavigationDestination(
-      icon: Icon(Icons.dashboard_outlined),
-      selectedIcon: Icon(Icons.dashboard),
-      label: 'Dashboard',
-    ),
-    NavigationDestination(
-      icon: Icon(Icons.hub_outlined),
-      selectedIcon: Icon(Icons.hub),
-      label: 'Profiles',
-    ),
-    NavigationDestination(
-      icon: Icon(Icons.cable_outlined),
-      selectedIcon: Icon(Icons.cable),
-      label: 'Connections',
-    ),
-    NavigationDestination(
-      icon: Icon(Icons.show_chart),
-      selectedIcon: Icon(Icons.show_chart),
-      label: 'Traffic',
-    ),
-    NavigationDestination(
-      icon: Icon(Icons.receipt_long_outlined),
-      selectedIcon: Icon(Icons.receipt_long),
-      label: 'Logs',
-    ),
-  ];
+  List<NavigationDestination> _destinations(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return [
+      NavigationDestination(
+        icon: Icon(Icons.dashboard_outlined),
+        selectedIcon: Icon(Icons.dashboard),
+        label: l10n.dashboard,
+      ),
+      NavigationDestination(
+        icon: Icon(Icons.hub_outlined),
+        selectedIcon: Icon(Icons.hub),
+        label: l10n.profiles,
+      ),
+      NavigationDestination(
+        icon: Icon(Icons.cable_outlined),
+        selectedIcon: Icon(Icons.cable),
+        label: l10n.connections,
+      ),
+      NavigationDestination(
+        icon: Icon(Icons.show_chart),
+        selectedIcon: Icon(Icons.show_chart),
+        label: l10n.traffic,
+      ),
+      NavigationDestination(
+        icon: Icon(Icons.receipt_long_outlined),
+        selectedIcon: Icon(Icons.receipt_long),
+        label: l10n.logs,
+      ),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -108,7 +112,7 @@ class AdaptiveScaffold extends StatelessWidget {
           bottomNavigationBar: NavigationBar(
             selectedIndex: selectedIndex,
             onDestinationSelected: onDestinationSelected,
-            destinations: _destinations,
+            destinations: _destinations(context),
           ),
         );
       },
@@ -124,6 +128,7 @@ class _DesktopSidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     Widget item(int index, String label, IconData icon) => ListTile(
       dense: true,
       selected: selectedIndex == index,
@@ -155,11 +160,11 @@ class _DesktopSidebar extends StatelessWidget {
                   ),
                 ),
               ),
-              item(0, 'Dashboard', Icons.dashboard_outlined),
-              item(1, 'Profiles', Icons.hub_outlined),
-              item(2, 'Connections', Icons.cable_outlined),
-              item(3, 'Traffic', Icons.show_chart),
-              item(4, 'Logs', Icons.receipt_long_outlined),
+              item(0, l10n.dashboard, Icons.dashboard_outlined),
+              item(1, l10n.profiles, Icons.hub_outlined),
+              item(2, l10n.connections, Icons.cable_outlined),
+              item(3, l10n.traffic, Icons.show_chart),
+              item(4, l10n.logs, Icons.receipt_long_outlined),
             ],
           ),
         ),

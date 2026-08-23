@@ -1,0 +1,10 @@
+{
+  "@@locale": "zh",
+  "appTitle": "Target",
+  "workspace": "工作区",
+  "dashboard": "仪表盘",
+  "profiles": "配置",
+  "connections": "连接",
+  "traffic": "流量",
+  "logs": "日志"
+}
