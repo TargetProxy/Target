@@ -1,8 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:path_provider/path_provider.dart';
+
 import '../logging/app_logger.dart';
-import '../../data/storage/app_storage_paths.dart';
 
 enum TargetLibServiceStatus { running, stopped, unknown, notInstalled }
 
@@ -53,7 +54,7 @@ class TargetLibServiceManager {
         'Rebuild the desktop target to include TargetLib$exeSuffix.',
       );
     }
-    final support = await SupportDirectory();
+    final support = await getApplicationSupportDirectory();
     final targetDir = Directory(
       '${support.path}${Platform.pathSeparator}TargetLib${Platform.pathSeparator}bin',
     );
