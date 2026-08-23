@@ -77,6 +77,8 @@ class CoreNotifier extends Notifier<CoreState> {
   CoreGateway? _gateway;
   StreamSubscription<CoreSnapshot>? _subscription;
   Future<void> Function()? _startupBarrier;
+  AppSettings? _pendingConfiguration;
+  Future<void>? _configurationTask;
 
   @override
   CoreState build() {
@@ -104,7 +106,29 @@ class CoreNotifier extends Notifier<CoreState> {
     if (!state.available) {
       return;
     }
-    await _run(() => _gateway!.configure(settings));
+    _pendingConfiguration = settings;
+    final activeTask = _configurationTask;
+    if (activeTask != null) {
+      await activeTask;
+      return;
+    }
+
+    final task = _run(() async {
+      while (true) {
+        final next = _pendingConfiguration;
+        if (next == null) return;
+        _pendingConfiguration = null;
+        await _gateway!.configure(next);
+      }
+    });
+    _configurationTask = task;
+    try {
+      await task;
+    } finally {
+      if (identical(_configurationTask, task)) {
+        _configurationTask = null;
+      }
+    }
   }
 
   Future<void> setRawConfig(String? config) async {
