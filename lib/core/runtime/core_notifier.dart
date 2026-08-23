@@ -5,29 +5,28 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/models/app_settings.dart';
 import '../../data/models/proxy_group.dart';
-import '../../data/models/proxy_node.dart';
 import '../../features/settings/application/settings_notifier.dart';
 import '../logging/app_logger.dart';
 import 'core_gateway.dart';
 import 'core_models.dart';
-import 'libbox_gateway.dart';
+import 'target_lib_gateway.dart';
 
 /// The native proxy core used by the application.
-final coreGatewayProvider = Provider<CoreGateway>((ref) => LibboxGateway());
+final coreGatewayProvider = Provider<CoreGateway>((ref) => TargetLibGateway());
 
 /// Immutable snapshot of the proxy core runtime.
 @immutable
 class CoreState {
   const CoreState({
     this.lifecycle = CoreLifecycle.unavailable,
-    this.message = 'Libbox is not initialized yet.',
+    this.message = 'TargetLib is not initialized yet.',
     this.settings = const AppSettings(),
     this.traffic = TrafficSnapshot.zero,
     this.connections = const [],
     this.proxyGroups = const [],
     this.busy = false,
     this.available = false,
-    this.backendName = 'Libbox',
+    this.backendName = 'TargetLib',
   });
 
   final CoreLifecycle lifecycle;
@@ -106,11 +105,6 @@ class CoreNotifier extends Notifier<CoreState> {
       return;
     }
     await _run(() => _gateway!.configure(settings));
-  }
-
-  Future<void> setProxyNodes(List<ProxyNode> nodes) async {
-    if (!state.available) return;
-    await _run(() => _gateway!.setProxyNodes(nodes));
   }
 
   Future<void> setRawConfig(String? config) async {
@@ -217,7 +211,6 @@ class CoreNotifier extends Notifier<CoreState> {
     state = state.copyWith(busy: true);
     try {
       await operation();
-      _applySnapshot(await _gateway!.current());
       AppLogger.info('Core $operationName completed');
     } on Object catch (error, stackTrace) {
       _setFailure(error, stackTrace, operationName: operationName);
@@ -233,7 +226,6 @@ class CoreNotifier extends Notifier<CoreState> {
     state = state.copyWith(busy: true);
     try {
       final value = await operation();
-      _applySnapshot(await _gateway!.current());
       AppLogger.info('Core $operationName completed');
       return value;
     } on Object catch (error, stackTrace) {

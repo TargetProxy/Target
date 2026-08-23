@@ -1,11 +1,10 @@
 import '../../data/models/app_settings.dart';
 import '../../data/models/ip_info.dart';
-import '../../data/models/proxy_node.dart';
 import 'core_models.dart';
 
 /// Stable app-facing boundary for the native proxy core.
 ///
-/// Widgets and feature controllers must not import libbox directly.
+/// Widgets and feature controllers must not import TargetLib directly.
 abstract class CoreGateway {
   String get name;
   bool get isAvailable;
@@ -13,7 +12,6 @@ abstract class CoreGateway {
 
   Future<CoreSnapshot> current();
   Future<void> configure(AppSettings settings);
-  Future<void> setProxyNodes(List<ProxyNode> nodes);
   Future<void> setRawConfig(String? config) async {}
   Future<void> start();
   Future<void> stop();
@@ -40,14 +38,14 @@ class CoreUnavailableException implements Exception {
   String toString() => message;
 }
 
-/// Explicit placeholder used when the libbox bridge is unavailable.
+/// Explicit placeholder used when the TargetLib bridge is unavailable.
 class UnavailableCoreGateway implements CoreGateway {
   const UnavailableCoreGateway();
 
-  static const _message = 'Libbox is not available.';
+  static const _message = 'TargetLib is not available.';
 
   @override
-  String get name => 'Libbox';
+  String get name => 'TargetLib';
 
   @override
   bool get isAvailable => false;
@@ -65,7 +63,6 @@ class UnavailableCoreGateway implements CoreGateway {
   Future<void> configure(AppSettings settings) => _unavailable();
 
   @override
-  Future<void> setProxyNodes(List<ProxyNode> nodes) => _unavailable();
 
   @override
   Future<void> setRawConfig(String? config) => _unavailable();

@@ -5,10 +5,6 @@ import '../logging/app_logger.dart';
 
 enum TargetLibServiceStatus { running, stopped, unknown, notInstalled }
 
-// Keep old name as alias for backward compatibility.
-typedef LibboxdServiceStatus = TargetLibServiceStatus;
-typedef LibboxdServiceResult = TargetLibServiceResult;
-
 class TargetLibServiceResult {
   const TargetLibServiceResult(this.status, {this.output = ''});
 
@@ -16,7 +12,7 @@ class TargetLibServiceResult {
   final String output;
 }
 
-/// Controls the standalone targetlib executable. This deliberately uses the
+/// Controls the standalone TargetLib executable. This deliberately uses the
 /// daemon's CLI so it works on Windows SCM and Linux systemd alike.
 class TargetLibServiceManager {
   TargetLibServiceManager([this._executablePath]);
@@ -42,22 +38,20 @@ class TargetLibServiceManager {
       ..._optional(_executablePath),
       '$baseDir${Platform.pathSeparator}TargetLib$exeSuffix',
       '$baseDir${Platform.pathSeparator}bin${Platform.pathSeparator}TargetLib$exeSuffix',
-      '$baseDir${Platform.pathSeparator}targetlibd$exeSuffix',
-      '$baseDir${Platform.pathSeparator}bin${Platform.pathSeparator}targetlibd$exeSuffix',
     ];
     for (final candidate in candidates) {
       if (await File(candidate).exists()) {
-        AppLogger.debug('Resolved executable: $candidate', source: 'targetlib');
+        AppLogger.debug('Resolved executable: $candidate', source: 'TargetLib');
         return candidate;
       }
     }
     AppLogger.error(
       'Executable not found; checked: ${candidates.join(', ')}',
-      source: 'targetlib',
+      source: 'TargetLib',
     );
     throw StateError(
       'TargetLib executable is not bundled with this application. '
-      'Rebuild the desktop target to copy it from the targetlib build output.',
+      'Rebuild the desktop target to copy it from the TargetLib build output.',
     );
   }
 
@@ -74,7 +68,7 @@ class TargetLibServiceManager {
         _cachedBasePath == basePath) {
       AppLogger.debug(
         'Using cached service status: ${_cachedStatus!.name}',
-        source: 'targetlib',
+        source: 'TargetLib',
       );
       return TargetLibServiceResult(_cachedStatus!);
     }
@@ -91,7 +85,7 @@ class TargetLibServiceManager {
       'Service action started: action=$action elevated=$effectiveElevated '
       'basePath=$basePath workingPath=${_displayOptional(workingPath)} '
       'tempPath=${_displayOptional(tempPath)} locale=${_displayOptional(locale)}',
-      source: 'targetlib',
+      source: 'TargetLib',
     );
     try {
       final executable = await resolveExecutable();
@@ -108,10 +102,10 @@ class TargetLibServiceManager {
       final stdout = result.stdout.toString().trim();
       final stderr = result.stderr.toString().trim();
       if (stdout.isNotEmpty) {
-        AppLogger.info('stdout:\n$stdout', source: 'targetlib');
+        AppLogger.info('stdout:\n$stdout', source: 'TargetLib');
       }
       if (stderr.isNotEmpty) {
-        AppLogger.warning('stderr:\n$stderr', source: 'targetlib');
+        AppLogger.warning('stderr:\n$stderr', source: 'TargetLib');
       }
       final output = [
         stdout,
@@ -120,7 +114,7 @@ class TargetLibServiceManager {
       AppLogger.info(
         'Service action exited: action=$action exitCode=${result.exitCode} '
         'elapsedMs=${stopwatch.elapsedMilliseconds}',
-        source: 'targetlib',
+        source: 'TargetLib',
       );
       if (result.exitCode != 0) {
         throw ProcessException(executable, args, output, result.exitCode);
@@ -146,7 +140,7 @@ class TargetLibServiceManager {
       AppLogger.error(
         'Service action failed: action=$action '
         'elapsedMs=${stopwatch.elapsedMilliseconds}',
-        source: 'targetlib',
+        source: 'TargetLib',
         error: error,
         stackTrace: stackTrace,
       );
@@ -166,7 +160,7 @@ class TargetLibServiceManager {
       'Service install+start started: basePath=$basePath '
       'workingPath=${_displayOptional(workingPath)} '
       'tempPath=${_displayOptional(tempPath)} locale=${_displayOptional(locale)}',
-      source: 'targetlib',
+      source: 'TargetLib',
     );
     try {
       final executable = await resolveExecutable();
@@ -188,10 +182,10 @@ class TargetLibServiceManager {
       final stdout = result.stdout.toString().trim();
       final stderr = result.stderr.toString().trim();
       if (stdout.isNotEmpty) {
-        AppLogger.info('stdout:\n$stdout', source: 'targetlib');
+        AppLogger.info('stdout:\n$stdout', source: 'TargetLib');
       }
       if (stderr.isNotEmpty) {
-        AppLogger.warning('stderr:\n$stderr', source: 'targetlib');
+        AppLogger.warning('stderr:\n$stderr', source: 'TargetLib');
       }
       final output = [
         stdout,
@@ -200,7 +194,7 @@ class TargetLibServiceManager {
       AppLogger.info(
         'Service install+start exited: exitCode=${result.exitCode} '
         'elapsedMs=${stopwatch.elapsedMilliseconds}',
-        source: 'targetlib',
+        source: 'TargetLib',
       );
       if (result.exitCode != 0) {
         throw ProcessException(
@@ -220,7 +214,7 @@ class TargetLibServiceManager {
       AppLogger.error(
         'Service install+start failed: '
         'elapsedMs=${stopwatch.elapsedMilliseconds}',
-        source: 'targetlib',
+        source: 'TargetLib',
         error: error,
         stackTrace: stackTrace,
       );
@@ -258,7 +252,7 @@ class TargetLibServiceManager {
     final nonce = '${pid}_${DateTime.now().microsecondsSinceEpoch}';
     final outputPath =
         '${Directory.systemTemp.path}${Platform.pathSeparator}'
-        'target_targetlib_$nonce.output.log';
+        'target_TargetLib_$nonce.output.log';
     // Pre-create the file so it is owned by the current (non-elevated) user;
     // the elevated process only overwrites its contents.
     await File(outputPath).create(recursive: true);
@@ -270,7 +264,7 @@ class TargetLibServiceManager {
     final encodedCommand = _encodePowerShellCommand(elevatedCommand);
     AppLogger.info(
       'Requesting Windows administrator privileges',
-      source: 'targetlib',
+      source: 'TargetLib',
     );
     final argList = _powershellQuote(
       '-NoProfile -NonInteractive -EncodedCommand $encodedCommand',
@@ -377,7 +371,7 @@ class TargetLibServiceManager {
     final stopwatch = Stopwatch()..start();
     AppLogger.info(
       'Querying service status via sc.exe (no elevation required)',
-      source: 'targetlib',
+      source: 'TargetLib',
     );
     try {
       final result = await Process.run('sc.exe', [
@@ -398,13 +392,13 @@ class TargetLibServiceManager {
       AppLogger.info(
         'Service status resolved: ${status.name} '
         '(elapsedMs=${stopwatch.elapsedMilliseconds})',
-        source: 'targetlib',
+        source: 'TargetLib',
       );
       return TargetLibServiceResult(status, output: output);
     } on Object catch (error, stackTrace) {
       AppLogger.error(
         'Service status query failed',
-        source: 'targetlib',
+        source: 'TargetLib',
         error: error,
         stackTrace: stackTrace,
       );
@@ -476,7 +470,7 @@ class TargetLibServiceManager {
       'Daemon launch started: basePath=$basePath '
       'workingPath=${_displayOptional(workingPath)} '
       'tempPath=${_displayOptional(tempPath)} locale=${_displayOptional(locale)}',
-      source: 'targetlib',
+      source: 'TargetLib',
     );
     try {
       final executable = await resolveExecutable();
@@ -493,13 +487,13 @@ class TargetLibServiceManager {
       final process = await Process.start(executable, args);
       AppLogger.info(
         'Daemon process started: pid=${process.pid}',
-        source: 'targetlib',
+        source: 'TargetLib',
       );
       return process;
     } on Object catch (error, stackTrace) {
       AppLogger.error(
         'Daemon launch failed',
-        source: 'targetlib',
+        source: 'TargetLib',
         error: error,
         stackTrace: stackTrace,
       );
@@ -523,6 +517,3 @@ class TargetLibServiceManager {
   String _displayOptional(String value) =>
       value.trim().isEmpty ? '<default>' : value;
 }
-
-// Backward-compatible aliases.
-typedef LibboxdServiceManager = TargetLibServiceManager;

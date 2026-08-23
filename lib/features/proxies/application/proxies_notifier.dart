@@ -163,8 +163,8 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
             .join(', ');
         state = state.copyWith(
           lastError: protocols.isEmpty
-              ? 'Libbox has no testable URLTest nodes. Add a subscription first.'
-              : 'Libbox has no testable URLTest nodes. '
+              ? 'TargetLib has no testable URLTest nodes. Add a subscription first.'
+              : 'TargetLib has no testable URLTest nodes. '
                     'Supported nodes found: $protocols.',
         );
         return;
@@ -210,7 +210,7 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
     );
     if (!testable) {
       state = state.copyWith(
-        lastError: 'This node is not part of a Libbox URLTest group.',
+        lastError: 'This node is not part of a TargetLib URLTest group.',
       );
       return;
     }

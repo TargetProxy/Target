@@ -490,10 +490,10 @@ class _ServiceInstallCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     checkFailed
-                        ? 'Unable to check Libbox service'
+                        ? 'Unable to check TargetLib service'
                         : installed
-                        ? 'Libbox service is stopped'
-                        : 'Install the Libbox service',
+                        ? 'TargetLib service is stopped'
+                        : 'Install the TargetLib service',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
@@ -503,8 +503,8 @@ class _ServiceInstallCard extends StatelessWidget {
             Text(
               (checkFailed ? error : null) ??
                   (installed
-                      ? 'Start the registered service to make targetlib available.'
-                      : 'Administrator permission is required to register targetlib with the operating system.'),
+                      ? 'Start the registered service to make TargetLib available.'
+                      : 'Administrator permission is required to register TargetLib with the operating system.'),
               style: TextStyle(color: scheme.onSecondaryContainer),
             ),
             const SizedBox(height: 12),

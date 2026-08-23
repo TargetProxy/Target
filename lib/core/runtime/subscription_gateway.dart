@@ -1,5 +1,15 @@
 import '../../data/models/proxy_node.dart';
 
+class RuntimeSubscriptionSnapshot {
+  const RuntimeSubscriptionSnapshot({
+    required this.subscriptions,
+    required this.activeId,
+  });
+
+  final List<RuntimeSubscription> subscriptions;
+  final String? activeId;
+}
+
 enum RuntimeSubscriptionStatus { idle, updating, ready, failed }
 
 class RuntimeSubscription {
@@ -63,7 +73,7 @@ class RuntimeSubscriptionUpdate {
 abstract interface class SubscriptionGateway {
   Stream<void> get subscriptionChanges;
 
-  Future<List<RuntimeSubscription>> listSubscriptions();
+  Future<RuntimeSubscriptionSnapshot> listSubscriptions();
 
   Future<RuntimeSubscription> addSubscription({
     required String id,
@@ -73,15 +83,14 @@ abstract interface class SubscriptionGateway {
     required bool autoUpdate,
     required int updateIntervalSeconds,
     required Map<String, String> headers,
+    bool activate = false,
+    bool updateNow = false,
   });
 
   Future<void> removeSubscription(String id);
   Future<RuntimeSubscription> renameSubscription(String id, String name);
-  Future<RuntimeSubscription> setSubscriptionEnabled(String id, bool enabled);
   Future<RuntimeSubscriptionUpdate> updateSubscription(String id);
 
-  /// Selects the subscription used by TargetLib BuildConfig. The state is
-  /// persisted by the backend; [activeSubscriptionId] reads it back.
+  /// Selects the subscription used by TargetLib BuildConfig.
   Future<void> activateSubscription(String? id);
-  Future<String?> activeSubscriptionId();
 }

@@ -16,7 +16,7 @@ class AppStoragePaths {
   Directory get coreDirectory =>
       Directory('${root.path}${Platform.pathSeparator}core');
 
-  /// Persistent cache file for sing-box / libbox cache_file experimental.
+  /// Persistent cache file for sing-box / TargetLib cache_file experimental.
   File get cacheFile =>
       File('${coreDirectory.path}${Platform.pathSeparator}cache.db');
 
@@ -140,7 +140,7 @@ class AppStoragePaths {
     return Directory.systemTemp;
   }
 
-  /// Helper for libbox working/cache locations that prefer the support dir.
+  /// Helper for TargetLib working/cache locations that prefer the support dir.
   static Future<Directory> resolveCacheDirectory() async {
     try {
       final cache = await getApplicationCacheDirectory();

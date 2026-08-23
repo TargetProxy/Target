@@ -9,10 +9,10 @@ commands, and logs.
 - Flutter UI: available
 - Settings persistence: available
 - TargetLib subscription persistence, parsing, scheduling, and proxy catalog: available
-- Libbox runtime lifecycle: available through FFI and gRPC
+- TargetLib runtime lifecycle: available through FFI and gRPC
 - Runtime metrics, connections, events, and outbound groups: available
 - Active URLTest triggering and refreshed latency results: available
-- Libbox logs: streamed through the authenticated gRPC command server
+- TargetLib logs: streamed through the authenticated gRPC command server
 - GitHub Actions: intentionally removed
 
 ## Architecture

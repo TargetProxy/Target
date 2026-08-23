@@ -25,8 +25,8 @@ import 'grpc/generated/api/TargetLib/targetlib.pbgrpc.dart' hide ProxyMode;
 import 'subscription_gateway.dart';
 import 'target_lib_service_manager.dart';
 
-class LibboxGateway implements CoreGateway, SubscriptionGateway {
-  LibboxGateway({AppStoragePaths? storagePaths, Directory? workingDirectory})
+class TargetLibGateway implements CoreGateway, SubscriptionGateway {
+  TargetLibGateway({AppStoragePaths? storagePaths, Directory? workingDirectory})
     : _injectedPaths = storagePaths,
       _workingDirectory = workingDirectory;
 
@@ -59,12 +59,12 @@ class LibboxGateway implements CoreGateway, SubscriptionGateway {
   Future<void> _lifecycleTail = Future<void>.value();
   CoreSnapshot _current = const CoreSnapshot(
     lifecycle: CoreLifecycle.stopped,
-    message: 'Libbox is ready.',
+    message: 'TargetLib is ready.',
   );
   bool _disposed = false;
 
   @override
-  String get name => 'Libbox';
+  String get name => 'TargetLib';
 
   @override
   bool get isAvailable =>
@@ -99,8 +99,8 @@ class LibboxGateway implements CoreGateway, SubscriptionGateway {
         message: state.errorMessage.isNotEmpty
             ? state.errorMessage
             : lifecycle == CoreLifecycle.running
-            ? 'Libbox is running.'
-            : 'Libbox is stopped.',
+            ? 'TargetLib is running.'
+            : 'TargetLib is stopped.',
       ),
     );
     return _current;
@@ -113,12 +113,6 @@ class LibboxGateway implements CoreGateway, SubscriptionGateway {
   });
 
   @override
-  Future<void> setProxyNodes(List<ProxyNode> nodes) => _serialize(() async {
-    _rawConfig = null;
-    await _clearActiveSubscription();
-    await _reloadIfRunning();
-  });
-
   @override
   Future<void> setRawConfig(String? config) => _serialize(() async {
     _rawConfig = config?.trim().isEmpty == true ? null : config?.trim();
@@ -134,7 +128,7 @@ class LibboxGateway implements CoreGateway, SubscriptionGateway {
     _publish(
       _copyCurrent(
         lifecycle: CoreLifecycle.starting,
-        message: 'Starting Libbox...',
+        message: 'Starting TargetLib...',
       ),
     );
     try {
@@ -151,7 +145,7 @@ class LibboxGateway implements CoreGateway, SubscriptionGateway {
       _publish(
         _copyCurrent(
           lifecycle: CoreLifecycle.running,
-          message: 'Libbox is running.',
+          message: 'TargetLib is running.',
         ),
       );
     } on Object {
@@ -199,13 +193,16 @@ class LibboxGateway implements CoreGateway, SubscriptionGateway {
   }
 
   @override
-  Future<List<RuntimeSubscription>> listSubscriptions() => _serialize(() async {
+  Future<RuntimeSubscriptionSnapshot> listSubscriptions() => _serialize(() async {
     await _ensureConnected();
     final result = await _manager!.listSubscriptions(
       Empty(),
       options: _callOptions,
     );
-    return result.subscriptions.map(_runtimeSubscription).toList();
+    return RuntimeSubscriptionSnapshot(
+      subscriptions: result.subscriptions.map(_runtimeSubscription).toList(),
+      activeId: result.activeId.isEmpty ? null : result.activeId,
+    );
   });
 
   @override
@@ -217,6 +214,8 @@ class LibboxGateway implements CoreGateway, SubscriptionGateway {
     required bool autoUpdate,
     required int updateIntervalSeconds,
     required Map<String, String> headers,
+    bool activate = false,
+    bool updateNow = false,
   }) => _serialize(() async {
     await _ensureConnected();
     final view = await _manager!.addSubscription(
@@ -228,6 +227,8 @@ class LibboxGateway implements CoreGateway, SubscriptionGateway {
         autoUpdate: autoUpdate,
         updateIntervalSeconds: Int64(updateIntervalSeconds),
         headers: headers.entries,
+        activate: activate,
+        updateNow: updateNow,
       ),
       options: _callOptions,
     );
@@ -241,9 +242,6 @@ class LibboxGateway implements CoreGateway, SubscriptionGateway {
       targetlib_pb.SubscriptionId(id: id),
       options: _callOptions,
     );
-    // The backend clears its persisted active state when the active
-    // subscription is removed; just reload to pick up the fallback.
-    await _reloadIfRunning();
   });
 
   @override
@@ -258,17 +256,6 @@ class LibboxGateway implements CoreGateway, SubscriptionGateway {
       });
 
   @override
-  Future<RuntimeSubscription> setSubscriptionEnabled(String id, bool enabled) =>
-      _serialize(() async {
-        await _ensureConnected();
-        final view = await _manager!.setSubscriptionEnabled(
-          targetlib_pb.SetSubscriptionEnabledRequest(id: id, enabled: enabled),
-          options: _callOptions,
-        );
-        return _runtimeSubscription(view);
-      });
-
-  @override
   Future<RuntimeSubscriptionUpdate> updateSubscription(String id) =>
       _serialize(() async {
         await _ensureConnected();
@@ -276,8 +263,6 @@ class LibboxGateway implements CoreGateway, SubscriptionGateway {
           targetlib_pb.SubscriptionId(id: id),
           options: _callOptions,
         );
-        final activeId = await _activeSubscriptionIdLocked();
-        if (activeId == id) await _reloadIfRunning();
         return RuntimeSubscriptionUpdate(
           subscription: _runtimeSubscription(result.subscription),
           changed: result.changed,
@@ -295,22 +280,7 @@ class LibboxGateway implements CoreGateway, SubscriptionGateway {
       options: _callOptions,
     );
     if (normalized != null) _rawConfig = null;
-    await _reloadIfRunning();
   });
-
-  @override
-  Future<String?> activeSubscriptionId() =>
-      _serialize(_activeSubscriptionIdLocked);
-
-  Future<String?> _activeSubscriptionIdLocked() async {
-    final manager = _manager;
-    if (manager == null) return null;
-    final response = await manager.getActiveSubscription(
-      Empty(),
-      options: _callOptions,
-    );
-    return response.id.isEmpty ? null : response.id;
-  }
 
   Future<void> _clearActiveSubscription() async {
     final manager = _manager;
@@ -403,7 +373,7 @@ class LibboxGateway implements CoreGateway, SubscriptionGateway {
       _publish(
         _copyCurrent(
           lifecycle: CoreLifecycle.stopped,
-          message: 'Libbox is stopped.',
+          message: 'TargetLib is stopped.',
         ),
       );
       return;
@@ -411,7 +381,7 @@ class LibboxGateway implements CoreGateway, SubscriptionGateway {
     _publish(
       _copyCurrent(
         lifecycle: CoreLifecycle.stopping,
-        message: 'Stopping Libbox...',
+        message: 'Stopping TargetLib...',
       ),
     );
     await manager.stop(Empty(), options: _callOptions);
@@ -420,7 +390,7 @@ class LibboxGateway implements CoreGateway, SubscriptionGateway {
     _publish(
       const CoreSnapshot(
         lifecycle: CoreLifecycle.stopped,
-        message: 'Libbox is stopped.',
+        message: 'TargetLib is stopped.',
       ),
     );
   }
@@ -442,7 +412,7 @@ class LibboxGateway implements CoreGateway, SubscriptionGateway {
     final manager = _manager;
     if (manager == null) {
       throw const CoreUnavailableException(
-        'Start Libbox before testing latency.',
+        'Start TargetLib before testing latency.',
       );
     }
     final result = _coreLatencyResult(
@@ -465,7 +435,7 @@ class LibboxGateway implements CoreGateway, SubscriptionGateway {
     final manager = _manager;
     if (manager == null) {
       throw const CoreUnavailableException(
-        'Start Libbox before testing latency.',
+        'Start TargetLib before testing latency.',
       );
     }
     final stream = manager.testOutbounds(
@@ -566,8 +536,8 @@ class LibboxGateway implements CoreGateway, SubscriptionGateway {
       await base.create(recursive: true);
     } on Object catch (error, stackTrace) {
       AppLogger.warning(
-        'Failed to create libbox base directory',
-        source: 'libbox',
+        'Failed to create TargetLib base directory',
+        source: 'TargetLib',
         error: error,
         stackTrace: stackTrace,
       );
@@ -578,7 +548,7 @@ class LibboxGateway implements CoreGateway, SubscriptionGateway {
   Future<String> _resolveWorkingPath() async {
     final override = _settings.serviceWorkingPath.trim();
     if (override.isNotEmpty) return override;
-    // When no override is set, let targetlib default to basePath.
+    // When no override is set, let TargetLib default to basePath.
     // Return empty so TargetLibServiceManager skips the flag.
     return '';
   }
@@ -586,7 +556,7 @@ class LibboxGateway implements CoreGateway, SubscriptionGateway {
   Future<String> _resolveTempPath() async {
     final override = _settings.serviceTempPath.trim();
     if (override.isNotEmpty) return override;
-    // Prefer path_provider's cache/temp directory as libbox scratch space.
+    // Prefer path_provider's cache/temp directory as TargetLib scratch space.
     try {
       final cacheDir = await getApplicationCacheDirectory();
       if (cacheDir.path.trim().isNotEmpty) {
@@ -609,7 +579,7 @@ class LibboxGateway implements CoreGateway, SubscriptionGateway {
     } on Object catch (error, stackTrace) {
       AppLogger.warning(
         'path_provider temp resolve failed',
-        source: 'libbox',
+        source: 'TargetLib',
         error: error,
         stackTrace: stackTrace,
       );
@@ -626,8 +596,8 @@ class LibboxGateway implements CoreGateway, SubscriptionGateway {
     final workingPath = await _resolveWorkingPath();
     final tempPath = await _resolveTempPath();
     AppLogger.info(
-      'Launching targetlib base=$baseDir working=$workingPath temp=$tempPath',
-      source: 'targetlib',
+      'Launching TargetLib base=$baseDir working=$workingPath temp=$tempPath',
+      source: 'TargetLib',
     );
     _daemonProcess = await _serviceManager.launch(
       basePath: baseDir.path,
@@ -677,7 +647,7 @@ class LibboxGateway implements CoreGateway, SubscriptionGateway {
     } on Object {
       // Preserve the handshake error, which is the useful failure here.
     }
-    throw StateError('Libbox command server did not become ready: $lastError');
+    throw StateError('TargetLib command server did not become ready: $lastError');
   }
 
   void _subscribeCommandStreams() {
@@ -716,7 +686,7 @@ class LibboxGateway implements CoreGateway, SubscriptionGateway {
       onError: (Object error, StackTrace stackTrace) {
         if (_manager != null && !_disposed) {
           AppLogger.warning(
-            'Libbox gRPC stream failed',
+            'TargetLib gRPC stream failed',
             error: error,
             stackTrace: stackTrace,
           );
@@ -744,7 +714,7 @@ class LibboxGateway implements CoreGateway, SubscriptionGateway {
         message: status.errorMessage.isNotEmpty
             ? status.errorMessage
             : lifecycle == CoreLifecycle.running
-            ? 'Libbox is running.'
+            ? 'TargetLib is running.'
             : _current.message,
       ),
     );
@@ -867,7 +837,7 @@ class LibboxGateway implements CoreGateway, SubscriptionGateway {
   StartedServiceClient _requireDaemon(String operation) {
     final daemon = _daemon;
     if (daemon == null) {
-      throw CoreUnavailableException('Start Libbox before $operation.');
+      throw CoreUnavailableException('Start TargetLib before $operation.');
     }
     return daemon;
   }
@@ -913,7 +883,7 @@ class LibboxGateway implements CoreGateway, SubscriptionGateway {
   void _ensureAvailable() {
     if (!isAvailable) {
       throw const CoreUnavailableException(
-        'Libbox is supported on Windows, Linux, and macOS.',
+        'TargetLib is supported on Windows, Linux, and macOS.',
       );
     }
   }

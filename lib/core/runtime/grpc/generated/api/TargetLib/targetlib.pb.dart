@@ -672,6 +672,8 @@ class AddSubscriptionRequest extends $pb.GeneratedMessage {
     $core.bool? autoUpdate,
     $fixnum.Int64? updateIntervalSeconds,
     $core.Iterable<$core.MapEntry<$core.String, $core.String>>? headers,
+    $core.bool? activate,
+    $core.bool? updateNow,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -682,6 +684,8 @@ class AddSubscriptionRequest extends $pb.GeneratedMessage {
     if (updateIntervalSeconds != null)
       result.updateIntervalSeconds = updateIntervalSeconds;
     if (headers != null) result.headers.addEntries(headers);
+    if (activate != null) result.activate = activate;
+    if (updateNow != null) result.updateNow = updateNow;
     return result;
   }
 
@@ -709,6 +713,8 @@ class AddSubscriptionRequest extends $pb.GeneratedMessage {
         keyFieldType: $pb.PbFieldType.OS,
         valueFieldType: $pb.PbFieldType.OS,
         packageName: const $pb.PackageName('targetlib'))
+    ..aOB(8, _omitFieldNames ? '' : 'activate')
+    ..aOB(9, _omitFieldNames ? '' : 'updateNow')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -787,6 +793,24 @@ class AddSubscriptionRequest extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(7)
   $pb.PbMap<$core.String, $core.String> get headers => $_getMap(6);
+
+  @$pb.TagNumber(8)
+  $core.bool get activate => $_getBF(7);
+  @$pb.TagNumber(8)
+  set activate($core.bool value) => $_setBool(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasActivate() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearActivate() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.bool get updateNow => $_getBF(8);
+  @$pb.TagNumber(9)
+  set updateNow($core.bool value) => $_setBool(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasUpdateNow() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearUpdateNow() => $_clearField(9);
 }
 
 class RenameSubscriptionRequest extends $pb.GeneratedMessage {
@@ -1067,9 +1091,11 @@ class ResolvedEndpointsRequest extends $pb.GeneratedMessage {
 class SubscriptionList extends $pb.GeneratedMessage {
   factory SubscriptionList({
     $core.Iterable<SubscriptionView>? subscriptions,
+    $core.String? activeId,
   }) {
     final result = create();
     if (subscriptions != null) result.subscriptions.addAll(subscriptions);
+    if (activeId != null) result.activeId = activeId;
     return result;
   }
 
@@ -1088,6 +1114,7 @@ class SubscriptionList extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..pPM<SubscriptionView>(1, _omitFieldNames ? '' : 'subscriptions',
         subBuilder: SubscriptionView.create)
+    ..aOS(2, _omitFieldNames ? '' : 'activeId')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1111,6 +1138,15 @@ class SubscriptionList extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(1)
   $pb.PbList<SubscriptionView> get subscriptions => $_getList(0);
+
+  @$pb.TagNumber(2)
+  $core.String get activeId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set activeId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasActiveId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearActiveId() => $_clearField(2);
 }
 
 class SubscriptionView extends $pb.GeneratedMessage {
