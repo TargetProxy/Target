@@ -5,6 +5,10 @@ import 'package:path_provider/path_provider.dart';
 import '../../app/app_identity.dart';
 import '../../core/logging/app_logger.dart';
 
+/// Returns the canonical application support directory.
+// ignore: non_constant_identifier_names
+Future<Directory> SupportDirectory() => AppStoragePaths._resolveRootDirectory();
+
 class AppStoragePaths {
   const AppStoragePaths._(this.root);
 

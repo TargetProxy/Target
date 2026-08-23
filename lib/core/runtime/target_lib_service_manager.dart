@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../logging/app_logger.dart';
+import '../../data/storage/app_storage_paths.dart';
 
 enum TargetLibServiceStatus { running, stopped, unknown, notInstalled }
 
@@ -39,20 +40,47 @@ class TargetLibServiceManager {
       '$baseDir${Platform.pathSeparator}TargetLib$exeSuffix',
       '$baseDir${Platform.pathSeparator}bin${Platform.pathSeparator}TargetLib$exeSuffix',
     ];
+    String? bundled;
     for (final candidate in candidates) {
       if (await File(candidate).exists()) {
-        AppLogger.debug('Resolved executable: $candidate', source: 'TargetLib');
-        return candidate;
+        bundled = candidate;
+        break;
       }
     }
-    AppLogger.error(
-      'Executable not found; checked: ${candidates.join(', ')}',
-      source: 'TargetLib',
+    if (bundled == null) {
+      throw StateError(
+        'TargetLib executable is not bundled with this application. '
+        'Rebuild the desktop target to include TargetLib$exeSuffix.',
+      );
+    }
+    final support = await SupportDirectory();
+    final targetDir = Directory(
+      '${support.path}${Platform.pathSeparator}TargetLib${Platform.pathSeparator}bin',
     );
-    throw StateError(
-      'TargetLib executable is not bundled with this application. '
-      'Rebuild the desktop target to copy it from the TargetLib build output.',
+    await targetDir.create(recursive: true);
+    final target = File(
+      '${targetDir.path}${Platform.pathSeparator}TargetLib$exeSuffix',
     );
+    final source = File(bundled);
+    final sourceStat = await source.stat();
+    final stamp = File('${target.path}.version');
+    final expectedStamp =
+        '${sourceStat.size}:${sourceStat.modified.microsecondsSinceEpoch}';
+    final currentStamp = await stamp.exists() ? await stamp.readAsString() : '';
+    if (!await target.exists() || currentStamp != expectedStamp) {
+      final temporary = File('${target.path}.new');
+      await source.copy(temporary.path);
+      try {
+        if (await target.exists()) await target.delete();
+        await temporary.rename(target.path);
+        await stamp.writeAsString(expectedStamp, flush: true);
+      } catch (_) {
+        if (await temporary.exists()) await temporary.delete();
+        rethrow;
+      }
+    }
+    AppLogger.debug('Resolved executable: ${target.path}', source: 'TargetLib');
+    return target.path;
   }
 
   Future<TargetLibServiceResult> run(

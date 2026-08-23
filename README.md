@@ -30,8 +30,10 @@ Flutter widgets
 ```
 
 `CoreGateway` keeps widgets independent from generated protobuf and process
-management code. Build the sibling `../TargetLib` checkout before packaging;
-the Windows build copies `../TargetLib/build/TargetLib.exe` beside the app.
+management code. Build the sibling `../TargetLib` checkout before packaging.
+The Windows build bundles `TargetLib.exe` beside the Flutter executable; on
+first use, Target copies it to the `path_provider` application support
+directory and runs that managed copy.
 
 ## Run
 
