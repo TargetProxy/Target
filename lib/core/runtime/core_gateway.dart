@@ -69,11 +69,10 @@ class UnavailableCoreGateway implements CoreGateway {
   Stream<CoreSnapshot> get snapshots => const Stream.empty();
 
   @override
-  Future<CoreSnapshot> current() async =>
-      const CoreSnapshot(
-        lifecycle: CoreLifecycle.unavailable,
-        message: _message,
-      );
+  Future<CoreSnapshot> current() async => const CoreSnapshot(
+    lifecycle: CoreLifecycle.unavailable,
+    message: _message,
+  );
 
   @override
   Future<void> configure(AppSettings settings) => _unavailable();

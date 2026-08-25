@@ -63,7 +63,7 @@ import 'app_localizations_zh.dart';
 /// property.
 abstract class AppLocalizations {
   AppLocalizations(String locale)
-      : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -72,7 +72,7 @@ abstract class AppLocalizations {
   }
 
   static const LocalizationsDelegate<AppLocalizations> delegate =
-  _AppLocalizationsDelegate();
+      _AppLocalizationsDelegate();
 
   /// A list of this localizations delegate along with the default localizations
   /// delegates.
@@ -85,12 +85,12 @@ abstract class AppLocalizations {
   /// MaterialApp. This list does not have to be used at all if a custom list
   /// of delegates is preferred or required.
   static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
-  <LocalizationsDelegate<dynamic>>[
-    delegate,
-    GlobalMaterialLocalizations.delegate,
-    GlobalCupertinoLocalizations.delegate,
-    GlobalWidgetsLocalizations.delegate,
-  ];
+      <LocalizationsDelegate<dynamic>>[
+        delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ];
 
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
@@ -134,11 +134,149 @@ abstract class AppLocalizations {
   /// **'Traffic'**
   String get traffic;
 
+  /// No description provided for @trafficSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Live throughput and runtime activity.'**
+  String get trafficSubtitle;
+
+  /// No description provided for @liveTraffic.
+  ///
+  /// In en, this message translates to:
+  /// **'Live traffic'**
+  String get liveTraffic;
+
+  /// No description provided for @upload.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload'**
+  String get upload;
+
+  /// No description provided for @download.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get download;
+
+  /// No description provided for @uploadRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload rate'**
+  String get uploadRate;
+
+  /// No description provided for @downloadRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Download rate'**
+  String get downloadRate;
+
+  /// No description provided for @activeConnections.
+  ///
+  /// In en, this message translates to:
+  /// **'Active connections'**
+  String get activeConnections;
+
+  /// No description provided for @running.
+  ///
+  /// In en, this message translates to:
+  /// **'Running'**
+  String get running;
+
+  /// No description provided for @stopped.
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped'**
+  String get stopped;
+
   /// No description provided for @logs.
   ///
   /// In en, this message translates to:
   /// **'Logs'**
   String get logs;
+
+  /// No description provided for @nodeMap.
+  ///
+  /// In en, this message translates to:
+  /// **'Node map'**
+  String get nodeMap;
+
+  /// No description provided for @mapSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{regionCount} regions · {nodeCount} nodes'**
+  String mapSummary(int regionCount, int nodeCount);
+
+  /// No description provided for @proxyNodeWorldMap.
+  ///
+  /// In en, this message translates to:
+  /// **'World map of proxy nodes'**
+  String get proxyNodeWorldMap;
+
+  /// No description provided for @zoomIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom in'**
+  String get zoomIn;
+
+  /// No description provided for @zoomOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom out'**
+  String get zoomOut;
+
+  /// No description provided for @fitMapToNodes.
+  ///
+  /// In en, this message translates to:
+  /// **'Fit map to nodes'**
+  String get fitMapToNodes;
+
+  /// No description provided for @countryMarkerNodeCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{countryCode} · {nodeCount, plural, =1{1 node} other{{nodeCount} nodes}}'**
+  String countryMarkerNodeCount(String countryCode, int nodeCount);
+
+  /// No description provided for @outboundPolicy.
+  ///
+  /// In en, this message translates to:
+  /// **'Outbound policy'**
+  String get outboundPolicy;
+
+  /// No description provided for @testLatency.
+  ///
+  /// In en, this message translates to:
+  /// **'Test latency'**
+  String get testLatency;
+
+  /// No description provided for @selectCountry.
+  ///
+  /// In en, this message translates to:
+  /// **'Select country'**
+  String get selectCountry;
+
+  /// No description provided for @countryCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Countries · {count}'**
+  String countryCount(int count);
+
+  /// No description provided for @selectionSavedForNextCoreStart.
+  ///
+  /// In en, this message translates to:
+  /// **'The saved selection will be used the next time the core starts.'**
+  String get selectionSavedForNextCoreStart;
+
+  /// No description provided for @noOutboundGroupsAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'No outbound groups are available.'**
+  String get noOutboundGroupsAvailable;
+
+  /// No description provided for @groupMembers.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 member} other{{count} members}} · {type}'**
+  String groupMembers(int count, String type);
 }
 
 class _AppLocalizationsDelegate
@@ -169,8 +307,8 @@ AppLocalizations lookupAppLocalizations(Locale locale) {
 
   throw FlutterError(
     'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
-        'an issue with the localizations generation tool. Please file an issue '
-        'on GitHub with a reproducible sample app and the gen-l10n configuration '
-        'that was used.',
+    'an issue with the localizations generation tool. Please file an issue '
+    'on GitHub with a reproducible sample app and the gen-l10n configuration '
+    'that was used.',
   );
 }

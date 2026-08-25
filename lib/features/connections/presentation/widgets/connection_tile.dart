@@ -61,9 +61,9 @@ class ConnectionTile extends StatelessWidget {
                       onPressed: closing ? null : onClose,
                       icon: closing
                           ? const SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
+                              dimension: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
                           : const Icon(Icons.close, size: 18),
                       tooltip: 'Close connection',
                       visualDensity: VisualDensity.compact,
@@ -111,9 +111,7 @@ class ConnectionTile extends StatelessWidget {
     if (createdAt <= 0) return '';
     final end = closedAt > 0
         ? closedAt
-        : DateTime
-        .now()
-        .millisecondsSinceEpoch ~/ 1000;
+        : DateTime.now().millisecondsSinceEpoch ~/ 1000;
     final seconds = end - createdAt;
     if (seconds < 0) return '';
     if (seconds < 60) return '${seconds}s';

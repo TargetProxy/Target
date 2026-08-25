@@ -48,17 +48,16 @@ class ProxyNode {
     );
   }
 
-  Map<String, dynamic> toJson() =>
-      {
-        'id': id,
-        'name': name,
-        'type': type,
-        'countryCode': countryCode,
-        'latencyMs': latencyMs,
-        'isSelected': isSelected,
-        'isAvailable': isAvailable,
-        'metadata': metadata,
-      };
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'type': type,
+    'countryCode': countryCode,
+    'latencyMs': latencyMs,
+    'isSelected': isSelected,
+    'isAvailable': isAvailable,
+    'metadata': metadata,
+  };
 
   factory ProxyNode.fromJson(Map<String, dynamic> json) {
     return ProxyNode(

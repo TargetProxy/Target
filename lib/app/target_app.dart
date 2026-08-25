@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/theme/app_theme.dart';
+import '../core/platform/app_platform.dart';
 import '../core/runtime/core_gateway.dart';
 import '../core/runtime/core_notifier.dart';
 import '../data/models/app_settings.dart';
@@ -19,12 +20,14 @@ import '../l10n/app_localizations.dart';
 class TargetApp extends StatelessWidget {
   const TargetApp({
     super.key,
+    this.capabilities,
     this.coreGateway,
     this.initialSettings,
     this.settingsStore,
   });
 
   final CoreGateway? coreGateway;
+  final AppCapabilities? capabilities;
   final AppSettings? initialSettings;
   final AppSettingsStore? settingsStore;
 
@@ -32,6 +35,8 @@ class TargetApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return ProviderScope(
       overrides: [
+        if (capabilities != null)
+          appCapabilitiesProvider.overrideWithValue(capabilities!),
         if (coreGateway != null)
           coreGatewayProvider.overrideWithValue(coreGateway!),
         if (initialSettings != null)
@@ -53,31 +58,36 @@ class _TargetAppView extends ConsumerStatefulWidget {
 
 class _TargetAppViewState extends ConsumerState<_TargetAppView> {
   late final AppRouter _appRouter = AppRouter();
-  late final DesktopTrayController _trayController = DesktopTrayController(
-    onToggleConnection: _toggleConnection,
-    onExit: _prepareExit,
-  );
+  DesktopTrayController? _trayController;
 
   @override
   void initState() {
     super.initState();
     ref.read(subscriptionsProvider.notifier).load();
-    unawaited(_trayController.initialize(ref.read(coreProvider)));
+    if (ref.read(appCapabilitiesProvider).supportsTray) {
+      final controller = DesktopTrayController(
+        onToggleConnection: _toggleConnection,
+        onExit: _prepareExit,
+      );
+      _trayController = controller;
+      unawaited(controller.initialize(ref.read(coreProvider)));
+    }
   }
 
   @override
   void dispose() {
-    _trayController.dispose();
+    _trayController?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final settings = ref
-        .watch(settingsProvider)
-        .settings;
+    final settings = ref.watch(settingsProvider).settings;
     ref.listen<CoreState>(coreProvider, (_, next) {
-      unawaited(_trayController.updateCoreState(next));
+      final controller = _trayController;
+      if (controller != null) {
+        unawaited(controller.updateCoreState(next));
+      }
     });
 
     return MaterialApp.router(
@@ -112,9 +122,7 @@ class _TargetAppViewState extends ConsumerState<_TargetAppView> {
 
   Future<void> _toggleConnection() async {
     final notifier = ref.read(coreProvider.notifier);
-    if (ref
-        .read(coreProvider)
-        .running) {
+    if (ref.read(coreProvider).running) {
       await notifier.stop();
     } else {
       await notifier.start();

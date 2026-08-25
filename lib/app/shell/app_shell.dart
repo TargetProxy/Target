@@ -130,15 +130,14 @@ class _DesktopSidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context);
-    Widget item(int index, String label, IconData icon) =>
-        ListTile(
-          dense: true,
-          selected: selectedIndex == index,
-          leading: Icon(icon, size: 20),
-          title: Text(label),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          onTap: () => onSelect(index),
-        );
+    Widget item(int index, String label, IconData icon) => ListTile(
+      dense: true,
+      selected: selectedIndex == index,
+      leading: Icon(icon, size: 20),
+      title: Text(label),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      onTap: () => onSelect(index),
+    );
     return Material(
       color: theme.colorScheme.surface,
       child: SizedBox(
@@ -180,9 +179,7 @@ class _BrandMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme
-        .of(context)
-        .colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Tooltip(
       message: AppIdentity.displayName,

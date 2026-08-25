@@ -10,15 +10,10 @@ class DesktopSingleInstance {
 
   static const _lockFileName = '${AppIdentity.bundleIdentifier}.lock';
 
-  static bool get isSupported =>
-      Platform.isWindows || Platform.isMacOS || Platform.isLinux;
-
   /// Acquires the application-wide desktop lock. A false result means the
   /// native plugin has activated the existing instance and this process must
   /// exit before initializing application services.
   static Future<bool> acquire() async {
-    if (!isSupported) return true;
-
     final canRun = await FlutterAlone.instance.checkAndRun(
       config: _configForCurrentPlatform(),
     );
@@ -32,7 +27,6 @@ class DesktopSingleInstance {
   }
 
   static Future<void> release() async {
-    if (!isSupported) return;
     await FlutterAlone.instance.dispose();
   }
 

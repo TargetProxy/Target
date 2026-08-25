@@ -17,7 +17,7 @@ class QuickActionsGrid extends StatelessWidget {
   final VoidCallback onTestLatency;
   final VoidCallback onRefreshRuleSets;
   final VoidCallback onCloseConnections;
-  final VoidCallback onReinstallService;
+  final VoidCallback? onReinstallService;
   final bool enabled;
 
   @override
@@ -30,13 +30,9 @@ class QuickActionsGrid extends StatelessWidget {
           children: [
             Text(
               'Quick Actions',
-              style: Theme
-                  .of(
+              style: Theme.of(
                 context,
-              )
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w700),
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: AppSpacing.itemGap),
             Row(
@@ -96,14 +92,16 @@ class QuickActionsGrid extends StatelessWidget {
                     onTap: () => context.go(AppRoute.logs.path),
                   ),
                 ),
-                const SizedBox(width: AppSpacing.smallGap),
-                Expanded(
-                  child: _QuickAction(
-                    icon: Icons.sync_lock_outlined,
-                    label: 'Reinstall Service',
-                    onTap: onReinstallService,
+                if (onReinstallService != null) ...[
+                  const SizedBox(width: AppSpacing.smallGap),
+                  Expanded(
+                    child: _QuickAction(
+                      icon: Icons.sync_lock_outlined,
+                      label: 'Reinstall Service',
+                      onTap: onReinstallService,
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ],
@@ -136,10 +134,7 @@ class _QuickAction extends StatelessWidget {
         children: [
           Icon(icon, size: 20),
           const SizedBox(height: 4),
-          Text(label, style: Theme
-              .of(context)
-              .textTheme
-              .labelSmall),
+          Text(label, style: Theme.of(context).textTheme.labelSmall),
         ],
       ),
     );

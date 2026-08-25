@@ -5,12 +5,11 @@ enum ThemeModeOption {
   light,
   dark;
 
-  String get label =>
-      switch (this) {
-        ThemeModeOption.system => 'System',
-        ThemeModeOption.light => 'Light',
-        ThemeModeOption.dark => 'Dark',
-      };
+  String get label => switch (this) {
+    ThemeModeOption.system => 'System',
+    ThemeModeOption.light => 'Light',
+    ThemeModeOption.dark => 'Dark',
+  };
 }
 
 extension ThemeModeOptionParsing on ThemeModeOption {
@@ -28,11 +27,10 @@ enum ProxyMode {
   mixed,
   tun;
 
-  String get label =>
-      switch (this) {
-        ProxyMode.mixed => 'Mixed',
-        ProxyMode.tun => 'TUN',
-      };
+  String get label => switch (this) {
+    ProxyMode.mixed => 'Mixed',
+    ProxyMode.tun => 'TUN',
+  };
 }
 
 extension ProxyModeParsing on ProxyMode {

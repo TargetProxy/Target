@@ -105,10 +105,10 @@ class Subscription {
     final userInfo = uri.userInfo.isEmpty ? '' : 'redacted';
     final query = uri.queryParameters.entries
         .map((entry) {
-      final key = entry.key;
-      final value = _isSensitiveKey(key) ? '***' : entry.value;
-      return '$key=$value';
-    })
+          final key = entry.key;
+          final value = _isSensitiveKey(key) ? '***' : entry.value;
+          return '$key=$value';
+        })
         .join('&');
 
     return uri.replace(userInfo: userInfo, query: query).toString();
@@ -149,7 +149,7 @@ class Subscription {
       updateStatus: updateStatus ?? this.updateStatus,
       autoUpdate: autoUpdate ?? this.autoUpdate,
       updateIntervalSeconds:
-      updateIntervalSeconds ?? this.updateIntervalSeconds,
+          updateIntervalSeconds ?? this.updateIntervalSeconds,
       headers: headers ?? this.headers,
       userAgent: userAgent ?? this.userAgent,
       allowInsecureHttp: allowInsecureHttp ?? this.allowInsecureHttp,
@@ -171,34 +171,33 @@ class Subscription {
     );
   }
 
-  Map<String, dynamic> toJson() =>
-      {
-        'id': id,
-        'name': name,
-        'url': url,
-        'formatHint': formatHint.name,
-        'updateStatus': updateStatus.name,
-        'autoUpdate': autoUpdate,
-        'updateIntervalSeconds': updateIntervalSeconds,
-        'headers': headers,
-        'userAgent': userAgent,
-        'allowInsecureHttp': allowInsecureHttp,
-        'lastUpdatedAt': lastUpdatedAt?.toIso8601String(),
-        'expiresAt': expiresAt?.toIso8601String(),
-        'lastEtag': lastEtag,
-        'lastModified': lastModified?.toIso8601String(),
-        'activeProfileId': activeProfileId,
-        'profileTitle': profileTitle,
-        'webPageUrl': webPageUrl,
-        'supportUrl': supportUrl,
-        'movedPermanentlyTo': movedPermanentlyTo,
-        'lastError': lastError,
-        'uploadBytes': uploadBytes,
-        'downloadBytes': downloadBytes,
-        'totalBytes': totalBytes,
-        'nodeCount': nodeCount,
-        'enabled': enabled,
-      };
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'url': url,
+    'formatHint': formatHint.name,
+    'updateStatus': updateStatus.name,
+    'autoUpdate': autoUpdate,
+    'updateIntervalSeconds': updateIntervalSeconds,
+    'headers': headers,
+    'userAgent': userAgent,
+    'allowInsecureHttp': allowInsecureHttp,
+    'lastUpdatedAt': lastUpdatedAt?.toIso8601String(),
+    'expiresAt': expiresAt?.toIso8601String(),
+    'lastEtag': lastEtag,
+    'lastModified': lastModified?.toIso8601String(),
+    'activeProfileId': activeProfileId,
+    'profileTitle': profileTitle,
+    'webPageUrl': webPageUrl,
+    'supportUrl': supportUrl,
+    'movedPermanentlyTo': movedPermanentlyTo,
+    'lastError': lastError,
+    'uploadBytes': uploadBytes,
+    'downloadBytes': downloadBytes,
+    'totalBytes': totalBytes,
+    'nodeCount': nodeCount,
+    'enabled': enabled,
+  };
 
   factory Subscription.fromJson(Map<String, dynamic> json) {
     return Subscription(
@@ -215,7 +214,7 @@ class Subscription {
       updateIntervalSeconds: json['updateIntervalSeconds'] as int? ?? 43200,
       headers: Map<String, String>.from(json['headers'] as Map? ?? const {}),
       userAgent:
-      json['userAgent'] as String? ?? SubscriptionRequestDefaults.userAgent,
+          json['userAgent'] as String? ?? SubscriptionRequestDefaults.userAgent,
       allowInsecureHttp: json['allowInsecureHttp'] as bool? ?? false,
       lastUpdatedAt: _parseDate(json['lastUpdatedAt'] as String?),
       expiresAt: _parseDate(json['expiresAt'] as String?),
@@ -258,7 +257,7 @@ class Subscription {
         r'(token|key|secret|password|passwd|auth)=([^&\s]+)',
         caseSensitive: false,
       ),
-          (match) => '${match.group(1)}=***',
+      (match) => '${match.group(1)}=***',
     );
   }
 }

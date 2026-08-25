@@ -24,11 +24,10 @@ class SharedPreferencesSettingsStore implements AppSettingsStore {
     // 兼容旧 JSON 文件的读取已移除，按你的要求直接按字段存取
     return AppSettings(
       themeMode: ThemeModeOptionParsing.fromName(
-          prefs.getString(_k('themeMode'))),
-      listenAddress: (prefs
-          .getString(_k('listenAddress'))
-          ?.trim()
-          .isEmpty ?? true)
+        prefs.getString(_k('themeMode')),
+      ),
+      listenAddress:
+          (prefs.getString(_k('listenAddress'))?.trim().isEmpty ?? true)
           ? '127.0.0.1'
           : prefs.getString(_k('listenAddress'))!.trim(),
       mixedPort: _sanitizePort(prefs.getInt(_k('mixedPort'))),
@@ -65,7 +64,7 @@ class SharedPreferencesSettingsStore implements AppSettingsStore {
 
 class MemorySettingsStore implements AppSettingsStore {
   MemorySettingsStore([AppSettings initialSettings = const AppSettings()])
-      : _settings = initialSettings;
+    : _settings = initialSettings;
 
   AppSettings _settings;
 

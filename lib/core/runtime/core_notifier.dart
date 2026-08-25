@@ -7,12 +7,15 @@ import '../../data/models/app_settings.dart';
 import '../../data/models/proxy_group.dart';
 import '../../features/settings/application/settings_notifier.dart';
 import '../logging/app_logger.dart';
+import '../platform/app_platform.dart';
 import 'core_gateway.dart';
 import 'core_models.dart';
 import 'target_lib_gateway.dart';
 
 /// The native proxy core used by the application.
-final coreGatewayProvider = Provider<CoreGateway>((ref) => TargetLibGateway());
+final coreGatewayProvider = Provider<CoreGateway>(
+  (ref) => TargetLibGateway(capabilities: ref.watch(appCapabilitiesProvider)),
+);
 
 /// Immutable snapshot of the proxy core runtime.
 @immutable
@@ -41,15 +44,14 @@ class CoreState {
 
   bool get running => lifecycle == CoreLifecycle.running;
 
-  String get status =>
-      switch (lifecycle) {
-        CoreLifecycle.unavailable => 'Core unavailable',
-        CoreLifecycle.stopped => 'Stopped',
-        CoreLifecycle.starting => 'Starting',
-        CoreLifecycle.running => 'Connected',
-        CoreLifecycle.stopping => 'Stopping',
-        CoreLifecycle.failed => 'Error',
-      };
+  String get status => switch (lifecycle) {
+    CoreLifecycle.unavailable => 'Core unavailable',
+    CoreLifecycle.stopped => 'Stopped',
+    CoreLifecycle.starting => 'Starting',
+    CoreLifecycle.running => 'Connected',
+    CoreLifecycle.stopping => 'Stopping',
+    CoreLifecycle.failed => 'Error',
+  };
 
   CoreState copyWith({
     CoreLifecycle? lifecycle,
@@ -94,9 +96,7 @@ class CoreNotifier extends Notifier<CoreState> {
     return CoreState(
       available: gateway.isAvailable,
       backendName: gateway.name,
-      settings: ref
-          .read(settingsProvider)
-          .settings,
+      settings: ref.read(settingsProvider).settings,
     );
   }
 
@@ -155,7 +155,7 @@ class CoreNotifier extends Notifier<CoreState> {
   }
 
   Future<void> selectOutbound(String groupId, String outboundId) async {
-    if (!state.available) return;
+    if (!state.running) return;
     await _run(() => _gateway!.selectOutbound(groupId, outboundId));
   }
 
@@ -236,7 +236,8 @@ class CoreNotifier extends Notifier<CoreState> {
     _applySnapshot(await _gateway!.current());
   }
 
-  Future<void> _run(Future<void> Function() operation, {
+  Future<void> _run(
+    Future<void> Function() operation, {
     String operationName = 'core operation',
   }) async {
     state = state.copyWith(busy: true);
@@ -250,7 +251,8 @@ class CoreNotifier extends Notifier<CoreState> {
     }
   }
 
-  Future<T?> _runValue<T>(Future<T> Function() operation, {
+  Future<T?> _runValue<T>(
+    Future<T> Function() operation, {
     required String operationName,
   }) async {
     state = state.copyWith(busy: true);
@@ -266,10 +268,11 @@ class CoreNotifier extends Notifier<CoreState> {
     }
   }
 
-  void _setFailure(Object error,
-      StackTrace stackTrace, {
-        required String operationName,
-      }) {
+  void _setFailure(
+    Object error,
+    StackTrace stackTrace, {
+    required String operationName,
+  }) {
     AppLogger.error(
       'Core $operationName failed',
       source: 'core',

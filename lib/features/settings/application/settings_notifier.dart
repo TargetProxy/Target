@@ -4,16 +4,18 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../data/models/app_settings.dart';
+import '../../../core/platform/app_platform.dart';
+import '../../../core/platform/platform_settings_policy.dart';
 import '../data/settings_store.dart';
 
 /// Settings snapshot injected at startup (e.g. loaded from disk in `main()`).
 final initialSettingsProvider = Provider<AppSettings>(
-      (ref) => const AppSettings(),
+  (ref) => const AppSettings(),
 );
 
 /// Persistence for [AppSettings]. Override in tests or for file storage.
 final settingsStoreProvider = Provider<AppSettingsStore>(
-      (ref) => MemorySettingsStore(),
+  (ref) => MemorySettingsStore(),
 );
 
 /// Immutable snapshot of the settings screen.
@@ -51,23 +53,31 @@ class SettingsNotifier extends Notifier<SettingsState> {
   @override
   SettingsState build() {
     _store = ref.read(settingsStoreProvider);
-    return SettingsState(settings: ref.read(initialSettingsProvider));
+    return SettingsState(
+      settings: PlatformSettingsPolicy.normalize(
+        ref.read(initialSettingsProvider),
+        ref.read(appCapabilitiesProvider),
+      ),
+    );
   }
 
   void updateSettings(AppSettings Function(AppSettings) updater) {
-    state = state.copyWith(settings: updater(state.settings), clearError: true);
+    final settings = PlatformSettingsPolicy.normalize(
+      updater(state.settings),
+      ref.read(appCapabilitiesProvider),
+    );
+    state = state.copyWith(settings: settings, clearError: true);
     unawaited(_saveLatest());
   }
 
   void setProxyMode(ProxyMode mode) {
     updateSettings(
-          (settings) =>
-          settings.copyWith(
-            proxyMode: mode,
-            // TUN owns the traffic entry point. Keeping the mixed inbound enabled
-            // at the same time makes Windows expose two competing proxy paths.
-            systemProxy: mode == ProxyMode.tun ? false : settings.systemProxy,
-          ),
+      (settings) => settings.copyWith(
+        proxyMode: mode,
+        // TUN owns the traffic entry point. Keeping the mixed inbound enabled
+        // at the same time makes Windows expose two competing proxy paths.
+        systemProxy: mode == ProxyMode.tun ? false : settings.systemProxy,
+      ),
     );
   }
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -46,10 +48,10 @@ class ProxiesState {
       nodes = nodes
           .where(
             (n) =>
-        n.name.toLowerCase().contains(q) ||
-            n.type.toLowerCase().contains(q) ||
-            (n.countryCode?.toLowerCase().contains(q) ?? false),
-      )
+                n.name.toLowerCase().contains(q) ||
+                n.type.toLowerCase().contains(q) ||
+                (n.countryCode?.toLowerCase().contains(q) ?? false),
+          )
           .toList();
     }
 
@@ -85,13 +87,20 @@ class ProxiesState {
 }
 
 class ProxiesNotifier extends Notifier<ProxiesState> {
+  final Map<String, String> _runtimeSelections = {};
+
   @override
   ProxiesState build() {
     ref.listen(proxyCatalogProvider, (_, next) {
       state = _syncFromCatalog(state, next);
     });
-    ref.listen(coreProvider, (_, next) {
+    ref.listen(coreProvider, (previous, next) {
       state = _syncFromCore(state, next);
+      if (!next.running) {
+        _runtimeSelections.clear();
+      } else if (previous?.running != true) {
+        unawaited(_syncSelectedNodeToRuntime());
+      }
     });
     var result = _syncFromCatalog(
       const ProxiesState(),
@@ -114,22 +123,42 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
   Future<void> selectNode(String nodeId) async {
     if (state.groups.isEmpty) return;
     final group = state.groups[state.selectedGroupIndex];
-    ref.read(proxyCatalogProvider.notifier).selectNode(group.id, nodeId);
-    state = state.copyWith(
-      groups: [
-        for (var i = 0; i < state.groups.length; i++)
-          i == state.selectedGroupIndex
-              ? group.copyWith(
-            selectedNodeId: nodeId,
-            nodes: [
-              for (final node in group.nodes)
-                node.copyWith(isSelected: node.id == nodeId),
-            ],
-          )
-              : state.groups[i],
-      ],
-    );
-    await ref.read(coreProvider.notifier).selectOutbound(group.id, nodeId);
+    if (!group.nodes.any((node) => node.id == nodeId)) return;
+    if (group.selectedNodeId != nodeId) {
+      ref.read(proxyCatalogProvider.notifier).selectNode(group.id, nodeId);
+      state = state.copyWith(
+        groups: [
+          for (var i = 0; i < state.groups.length; i++)
+            i == state.selectedGroupIndex
+                ? group.copyWith(
+                    selectedNodeId: nodeId,
+                    nodes: [
+                      for (final node in group.nodes)
+                        node.copyWith(isSelected: node.id == nodeId),
+                    ],
+                  )
+                : state.groups[i],
+        ],
+      );
+    }
+    await _selectRuntime(group.id, nodeId);
+  }
+
+  Future<void> _syncSelectedNodeToRuntime() async {
+    final group = state.selectedGroup;
+    final nodeId = group?.selectedNodeId;
+    if (group != null && nodeId != null) {
+      await _selectRuntime(group.id, nodeId);
+    }
+  }
+
+  Future<void> _selectRuntime(String groupId, String nodeId) async {
+    if (!ref.read(coreProvider).running ||
+        _runtimeSelections[groupId] == nodeId) {
+      return;
+    }
+    _runtimeSelections[groupId] = nodeId;
+    await ref.read(coreProvider.notifier).selectOutbound(groupId, nodeId);
   }
 
   void setSearchQuery(String query) {
@@ -145,9 +174,7 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
     state = state.copyWith(testing: true, clearError: true);
 
     try {
-      final coreGroups = ref
-          .read(coreProvider)
-          .proxyGroups;
+      final coreGroups = ref.read(coreProvider).proxyGroups;
       final candidateGroups = coreGroups.any((group) => _isUrlTest(group.type))
           ? coreGroups
           : state.groups;
@@ -167,14 +194,14 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
           lastError: protocols.isEmpty
               ? 'TargetLib has no testable URLTest nodes. Add a subscription first.'
               : 'TargetLib has no testable URLTest nodes. '
-              'Supported nodes found: $protocols.',
+                    'Supported nodes found: $protocols.',
         );
         return;
       }
       var successCount = 0;
       final errors = <String>[];
       await for (final result
-      in ref.read(coreProvider.notifier).testLatencies(nodeIds)) {
+          in ref.read(coreProvider.notifier).testLatencies(nodeIds)) {
         final latency = result.delayMilliseconds;
         if (result.succeeded && latency != null) {
           successCount++;
@@ -186,9 +213,7 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
       if (successCount == 0) {
         state = state.copyWith(
           lastError: errors.isEmpty
-              ? ref
-              .read(coreProvider)
-              .message
+              ? ref.read(coreProvider).message
               : errors.first,
         );
       }
@@ -201,18 +226,15 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
 
   Future<void> testSingleLatency(String nodeId) async {
     state = state.copyWith(clearError: true);
-    final coreGroups = ref
-        .read(coreProvider)
-        .proxyGroups;
+    final coreGroups = ref.read(coreProvider).proxyGroups;
     final candidateGroups = coreGroups.any(_isUrlTestGroup)
         ? coreGroups
         : state.groups;
     final testable = candidateGroups.any(
-          (group) =>
-      _isUrlTestGroup(group) &&
+      (group) =>
+          _isUrlTestGroup(group) &&
           group.nodes.any(
-                (node) =>
-            node.id == nodeId && node.type.toLowerCase() != 'direct',
+            (node) => node.id == nodeId && node.type.toLowerCase() != 'direct',
           ),
     );
     if (!testable) {
@@ -231,9 +253,7 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
           .read(coreProvider.notifier)
           .testLatency(node.id);
       if (latency == null) {
-        state = state.copyWith(lastError: ref
-            .read(coreProvider)
-            .message);
+        state = state.copyWith(lastError: ref.read(coreProvider).message);
       }
       final updated = List<ProxyNode>.from(group.nodes);
       updated[idx] = node.copyWith(latencyMs: latency);
@@ -285,9 +305,7 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
     if (core.proxyGroups.isEmpty) {
       return current;
     }
-    final catalogGroups = ref
-        .read(proxyCatalogProvider)
-        .groups;
+    final catalogGroups = ref.read(proxyCatalogProvider).groups;
     if (catalogGroups.isNotEmpty) {
       final runtimeNodes = <String, ProxyNode>{
         for (final group in core.proxyGroups)

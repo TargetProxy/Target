@@ -76,17 +76,17 @@ class _LogsPageState extends ConsumerState<LogsPage> {
           Expanded(
             child: entries.isEmpty
                 ? const EmptyState(
-              icon: Icons.receipt_long_outlined,
-              title: 'No logs',
-              description: 'Logs will appear here in real time.',
-            )
+                    icon: Icons.receipt_long_outlined,
+                    title: 'No logs',
+                    description: 'Logs will appear here in real time.',
+                  )
                 : ListView.builder(
-              controller: _scrollController,
-              itemCount: entries.length,
-              itemBuilder: (context, index) {
-                return LogLineTile(entry: entries[index]);
-              },
-            ),
+                    controller: _scrollController,
+                    itemCount: entries.length,
+                    itemBuilder: (context, index) {
+                      return LogLineTile(entry: entries[index]);
+                    },
+                  ),
           ),
         ],
       ),
@@ -104,34 +104,31 @@ class _LogsPageState extends ConsumerState<LogsPage> {
   void _export() {
     showDialog(
       context: context,
-      builder: (_) =>
-          AlertDialog(
-            title: const Text('Export logs'),
-            content: const Text('Sanitize sensitive data (URLs, IPs, tokens)?'),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  _doExport(sanitize: false);
-                },
-                child: const Text('Raw'),
-              ),
-              FilledButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  _doExport(sanitize: true);
-                },
-                child: const Text('Sanitized'),
-              ),
-            ],
+      builder: (_) => AlertDialog(
+        title: const Text('Export logs'),
+        content: const Text('Sanitize sensitive data (URLs, IPs, tokens)?'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _doExport(sanitize: false);
+            },
+            child: const Text('Raw'),
           ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _doExport(sanitize: true);
+            },
+            child: const Text('Sanitized'),
+          ),
+        ],
+      ),
     );
   }
 
   void _doExport({required bool sanitize}) {
-    final text = ref
-        .read(logsProvider.notifier)
-        .exportLogs(sanitize: sanitize);
+    final text = ref.read(logsProvider.notifier).exportLogs(sanitize: sanitize);
     Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

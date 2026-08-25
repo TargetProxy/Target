@@ -29,7 +29,7 @@ class DesktopTrayController with tray.TrayListener, window.WindowListener {
   bool? _windowVisible;
 
   Future<void> initialize(CoreState core) async {
-    if (!_isDesktop || _initialized) return;
+    if (_initialized) return;
 
     tray.trayManager.addListener(this);
     window.windowManager.addListener(this);
@@ -59,8 +59,8 @@ class DesktopTrayController with tray.TrayListener, window.WindowListener {
   Future<void> updateCoreState(CoreState core, {bool force = false}) async {
     final changed =
         _running != core.running ||
-            _busy != core.busy ||
-            _available != core.available;
+        _busy != core.busy ||
+        _available != core.available;
     _running = core.running;
     _busy = core.busy;
     _available = core.available;
@@ -70,7 +70,6 @@ class DesktopTrayController with tray.TrayListener, window.WindowListener {
   }
 
   void dispose() {
-    if (!_isDesktop) return;
     tray.trayManager.removeListener(this);
     window.windowManager.removeListener(this);
   }
@@ -166,7 +165,4 @@ class DesktopTrayController with tray.TrayListener, window.WindowListener {
       );
     }
   }
-
-  bool get _isDesktop =>
-      Platform.isWindows || Platform.isMacOS || Platform.isLinux;
 }

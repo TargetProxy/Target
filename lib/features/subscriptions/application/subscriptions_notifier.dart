@@ -105,8 +105,7 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
           subscriptions: subscriptions,
           activeId: activeId,
           busy: subscriptions.any(
-                (item) =>
-            item.updateStatus == SubscriptionUpdateStatus.updating,
+            (item) => item.updateStatus == SubscriptionUpdateStatus.updating,
           ),
           clearError: true,
         );
@@ -155,10 +154,7 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
     // handled by the TargetLib backend inside AddSubscription.
     final normalizedName = name?.trim();
     final subscription = Subscription(
-      id: DateTime
-          .now()
-          .microsecondsSinceEpoch
-          .toString(),
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
       name: normalizedName == null || normalizedName.isEmpty
           ? 'Subscription ${state.subscriptions.length + 1}'
           : normalizedName,
@@ -289,9 +285,9 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
         for (var i = 0; i < state.subscriptions.length; i++)
           i == index
               ? state.subscriptions[i].copyWith(
-            updateStatus: SubscriptionUpdateStatus.updating,
-            lastError: '',
-          )
+                  updateStatus: SubscriptionUpdateStatus.updating,
+                  lastError: '',
+                )
               : state.subscriptions[i],
       ],
     );
@@ -312,8 +308,7 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
       state = state.copyWith(
         subscriptions: [
           for (final item in state.subscriptions)
-            if (item.id == id) subscription else
-              item,
+            if (item.id == id) subscription else item,
         ],
         busy: false,
         clearError: true,
@@ -371,19 +366,20 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
 
   bool snapshotIsActive(String id) => state.activeId == id;
 
-  Subscription _subscriptionFromRuntime(RuntimeSubscription runtime,
-      Subscription? previous, {
-        bool notModified = false,
-      }) {
+  Subscription _subscriptionFromRuntime(
+    RuntimeSubscription runtime,
+    Subscription? previous, {
+    bool notModified = false,
+  }) {
     final status = notModified
         ? SubscriptionUpdateStatus.noChange
         : switch (runtime.status) {
-      RuntimeSubscriptionStatus.updating =>
-      SubscriptionUpdateStatus.updating,
-      RuntimeSubscriptionStatus.ready => SubscriptionUpdateStatus.updated,
-      RuntimeSubscriptionStatus.failed => SubscriptionUpdateStatus.failed,
-      RuntimeSubscriptionStatus.idle => SubscriptionUpdateStatus.idle,
-    };
+            RuntimeSubscriptionStatus.updating =>
+              SubscriptionUpdateStatus.updating,
+            RuntimeSubscriptionStatus.ready => SubscriptionUpdateStatus.updated,
+            RuntimeSubscriptionStatus.failed => SubscriptionUpdateStatus.failed,
+            RuntimeSubscriptionStatus.idle => SubscriptionUpdateStatus.idle,
+          };
     return Subscription(
       id: runtime.id,
       name: runtime.name,
@@ -428,6 +424,6 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
 }
 
 final subscriptionsProvider =
-NotifierProvider<SubscriptionsNotifier, SubscriptionsState>(
-  SubscriptionsNotifier.new,
-);
+    NotifierProvider<SubscriptionsNotifier, SubscriptionsState>(
+      SubscriptionsNotifier.new,
+    );

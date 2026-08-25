@@ -1,19 +1,20 @@
-import 'dart:io';
-
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/platform/app_platform.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/runtime/core_notifier.dart';
 import 'home_info_row.dart';
 
-class CurrentProfileCard extends StatelessWidget {
+class CurrentProfileCard extends ConsumerWidget {
   const CurrentProfileCard({required this.core, super.key});
 
   final CoreState core;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final capabilities = ref.watch(appCapabilitiesProvider);
     final isTun = core.settings.proxyMode.name == 'tun';
 
     return Card(
@@ -54,9 +55,9 @@ class CurrentProfileCard extends StatelessWidget {
                   : Icons.place_outlined,
               label: isTun ? 'Privilege' : 'Listen',
               value: isTun
-                  ? Platform.isAndroid
-                  ? 'VPN service'
-                  : 'Elevate on demand'
+                  ? capabilities.vpnOnly
+                        ? 'VPN service'
+                        : 'Elevate on demand'
                   : '${core.settings.listenAddress}:${core.settings.mixedPort}',
             ),
           ],

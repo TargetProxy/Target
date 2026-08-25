@@ -24,38 +24,39 @@ abstract final class AppLogger {
   static void info(String message, {String source = 'APP'}) =>
       _record(message, LogLevel.info, source);
 
-  static void warning(String message, {
+  static void warning(
+    String message, {
     String source = 'APP',
     Object? error,
     StackTrace? stackTrace,
-  }) =>
-      _record(message, LogLevel.warning, source, error, stackTrace);
+  }) => _record(message, LogLevel.warning, source, error, stackTrace);
 
-  static void error(String message, {
+  static void error(
+    String message, {
     String source = 'APP',
     Object? error,
     StackTrace? stackTrace,
-  }) =>
-      _record(message, LogLevel.error, source, error, stackTrace);
+  }) => _record(message, LogLevel.error, source, error, stackTrace);
 
-  static void fatal(String message, {
+  static void fatal(
+    String message, {
     String source = 'APP',
     Object? error,
     StackTrace? stackTrace,
-  }) =>
-      _record(message, LogLevel.critical, source, error, stackTrace);
+  }) => _record(message, LogLevel.critical, source, error, stackTrace);
 
   static void log(LogLevel level, String message, {String source = 'APP'}) =>
       _record(message, level, source);
 
   static void clear() => talker.cleanHistory();
 
-  static void _record(String message,
-      LogLevel level,
-      String source, [
-        Object? error,
-        StackTrace? stackTrace,
-      ]) {
+  static void _record(
+    String message,
+    LogLevel level,
+    String source, [
+    Object? error,
+    StackTrace? stackTrace,
+  ]) {
     talker.logCustom(
       TalkerLog(
         _withError(message, error),
