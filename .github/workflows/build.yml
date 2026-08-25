@@ -10,144 +10,98 @@ permissions:
   contents: read
 
 jobs:
-  build-windows:
-    runs-on: windows-2022
-    steps:
-      - name: Checkout Target
-        uses: actions/checkout@v4
-        with:
-          path: Target
-      - name: Checkout TargetLib
-        uses: actions/checkout@v4
-        with:
-          repository: TargetProxy/TargetLib
-          path: TargetLib
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: stable
-          cache: true
-          cache-dependency-path: TargetLib/go.sum
-      - name: Build TargetLib
-        working-directory: TargetLib
-        run: go build -trimpath -buildvcs=false -o build/TargetLib.exe ./cmd/TargetLib
-      - name: Get Flutter dependencies
-        working-directory: Target
-        run: flutter pub get
-      - name: Build Windows
-        working-directory: Target
-        run: flutter build windows --release
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-2022
+            target: windows
+            args: --release
+            targetlib: true
+          - name: Linux
+            os: ubuntu-24.04
+            target: linux
+            args: --release
+            targetlib: true
+          - name: Android
+            os: ubuntu-24.04
+            target: apk
+            args: --debug
+            java: true
+          - name: macOS
+            os: macos-14
+            target: macos
+            args: --release
+            generate: macos
+          - name: iOS
+            os: macos-14
+            target: ios
+            args: --release --no-codesign
+            generate: ios
 
-  build-linux:
-    runs-on: ubuntu-24.04
     steps:
       - name: Checkout Target
         uses: actions/checkout@v4
         with:
           path: Target
+
       - name: Checkout TargetLib
         uses: actions/checkout@v4
         with:
           repository: TargetProxy/TargetLib
           path: TargetLib
+
       - name: Install Linux build dependencies
+        if: matrix.os == 'ubuntu-24.04' && matrix.target == 'linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: stable
-          cache: true
-          cache-dependency-path: TargetLib/go.sum
-      - name: Build TargetLib
-        working-directory: TargetLib
-        run: go build -trimpath -buildvcs=false -o build/TargetLib ./cmd/TargetLib
-      - name: Get Flutter dependencies
-        working-directory: Target
-        run: flutter pub get
-      - name: Build Linux
-        working-directory: Target
-        run: flutter build linux --release
 
-  build-android:
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout Target
-        uses: actions/checkout@v4
-        with:
-          path: Target
-      - name: Checkout TargetLib
-        uses: actions/checkout@v4
-        with:
-          repository: TargetProxy/TargetLib
-          path: TargetLib
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
+
       - name: Setup Java
+        if: matrix.java == true
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
           cache: gradle
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: stable
-          cache: true
-          cache-dependency-path: TargetLib/go.sum
-      - name: Get Flutter dependencies
-        working-directory: Target
-        run: flutter pub get
-      - name: Build Android
-        working-directory: Target
-        run: flutter build apk --debug
 
-  build-apple:
-    runs-on: macos-14
-    steps:
-      - name: Checkout Target
-        uses: actions/checkout@v4
-        with:
-          path: Target
-      - name: Checkout TargetLib
-        uses: actions/checkout@v4
-        with:
-          repository: TargetProxy/TargetLib
-          path: TargetLib
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
           go-version: stable
           cache: true
           cache-dependency-path: TargetLib/go.sum
-      - name: Generate Apple projects
+
+      - name: Build TargetLib
+        if: matrix.targetlib == true
+        working-directory: TargetLib
+        shell: bash
+        run: |
+          if [ "${{ matrix.target }}" = "windows" ]; then
+            go build -trimpath -buildvcs=false -o build/TargetLib.exe ./cmd/TargetLib
+          else
+            go build -trimpath -buildvcs=false -o build/TargetLib ./cmd/TargetLib
+          fi
+
+      - name: Generate Apple project
+        if: matrix.generate != ''
         working-directory: Target
-        run: flutter create --platforms=macos,ios .
+        run: flutter create --platforms=${{ matrix.generate }} .
+
       - name: Get Flutter dependencies
         working-directory: Target
         run: flutter pub get
-      - name: Build macOS
+
+      - name: Build platform
         working-directory: Target
-        run: flutter build macos --release
-      - name: Build iOS without signing
-        working-directory: Target
-        run: flutter build ios --release --no-codesign
+        run: flutter build ${{ matrix.target }} ${{ matrix.args }}
