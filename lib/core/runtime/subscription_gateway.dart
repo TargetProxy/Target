@@ -88,7 +88,9 @@ abstract interface class SubscriptionGateway {
   });
 
   Future<void> removeSubscription(String id);
+
   Future<RuntimeSubscription> renameSubscription(String id, String name);
+
   Future<RuntimeSubscriptionUpdate> updateSubscription(String id);
 
   /// Selects the subscription used by TargetLib BuildConfig.

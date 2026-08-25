@@ -8,12 +8,12 @@ import '../data/settings_store.dart';
 
 /// Settings snapshot injected at startup (e.g. loaded from disk in `main()`).
 final initialSettingsProvider = Provider<AppSettings>(
-  (ref) => const AppSettings(),
+      (ref) => const AppSettings(),
 );
 
 /// Persistence for [AppSettings]. Override in tests or for file storage.
 final settingsStoreProvider = Provider<AppSettingsStore>(
-  (ref) => MemorySettingsStore(),
+      (ref) => MemorySettingsStore(),
 );
 
 /// Immutable snapshot of the settings screen.
@@ -59,39 +59,16 @@ class SettingsNotifier extends Notifier<SettingsState> {
     unawaited(_saveLatest());
   }
 
-  void setThemeMode(ThemeModeOption mode) {
-    updateSettings((settings) => settings.copyWith(themeMode: mode));
-  }
-
-  void setStartOnBoot(bool value) {
-    updateSettings((settings) => settings.copyWith(startOnBoot: value));
-  }
-
-  void setNotifications(bool value) {
-    updateSettings((settings) => settings.copyWith(enableNotifications: value));
-  }
-
-  void setMixedPort(int port) {
-    updateSettings((settings) => settings.copyWith(mixedPort: port));
-  }
-
   void setProxyMode(ProxyMode mode) {
     updateSettings(
-      (settings) => settings.copyWith(
-        proxyMode: mode,
-        // TUN owns the traffic entry point. Keeping the mixed inbound enabled
-        // at the same time makes Windows expose two competing proxy paths.
-        systemProxy: mode == ProxyMode.tun ? false : settings.systemProxy,
-      ),
+          (settings) =>
+          settings.copyWith(
+            proxyMode: mode,
+            // TUN owns the traffic entry point. Keeping the mixed inbound enabled
+            // at the same time makes Windows expose two competing proxy paths.
+            systemProxy: mode == ProxyMode.tun ? false : settings.systemProxy,
+          ),
     );
-  }
-
-  void setIPv6(bool value) {
-    updateSettings((settings) => settings.copyWith(ipv6: value));
-  }
-
-  void setSystemProxy(bool value) {
-    updateSettings((settings) => settings.copyWith(systemProxy: value));
   }
 
   Future<void> _saveLatest() async {

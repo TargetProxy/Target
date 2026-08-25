@@ -38,9 +38,9 @@ class ConnectionsPage extends ConsumerWidget {
                         : () => _closeAll(context, ref, notifier),
                     icon: state.closingAll
                         ? const SizedBox.square(
-                            dimension: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
+                      dimension: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
                         : const Icon(Icons.cancel_presentation_outlined),
                     tooltip: 'Close all connections',
                   ),
@@ -58,67 +58,67 @@ class ConnectionsPage extends ConsumerWidget {
           Expanded(
             child: connections.isEmpty
                 ? const EmptyState(
-                    icon: Icons.cable_outlined,
-                    title: 'No connections',
-                    description:
-                        'Active connections will appear here when the proxy is running.',
-                  )
+              icon: Icons.cable_outlined,
+              title: 'No connections',
+              description:
+              'Active connections will appear here when the proxy is running.',
+            )
                 : ListView.builder(
-                    itemCount: connections.length,
-                    itemBuilder: (context, index) {
-                      final connection = connections[index];
-                      return ConnectionTile(
-                        connection: connection,
-                        closing: state.isClosing(connection.id),
-                        onClose: () =>
-                            _closeOne(context, ref, notifier, connection.id),
-                      );
-                    },
-                  ),
+              itemCount: connections.length,
+              itemBuilder: (context, index) {
+                final connection = connections[index];
+                return ConnectionTile(
+                  connection: connection,
+                  closing: state.isClosing(connection.id),
+                  onClose: () =>
+                      _closeOne(context, ref, notifier, connection.id),
+                );
+              },
+            ),
           ),
         ],
       ),
     );
   }
 
-  Future<void> _closeOne(
-    BuildContext context,
-    WidgetRef ref,
-    ConnectionsNotifier notifier,
-    String id,
-  ) async {
+  Future<void> _closeOne(BuildContext context,
+      WidgetRef ref,
+      ConnectionsNotifier notifier,
+      String id,) async {
     final closed = await notifier.close(id);
     if (!context.mounted || closed) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          ref.read(connectionsProvider).lastError ?? 'Unable to close connection.',
+          ref
+              .read(connectionsProvider)
+              .lastError ?? 'Unable to close connection.',
         ),
       ),
     );
   }
 
-  Future<void> _closeAll(
-    BuildContext context,
-    WidgetRef ref,
-    ConnectionsNotifier notifier,
-  ) async {
+  Future<void> _closeAll(BuildContext context,
+      WidgetRef ref,
+      ConnectionsNotifier notifier,) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Close all connections?'),
-        content: const Text('Active network connections will be interrupted.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+      builder: (dialogContext) =>
+          AlertDialog(
+            title: const Text('Close all connections?'),
+            content: const Text(
+                'Active network connections will be interrupted.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Close all'),
+              ),
+            ],
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Close all'),
-          ),
-        ],
-      ),
     );
     if (confirmed != true) return;
     final count = await notifier.closeAll();
@@ -127,8 +127,10 @@ class ConnectionsPage extends ConsumerWidget {
       SnackBar(
         content: Text(
           count == null
-              ? ref.read(connectionsProvider).lastError ??
-                    'Unable to close connections.'
+              ? ref
+              .read(connectionsProvider)
+              .lastError ??
+              'Unable to close connections.'
               : 'Closed $count active connection${count == 1 ? '' : 's'}.',
         ),
       ),
@@ -182,7 +184,8 @@ class _ConnectionsToolbar extends StatelessWidget {
             ),
             tooltip: 'Sort by',
             onSelected: onSortChanged,
-            itemBuilder: (context) => [
+            itemBuilder: (context) =>
+            [
               _sortItem(ConnectionSortBy.traffic, 'Traffic'),
               _sortItem(ConnectionSortBy.destination, 'Destination'),
               _sortItem(ConnectionSortBy.outbound, 'Outbound'),
@@ -194,10 +197,8 @@ class _ConnectionsToolbar extends StatelessWidget {
     );
   }
 
-  PopupMenuItem<ConnectionSortBy> _sortItem(
-    ConnectionSortBy value,
-    String label,
-  ) {
+  PopupMenuItem<ConnectionSortBy> _sortItem(ConnectionSortBy value,
+      String label,) {
     return PopupMenuItem(
       value: value,
       child: Row(

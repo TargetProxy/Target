@@ -27,7 +27,9 @@ class TrafficPage extends ConsumerWidget {
                 ),
                 const SizedBox(height: 22),
                 GridView.count(
-                  crossAxisCount: MediaQuery.sizeOf(context).width >= 800
+                  crossAxisCount: MediaQuery
+                      .sizeOf(context)
+                      .width >= 800
                       ? 2
                       : 1,
                   crossAxisSpacing: 16,
@@ -113,6 +115,7 @@ class _Metric extends StatelessWidget {
     required this.icon,
     required this.color,
   });
+
   final String title;
   final String value;
   final IconData icon;

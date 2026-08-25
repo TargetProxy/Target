@@ -44,8 +44,7 @@ class AppRouter {
   );
 
   static Page<void> Function(BuildContext, GoRouterState) _fadePageBuilder(
-    Widget child,
-  ) {
+      Widget child,) {
     return (context, state) =>
         NoTransitionPage<void>(key: state.pageKey, child: child);
   }

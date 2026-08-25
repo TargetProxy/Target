@@ -73,7 +73,9 @@ class _TargetAppViewState extends ConsumerState<_TargetAppView> {
 
   @override
   Widget build(BuildContext context) {
-    final settings = ref.watch(settingsProvider).settings;
+    final settings = ref
+        .watch(settingsProvider)
+        .settings;
     ref.listen<CoreState>(coreProvider, (_, next) {
       unawaited(_trayController.updateCoreState(next));
     });
@@ -110,7 +112,9 @@ class _TargetAppViewState extends ConsumerState<_TargetAppView> {
 
   Future<void> _toggleConnection() async {
     final notifier = ref.read(coreProvider.notifier);
-    if (ref.read(coreProvider).running) {
+    if (ref
+        .read(coreProvider)
+        .running) {
       await notifier.stop();
     } else {
       await notifier.start();

@@ -138,6 +138,6 @@ class ProxyCatalogNotifier extends Notifier<ProxyCatalogState> {
 }
 
 final proxyCatalogProvider =
-    NotifierProvider<ProxyCatalogNotifier, ProxyCatalogState>(
-      ProxyCatalogNotifier.new,
-    );
+NotifierProvider<ProxyCatalogNotifier, ProxyCatalogState>(
+  ProxyCatalogNotifier.new,
+);

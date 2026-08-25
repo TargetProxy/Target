@@ -26,7 +26,10 @@ class _AddSubscriptionSheetState extends State<AddSubscriptionSheet> {
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
+        bottom: MediaQuery
+            .of(context)
+            .viewInsets
+            .bottom,
       ),
       child: SafeArea(
         child: Padding(
@@ -40,7 +43,10 @@ class _AddSubscriptionSheetState extends State<AddSubscriptionSheet> {
               children: [
                 Text(
                   'Add Subscription',
-                  style: Theme.of(context).textTheme.titleLarge,
+                  style: Theme
+                      .of(context)
+                      .textTheme
+                      .titleLarge,
                 ),
                 const SizedBox(height: AppSpacing.itemGap),
                 TextFormField(
@@ -57,7 +63,9 @@ class _AddSubscriptionSheetState extends State<AddSubscriptionSheet> {
                     hintText: 'https://example.com/sub',
                   ),
                   validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
+                    if (value == null || value
+                        .trim()
+                        .isEmpty) {
                       return 'URL is required';
                     }
                     return null;
@@ -107,7 +115,9 @@ class _AddSubscriptionSheetState extends State<AddSubscriptionSheet> {
     // the client only validates non-empty input.
     Navigator.of(context).pop({
       'url': _urlController.text.trim(),
-      if (_nameController.text.trim().isNotEmpty)
+      if (_nameController.text
+          .trim()
+          .isNotEmpty)
         'name': _nameController.text.trim(),
     });
   }

@@ -55,8 +55,8 @@ class CurrentProfileCard extends StatelessWidget {
               label: isTun ? 'Privilege' : 'Listen',
               value: isTun
                   ? Platform.isAndroid
-                        ? 'VPN service'
-                        : 'Elevate on demand'
+                  ? 'VPN service'
+                  : 'Elevate on demand'
                   : '${core.settings.listenAddress}:${core.settings.mixedPort}',
             ),
           ],

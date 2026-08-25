@@ -7,21 +7,35 @@ import 'core_models.dart';
 /// Widgets and feature controllers must not import TargetLib directly.
 abstract class CoreGateway {
   String get name;
+
   bool get isAvailable;
+
   Stream<CoreSnapshot> get snapshots;
 
   Future<CoreSnapshot> current();
+
   Future<void> configure(AppSettings settings);
+
   Future<void> setRawConfig(String? config) async {}
+
   Future<void> start();
+
   Future<void> stop();
+
   Future<void> selectOutbound(String groupId, String outboundId);
+
   Future<int?> testLatency(String outboundId);
+
   Stream<CoreLatencyResult> testLatencies(Iterable<String> outboundIds);
+
   Future<void> closeConnection(String connectionId);
+
   Future<int> closeAllConnections();
+
   Future<int> refreshRuleSets();
+
   Future<void> clearLogs();
+
   Future<void> reinstallService();
 
   /// Queries the egress IP geolocation through the backend.
@@ -55,10 +69,11 @@ class UnavailableCoreGateway implements CoreGateway {
   Stream<CoreSnapshot> get snapshots => const Stream.empty();
 
   @override
-  Future<CoreSnapshot> current() async => const CoreSnapshot(
-    lifecycle: CoreLifecycle.unavailable,
-    message: _message,
-  );
+  Future<CoreSnapshot> current() async =>
+      const CoreSnapshot(
+        lifecycle: CoreLifecycle.unavailable,
+        message: _message,
+      );
 
   @override
   Future<void> configure(AppSettings settings) => _unavailable();

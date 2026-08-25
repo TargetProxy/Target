@@ -41,14 +41,15 @@ class CoreState {
 
   bool get running => lifecycle == CoreLifecycle.running;
 
-  String get status => switch (lifecycle) {
-    CoreLifecycle.unavailable => 'Core unavailable',
-    CoreLifecycle.stopped => 'Stopped',
-    CoreLifecycle.starting => 'Starting',
-    CoreLifecycle.running => 'Connected',
-    CoreLifecycle.stopping => 'Stopping',
-    CoreLifecycle.failed => 'Error',
-  };
+  String get status =>
+      switch (lifecycle) {
+        CoreLifecycle.unavailable => 'Core unavailable',
+        CoreLifecycle.stopped => 'Stopped',
+        CoreLifecycle.starting => 'Starting',
+        CoreLifecycle.running => 'Connected',
+        CoreLifecycle.stopping => 'Stopping',
+        CoreLifecycle.failed => 'Error',
+      };
 
   CoreState copyWith({
     CoreLifecycle? lifecycle,
@@ -93,7 +94,9 @@ class CoreNotifier extends Notifier<CoreState> {
     return CoreState(
       available: gateway.isAvailable,
       backendName: gateway.name,
-      settings: ref.read(settingsProvider).settings,
+      settings: ref
+          .read(settingsProvider)
+          .settings,
     );
   }
 
@@ -233,8 +236,7 @@ class CoreNotifier extends Notifier<CoreState> {
     _applySnapshot(await _gateway!.current());
   }
 
-  Future<void> _run(
-    Future<void> Function() operation, {
+  Future<void> _run(Future<void> Function() operation, {
     String operationName = 'core operation',
   }) async {
     state = state.copyWith(busy: true);
@@ -248,8 +250,7 @@ class CoreNotifier extends Notifier<CoreState> {
     }
   }
 
-  Future<T?> _runValue<T>(
-    Future<T> Function() operation, {
+  Future<T?> _runValue<T>(Future<T> Function() operation, {
     required String operationName,
   }) async {
     state = state.copyWith(busy: true);
@@ -265,11 +266,10 @@ class CoreNotifier extends Notifier<CoreState> {
     }
   }
 
-  void _setFailure(
-    Object error,
-    StackTrace stackTrace, {
-    required String operationName,
-  }) {
+  void _setFailure(Object error,
+      StackTrace stackTrace, {
+        required String operationName,
+      }) {
     AppLogger.error(
       'Core $operationName failed',
       source: 'core',

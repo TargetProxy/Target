@@ -1,54 +1,71 @@
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../../data/models/app_settings.dart';
-import '../../../data/storage/json_file_store.dart';
 
 abstract class AppSettingsStore {
   Future<AppSettings> load();
+
   Future<void> save(AppSettings settings);
 }
 
-class SettingsStore implements AppSettingsStore {
-  const SettingsStore(this._store);
+/// 单键 KV 直存：每个字段独立 key，无 JSON 包装
+/// 旧的 settings.json 文件已废弃，不再读写
+class SharedPreferencesSettingsStore implements AppSettingsStore {
+  SharedPreferencesSettingsStore({this.keyPrefix = 'app_settings.'});
 
-  static const _schemaVersion = 1;
+  final String keyPrefix;
 
-  final JsonFileStore _store;
+  String _k(String name) => '$keyPrefix$name';
 
   @override
   Future<AppSettings> load() async {
-    final Map<String, dynamic>? root;
-    try {
-      root = await _store.readObject();
-    } on Object {
-      return const AppSettings();
-    }
-    if (root == null) {
-      return const AppSettings();
-    }
-
-    final version = root['schemaVersion'] as int? ?? 1;
-    if (version != _schemaVersion) {
-      return const AppSettings();
-    }
-
-    final settings = root['settings'];
-    if (settings is Map<String, dynamic>) {
-      return AppSettings.fromJson(settings);
-    }
-    return const AppSettings();
+    final prefs = await SharedPreferences.getInstance();
+    // 若没有任何 key，返回默认值（首次启动）
+    // 兼容旧 JSON 文件的读取已移除，按你的要求直接按字段存取
+    return AppSettings(
+      themeMode: ThemeModeOptionParsing.fromName(
+          prefs.getString(_k('themeMode'))),
+      listenAddress: (prefs
+          .getString(_k('listenAddress'))
+          ?.trim()
+          .isEmpty ?? true)
+          ? '127.0.0.1'
+          : prefs.getString(_k('listenAddress'))!.trim(),
+      mixedPort: _sanitizePort(prefs.getInt(_k('mixedPort'))),
+      proxyMode: ProxyModeParsing.fromName(prefs.getString(_k('proxyMode'))),
+      ipv6: prefs.getBool(_k('ipv6')) ?? false,
+      systemProxy: prefs.getBool(_k('systemProxy')) ?? true,
+      serviceBasePath: (prefs.getString(_k('serviceBasePath')) ?? '').trim(),
+      serviceWorkingPath: (prefs.getString(_k('serviceWorkingPath')) ?? '')
+          .trim(),
+      serviceTempPath: (prefs.getString(_k('serviceTempPath')) ?? '').trim(),
+      serviceLocale: (prefs.getString(_k('serviceLocale')) ?? '').trim(),
+    );
   }
 
   @override
-  Future<void> save(AppSettings settings) {
-    return _store.writeObject({
-      'schemaVersion': _schemaVersion,
-      'settings': settings.toJson(),
-    });
+  Future<void> save(AppSettings settings) async {
+    final prefs = await SharedPreferences.getInstance();
+    await Future.wait([
+      prefs.setString(_k('themeMode'), settings.themeMode.name),
+      prefs.setString(_k('listenAddress'), settings.listenAddress),
+      prefs.setInt(_k('mixedPort'), settings.mixedPort),
+      prefs.setString(_k('proxyMode'), settings.proxyMode.name),
+      prefs.setBool(_k('ipv6'), settings.ipv6),
+      prefs.setBool(_k('systemProxy'), settings.systemProxy),
+      prefs.setString(_k('serviceBasePath'), settings.serviceBasePath),
+      prefs.setString(_k('serviceWorkingPath'), settings.serviceWorkingPath),
+      prefs.setString(_k('serviceTempPath'), settings.serviceTempPath),
+      prefs.setString(_k('serviceLocale'), settings.serviceLocale),
+    ]);
   }
+
+  int _sanitizePort(int? v) => v == null || v <= 0 || v >= 65536 ? 2080 : v;
 }
 
 class MemorySettingsStore implements AppSettingsStore {
   MemorySettingsStore([AppSettings initialSettings = const AppSettings()])
-    : _settings = initialSettings;
+      : _settings = initialSettings;
 
   AppSettings _settings;
 

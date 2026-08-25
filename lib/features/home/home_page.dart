@@ -18,6 +18,7 @@ import 'presentation/widgets/current_profile_card.dart';
 import 'presentation/widgets/ip_info_card.dart';
 import 'presentation/widgets/quick_actions_grid.dart';
 import 'presentation/widgets/traffic_stats_card.dart';
+import '../maps/presentation/widgets/home_world_map.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -51,7 +52,9 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   Future<void> _checkTargetLibService() async {
     try {
-      final settings = ref.read(settingsProvider).settings;
+      final settings = ref
+          .read(settingsProvider)
+          .settings;
       final result = await _serviceController.status(
         basePath: settings.serviceBasePath,
       );
@@ -88,7 +91,9 @@ class _HomePageState extends ConsumerState<HomePage> {
       _serviceInstallError = null;
     });
     try {
-      final settings = ref.read(settingsProvider).settings;
+      final settings = ref
+          .read(settingsProvider)
+          .settings;
       await _serviceController.installAndStart(
         basePath: settings.serviceBasePath,
         workingPath: settings.serviceWorkingPath,
@@ -117,7 +122,9 @@ class _HomePageState extends ConsumerState<HomePage> {
       _serviceInstallError = null;
     });
     try {
-      final settings = ref.read(settingsProvider).settings;
+      final settings = ref
+          .read(settingsProvider)
+          .settings;
       await _serviceController.start(
         basePath: settings.serviceBasePath,
         workingPath: settings.serviceWorkingPath,
@@ -172,7 +179,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                     const TargetPageHeader(
                       title: 'Dashboard',
                       subtitle:
-                          'Monitor your local network service and runtime health.',
+                      'Monitor your local network service and runtime health.',
                     ),
                     const SizedBox(height: 20),
                     if (!_serviceChecking &&
@@ -183,7 +190,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                       _ServiceInstallCard(
                         installing: _serviceInstalling,
                         installed:
-                            _serviceStatus == TargetLibServiceStatus.stopped,
+                        _serviceStatus == TargetLibServiceStatus.stopped,
                         checkFailed: _serviceCheckFailed,
                         error: _serviceInstallError,
                         onAction: _serviceCheckFailed
@@ -236,8 +243,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                             Text(
                               core.available
                                   ? (core.running
-                                        ? 'Traffic is being routed through the active profile.'
-                                        : 'Start the service to begin routing traffic.')
+                                  ? 'Traffic is being routed through the active profile.'
+                                  : 'Start the service to begin routing traffic.')
                                   : 'The local core is unavailable on this platform.',
                               style: theme.textTheme.bodyMedium,
                             ),
@@ -273,18 +280,19 @@ class _HomePageState extends ConsumerState<HomePage> {
                                 onSelectionChanged: core.busy
                                     ? null
                                     : (selected) {
-                                        if (selected.isNotEmpty) {
-                                          _changeProxyMode(selected.first);
-                                        }
-                                      },
+                                  if (selected.isNotEmpty) {
+                                    _changeProxyMode(selected.first);
+                                  }
+                                },
                               ),
                             const SizedBox(height: 14),
                             FilledButton(
                               onPressed: core.busy || !core.available
                                   ? null
-                                  : () => core.running
-                                        ? ref.read(coreProvider.notifier).stop()
-                                        : _connect(),
+                                  : () =>
+                              core.running
+                                  ? ref.read(coreProvider.notifier).stop()
+                                  : _connect(),
                               child: Text(
                                 core.busy
                                     ? 'Working…'
@@ -333,6 +341,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                       onCloseConnections: _closeConnections,
                       onReinstallService: _reinstallService,
                     ),
+                    const SizedBox(height: 18),
+                    const HomeWorldMapCard(),
                   ],
                 ),
               ),
@@ -370,26 +380,29 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   Future<void> _reinstallService() async {
-    if (ref.read(coreProvider).busy) return;
+    if (ref
+        .read(coreProvider)
+        .busy) return;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Force reinstall service?'),
-        content: const Text(
-          'TargetLib will stop, uninstall, and install again with '
-          'administrator permission.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+      builder: (dialogContext) =>
+          AlertDialog(
+            title: const Text('Force reinstall service?'),
+            content: const Text(
+              'TargetLib will stop, uninstall, and install again with '
+                  'administrator permission.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Reinstall'),
+              ),
+            ],
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Reinstall'),
-          ),
-        ],
-      ),
     );
     if (confirmed != true || !mounted) return;
     await ref.read(coreProvider.notifier).reinstallService();
@@ -407,11 +420,15 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   Future<void> _changeProxyMode(settings_models.ProxyMode mode) async {
-    final current = ref.read(settingsProvider).settings;
+    final current = ref
+        .read(settingsProvider)
+        .settings;
     if (current.proxyMode == mode) return;
     final settingsNotifier = ref.read(settingsProvider.notifier);
     settingsNotifier.setProxyMode(mode);
-    final next = ref.read(settingsProvider).settings;
+    final next = ref
+        .read(settingsProvider)
+        .settings;
     await ref.read(coreProvider.notifier).configure(next);
     if (!mounted) return;
     final core = ref.read(coreProvider);
@@ -424,14 +441,18 @@ class _HomePageState extends ConsumerState<HomePage> {
     final notifier = ref.read(proxiesProvider.notifier);
     await notifier.testAllLatency();
     if (!mounted) return;
-    final error = ref.read(proxiesProvider).lastError;
+    final error = ref
+        .read(proxiesProvider)
+        .lastError;
     _showMessage(error ?? 'Proxy URLTest completed.', error: error != null);
   }
 
   Future<void> _refreshRuleSets() async {
     final count = await ref.read(coreProvider.notifier).refreshRuleSets();
     if (!mounted) return;
-    final message = ref.read(coreProvider).message;
+    final message = ref
+        .read(coreProvider)
+        .message;
     _showMessage(
       count == null
           ? message
@@ -443,34 +464,42 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   Future<void> _closeConnections() async {
-    final active = ref.read(coreProvider).traffic.activeConnections;
+    final active = ref
+        .read(coreProvider)
+        .traffic
+        .activeConnections;
     if (active == 0) {
       _showMessage('There are no active connections.');
       return;
     }
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Close all connections?'),
-        content: Text(
-          '$active active connection${active == 1 ? '' : 's'} will be interrupted.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+      builder: (dialogContext) =>
+          AlertDialog(
+            title: const Text('Close all connections?'),
+            content: Text(
+              '$active active connection${active == 1
+                  ? ''
+                  : 's'} will be interrupted.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Close all'),
+              ),
+            ],
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Close all'),
-          ),
-        ],
-      ),
     );
     if (confirmed != true) return;
     final count = await ref.read(coreProvider.notifier).closeAllConnections();
     if (!mounted) return;
-    final message = ref.read(coreProvider).message;
+    final message = ref
+        .read(coreProvider)
+        .message;
     _showMessage(
       count == null
           ? message
@@ -486,7 +515,10 @@ class _HomePageState extends ConsumerState<HomePage> {
       ..showSnackBar(
         SnackBar(
           content: Text(message),
-          backgroundColor: error ? Theme.of(context).colorScheme.error : null,
+          backgroundColor: error ? Theme
+              .of(context)
+              .colorScheme
+              .error : null,
         ),
       );
   }
@@ -509,7 +541,9 @@ class _ServiceInstallCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final scheme = Theme
+        .of(context)
+        .colorScheme;
     return Card(
       color: scheme.secondaryContainer,
       child: Padding(
@@ -531,7 +565,10 @@ class _ServiceInstallCard extends StatelessWidget {
                         : installed
                         ? 'TargetLib service is stopped'
                         : 'Install the TargetLib service',
-                    style: Theme.of(context).textTheme.titleMedium,
+                    style: Theme
+                        .of(context)
+                        .textTheme
+                        .titleMedium,
                   ),
                 ),
               ],
@@ -551,17 +588,17 @@ class _ServiceInstallCard extends StatelessWidget {
                 onPressed: installing ? null : onAction,
                 icon: installing
                     ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
                     : Icon(
-                        checkFailed
-                            ? Icons.refresh
-                            : installed
-                            ? Icons.play_arrow
-                            : Icons.download,
-                      ),
+                  checkFailed
+                      ? Icons.refresh
+                      : installed
+                      ? Icons.play_arrow
+                      : Icons.download,
+                ),
                 label: Text(
                   installing
                       ? (installed ? 'Starting…' : 'Installing…')

@@ -19,7 +19,6 @@ dependencies:
   grpc: ^5.1.0
   intl: ^0.20.2
   lottie: ^3.5.1
-  path_provider: ^2.1.6
   path: ^1.9.1
   protobuf: ^6.0.0
   tray_manager: ^0.5.3
@@ -29,6 +28,9 @@ dependencies:
   talker: ^5.1.20
   targetlib:
     path: ../TargetLib/flutter
+  syncfusion_flutter_maps: ^34.2.4
+  shared_preferences: ^2.5.5
+  path_provider: ^2.1.6
 dev_dependencies:
   flutter_launcher_icons: ^0.14.4
   flutter_test:

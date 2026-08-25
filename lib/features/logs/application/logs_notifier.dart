@@ -34,9 +34,9 @@ class LogsState {
       list = list
           .where(
             (e) =>
-                (e.message ?? '').toLowerCase().contains(q) ||
-                (e.title ?? '').toLowerCase().contains(q),
-          )
+        (e.message ?? '').toLowerCase().contains(q) ||
+            (e.title ?? '').toLowerCase().contains(q),
+      )
           .toList();
     }
 
@@ -121,13 +121,13 @@ class LogsNotifier extends Notifier<LogsState> {
     return text
         .replaceAllMapped(RegExp(r'https?://[^\s]+'), (m) => '[URL]')
         .replaceAllMapped(
-          RegExp(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b'),
+      RegExp(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b'),
           (m) => '[IP]',
-        )
+    )
         .replaceAllMapped(
-          RegExp(r'token=[^\s&]+', caseSensitive: false),
+      RegExp(r'token=[^\s&]+', caseSensitive: false),
           (m) => 'token=[HIDDEN]',
-        );
+    );
   }
 }
 

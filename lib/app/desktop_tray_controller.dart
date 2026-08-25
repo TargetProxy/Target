@@ -59,8 +59,8 @@ class DesktopTrayController with tray.TrayListener, window.WindowListener {
   Future<void> updateCoreState(CoreState core, {bool force = false}) async {
     final changed =
         _running != core.running ||
-        _busy != core.busy ||
-        _available != core.available;
+            _busy != core.busy ||
+            _available != core.available;
     _running = core.running;
     _busy = core.busy;
     _available = core.available;

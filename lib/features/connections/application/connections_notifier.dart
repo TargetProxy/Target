@@ -39,16 +39,17 @@ class ConnectionsState {
       list = list
           .where(
             (c) =>
-                c.destination.toLowerCase().contains(q) ||
-                c.outbound.toLowerCase().contains(q) ||
-                c.network.toLowerCase().contains(q) ||
-                c.protocol.toLowerCase().contains(q) ||
-                c.domain.toLowerCase().contains(q),
-          )
+        c.destination.toLowerCase().contains(q) ||
+            c.outbound.toLowerCase().contains(q) ||
+            c.network.toLowerCase().contains(q) ||
+            c.protocol.toLowerCase().contains(q) ||
+            c.domain.toLowerCase().contains(q),
+      )
           .toList();
     }
 
-    list = List.of(list)..sort(_compare);
+    list = List.of(list)
+      ..sort(_compare);
 
     return list;
   }
@@ -79,9 +80,10 @@ class ConnectionsState {
       ConnectionSortBy.destination => a.destination.compareTo(b.destination),
       ConnectionSortBy.outbound => a.outbound.compareTo(b.outbound),
       ConnectionSortBy.network => a.network.compareTo(b.network),
-      ConnectionSortBy.traffic => (a.uplinkTotal + a.downlinkTotal).compareTo(
-        b.uplinkTotal + b.downlinkTotal,
-      ),
+      ConnectionSortBy.traffic =>
+          (a.uplinkTotal + a.downlinkTotal).compareTo(
+            b.uplinkTotal + b.downlinkTotal,
+          ),
     };
     return sortAsc ? result : -result;
   }
@@ -93,7 +95,9 @@ class ConnectionsNotifier extends Notifier<ConnectionsState> {
     ref.listen(coreProvider, (_, next) {
       state = state.copyWith(connections: next.connections);
     });
-    return ConnectionsState(connections: ref.read(coreProvider).connections);
+    return ConnectionsState(connections: ref
+        .read(coreProvider)
+        .connections);
   }
 
   void setSearchQuery(String query) {
@@ -118,7 +122,9 @@ class ConnectionsNotifier extends Notifier<ConnectionsState> {
     try {
       final closed = await core.closeConnection(connectionId);
       if (!closed) {
-        state = state.copyWith(lastError: ref.read(coreProvider).message);
+        state = state.copyWith(lastError: ref
+            .read(coreProvider)
+            .message);
       }
       return closed;
     } finally {
@@ -135,7 +141,9 @@ class ConnectionsNotifier extends Notifier<ConnectionsState> {
     try {
       final count = await core.closeAllConnections();
       if (count == null) {
-        state = state.copyWith(lastError: ref.read(coreProvider).message);
+        state = state.copyWith(lastError: ref
+            .read(coreProvider)
+            .message);
       }
       return count;
     } finally {
@@ -145,6 +153,6 @@ class ConnectionsNotifier extends Notifier<ConnectionsState> {
 }
 
 final connectionsProvider =
-    NotifierProvider<ConnectionsNotifier, ConnectionsState>(
-      ConnectionsNotifier.new,
-    );
+NotifierProvider<ConnectionsNotifier, ConnectionsState>(
+  ConnectionsNotifier.new,
+);

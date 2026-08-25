@@ -46,10 +46,10 @@ class ProxiesState {
       nodes = nodes
           .where(
             (n) =>
-                n.name.toLowerCase().contains(q) ||
-                n.type.toLowerCase().contains(q) ||
-                (n.countryCode?.toLowerCase().contains(q) ?? false),
-          )
+        n.name.toLowerCase().contains(q) ||
+            n.type.toLowerCase().contains(q) ||
+            (n.countryCode?.toLowerCase().contains(q) ?? false),
+      )
           .toList();
     }
 
@@ -120,12 +120,12 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
         for (var i = 0; i < state.groups.length; i++)
           i == state.selectedGroupIndex
               ? group.copyWith(
-                  selectedNodeId: nodeId,
-                  nodes: [
-                    for (final node in group.nodes)
-                      node.copyWith(isSelected: node.id == nodeId),
-                  ],
-                )
+            selectedNodeId: nodeId,
+            nodes: [
+              for (final node in group.nodes)
+                node.copyWith(isSelected: node.id == nodeId),
+            ],
+          )
               : state.groups[i],
       ],
     );
@@ -145,7 +145,9 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
     state = state.copyWith(testing: true, clearError: true);
 
     try {
-      final coreGroups = ref.read(coreProvider).proxyGroups;
+      final coreGroups = ref
+          .read(coreProvider)
+          .proxyGroups;
       final candidateGroups = coreGroups.any((group) => _isUrlTest(group.type))
           ? coreGroups
           : state.groups;
@@ -165,14 +167,14 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
           lastError: protocols.isEmpty
               ? 'TargetLib has no testable URLTest nodes. Add a subscription first.'
               : 'TargetLib has no testable URLTest nodes. '
-                    'Supported nodes found: $protocols.',
+              'Supported nodes found: $protocols.',
         );
         return;
       }
       var successCount = 0;
       final errors = <String>[];
       await for (final result
-          in ref.read(coreProvider.notifier).testLatencies(nodeIds)) {
+      in ref.read(coreProvider.notifier).testLatencies(nodeIds)) {
         final latency = result.delayMilliseconds;
         if (result.succeeded && latency != null) {
           successCount++;
@@ -184,7 +186,9 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
       if (successCount == 0) {
         state = state.copyWith(
           lastError: errors.isEmpty
-              ? ref.read(coreProvider).message
+              ? ref
+              .read(coreProvider)
+              .message
               : errors.first,
         );
       }
@@ -197,15 +201,18 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
 
   Future<void> testSingleLatency(String nodeId) async {
     state = state.copyWith(clearError: true);
-    final coreGroups = ref.read(coreProvider).proxyGroups;
+    final coreGroups = ref
+        .read(coreProvider)
+        .proxyGroups;
     final candidateGroups = coreGroups.any(_isUrlTestGroup)
         ? coreGroups
         : state.groups;
     final testable = candidateGroups.any(
-      (group) =>
-          _isUrlTestGroup(group) &&
+          (group) =>
+      _isUrlTestGroup(group) &&
           group.nodes.any(
-            (node) => node.id == nodeId && node.type.toLowerCase() != 'direct',
+                (node) =>
+            node.id == nodeId && node.type.toLowerCase() != 'direct',
           ),
     );
     if (!testable) {
@@ -224,7 +231,9 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
           .read(coreProvider.notifier)
           .testLatency(node.id);
       if (latency == null) {
-        state = state.copyWith(lastError: ref.read(coreProvider).message);
+        state = state.copyWith(lastError: ref
+            .read(coreProvider)
+            .message);
       }
       final updated = List<ProxyNode>.from(group.nodes);
       updated[idx] = node.copyWith(latencyMs: latency);
@@ -276,7 +285,9 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
     if (core.proxyGroups.isEmpty) {
       return current;
     }
-    final catalogGroups = ref.read(proxyCatalogProvider).groups;
+    final catalogGroups = ref
+        .read(proxyCatalogProvider)
+        .groups;
     if (catalogGroups.isNotEmpty) {
       final runtimeNodes = <String, ProxyNode>{
         for (final group in core.proxyGroups)

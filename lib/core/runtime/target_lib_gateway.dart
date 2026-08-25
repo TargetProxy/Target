@@ -23,7 +23,7 @@ import 'subscription_gateway.dart';
 
 class TargetLibGateway implements CoreGateway, SubscriptionGateway {
   TargetLibGateway({Directory? workingDirectory})
-    : _workingDirectory = workingDirectory {
+      : _workingDirectory = workingDirectory {
     TargetLibLog.sink = _forwardTargetLibLog;
   }
 
@@ -31,9 +31,9 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
   final Directory? _workingDirectory;
 
   final StreamController<CoreSnapshot> _snapshots =
-      StreamController<CoreSnapshot>.broadcast();
+  StreamController<CoreSnapshot>.broadcast();
   final StreamController<void> _subscriptionChanges =
-      StreamController<void>.broadcast();
+  StreamController<void>.broadcast();
   final Map<String, ProxyGroup> _groups = {};
   final Map<String, CoreConnection> _connections = {};
   final List<StreamSubscription<Object?>> _subscriptions = [];
@@ -71,13 +71,13 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
     final state = await manager.getState(Empty(), options: _callOptions);
     final lifecycle = switch (state.state) {
       targetlib_pb.ServiceStateType.SERVICE_STATE_RUNNING =>
-        CoreLifecycle.running,
+      CoreLifecycle.running,
       targetlib_pb.ServiceStateType.SERVICE_STATE_STARTING =>
-        CoreLifecycle.starting,
+      CoreLifecycle.starting,
       targetlib_pb.ServiceStateType.SERVICE_STATE_STOPPING =>
-        CoreLifecycle.stopping,
+      CoreLifecycle.stopping,
       targetlib_pb.ServiceStateType.SERVICE_STATE_FAILED =>
-        CoreLifecycle.failed,
+      CoreLifecycle.failed,
       _ => CoreLifecycle.stopped,
     };
     _publish(
@@ -94,18 +94,22 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
   }
 
   @override
-  Future<void> configure(AppSettings settings) => _serialize(() async {
-    _settings = settings;
-    await _reloadIfRunning();
-  });
+  Future<void> configure(AppSettings settings) =>
+      _serialize(() async {
+        _settings = settings;
+        await _reloadIfRunning();
+      });
 
   @override
   @override
-  Future<void> setRawConfig(String? config) => _serialize(() async {
-    _rawConfig = config?.trim().isEmpty == true ? null : config?.trim();
-    if (_rawConfig != null) await _clearActiveSubscription();
-    await _reloadIfRunning();
-  });
+  Future<void> setRawConfig(String? config) =>
+      _serialize(() async {
+        _rawConfig = config
+            ?.trim()
+            .isEmpty == true ? null : config?.trim();
+        if (_rawConfig != null) await _clearActiveSubscription();
+        await _reloadIfRunning();
+      });
 
   @override
   Future<void> start() => _serialize(_startLocked);
@@ -188,19 +192,22 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
   }
 
   @override
-  Future<RuntimeSubscriptionSnapshot> listSubscriptions() => _serialize(
-    () async {
-      await _ensureConnected();
-      final result = await _manager!.listSubscriptions(
-        Empty(),
-        options: _callOptions,
+  Future<RuntimeSubscriptionSnapshot> listSubscriptions() =>
+      _serialize(
+            () async {
+          await _ensureConnected();
+          final result = await _manager!.listSubscriptions(
+            Empty(),
+            options: _callOptions,
+          );
+          return RuntimeSubscriptionSnapshot(
+            subscriptions: result.subscriptions
+                .map(_runtimeSubscription)
+                .toList(),
+            activeId: result.activeId.isEmpty ? null : result.activeId,
+          );
+        },
       );
-      return RuntimeSubscriptionSnapshot(
-        subscriptions: result.subscriptions.map(_runtimeSubscription).toList(),
-        activeId: result.activeId.isEmpty ? null : result.activeId,
-      );
-    },
-  );
 
   @override
   Future<RuntimeSubscription> addSubscription({
@@ -213,33 +220,35 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
     required Map<String, String> headers,
     bool activate = false,
     bool updateNow = false,
-  }) => _serialize(() async {
-    await _ensureConnected();
-    final view = await _manager!.addSubscription(
-      targetlib_pb.AddSubscriptionRequest(
-        id: id,
-        name: name,
-        url: url,
-        enabled: enabled,
-        autoUpdate: autoUpdate,
-        updateIntervalSeconds: Int64(updateIntervalSeconds),
-        headers: headers.entries,
-        activate: activate,
-        updateNow: updateNow,
-      ),
-      options: _callOptions,
-    );
-    return _runtimeSubscription(view);
-  });
+  }) =>
+      _serialize(() async {
+        await _ensureConnected();
+        final view = await _manager!.addSubscription(
+          targetlib_pb.AddSubscriptionRequest(
+            id: id,
+            name: name,
+            url: url,
+            enabled: enabled,
+            autoUpdate: autoUpdate,
+            updateIntervalSeconds: Int64(updateIntervalSeconds),
+            headers: headers.entries,
+            activate: activate,
+            updateNow: updateNow,
+          ),
+          options: _callOptions,
+        );
+        return _runtimeSubscription(view);
+      });
 
   @override
-  Future<void> removeSubscription(String id) => _serialize(() async {
-    await _ensureConnected();
-    await _manager!.removeSubscription(
-      targetlib_pb.SubscriptionId(id: id),
-      options: _callOptions,
-    );
-  });
+  Future<void> removeSubscription(String id) =>
+      _serialize(() async {
+        await _ensureConnected();
+        await _manager!.removeSubscription(
+          targetlib_pb.SubscriptionId(id: id),
+          options: _callOptions,
+        );
+      });
 
   @override
   Future<RuntimeSubscription> renameSubscription(String id, String name) =>
@@ -271,15 +280,18 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
       });
 
   @override
-  Future<void> activateSubscription(String? id) => _serialize(() async {
-    await _ensureConnected();
-    final normalized = id?.trim().isEmpty == true ? null : id?.trim();
-    await _manager!.setActiveSubscription(
-      targetlib_pb.SetActiveSubscriptionRequest(id: normalized ?? ''),
-      options: _callOptions,
-    );
-    if (normalized != null) _rawConfig = null;
-  });
+  Future<void> activateSubscription(String? id) =>
+      _serialize(() async {
+        await _ensureConnected();
+        final normalized = id
+            ?.trim()
+            .isEmpty == true ? null : id?.trim();
+        await _manager!.setActiveSubscription(
+          targetlib_pb.SetActiveSubscriptionRequest(id: normalized ?? ''),
+          options: _callOptions,
+        );
+        if (normalized != null) _rawConfig = null;
+      });
 
   Future<void> _clearActiveSubscription() async {
     final manager = _manager;
@@ -292,19 +304,21 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
 
   /// Queries the egress IP geolocation through the TargetLib backend.
   @override
-  Future<IpInfo> fetchIpInfo() => _serialize(() async {
-    await _ensureConnected();
-    final response = await _manager!.getIpInfo(Empty(), options: _callOptions);
-    return IpInfo(
-      ip: response.ip,
-      country: response.country,
-      countryCode: response.countryCode,
-      city: response.city,
-      isp: response.isp,
-      org: response.org,
-      asName: response.asName,
-    );
-  });
+  Future<IpInfo> fetchIpInfo() =>
+      _serialize(() async {
+        await _ensureConnected();
+        final response = await _manager!.getIpInfo(
+            Empty(), options: _callOptions);
+        return IpInfo(
+          ip: response.ip,
+          country: response.country,
+          countryCode: response.countryCode,
+          city: response.city,
+          isp: response.isp,
+          org: response.org,
+          asName: response.asName,
+        );
+      });
 
   RuntimeSubscription _runtimeSubscription(targetlib_pb.SubscriptionView view) {
     return RuntimeSubscription(
@@ -316,11 +330,11 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
       updateIntervalSeconds: view.updateIntervalSeconds.toInt(),
       status: switch (view.status) {
         targetlib_pb.SubscriptionStatus.SUBSCRIPTION_STATUS_UPDATING =>
-          RuntimeSubscriptionStatus.updating,
+        RuntimeSubscriptionStatus.updating,
         targetlib_pb.SubscriptionStatus.SUBSCRIPTION_STATUS_READY =>
-          RuntimeSubscriptionStatus.ready,
+        RuntimeSubscriptionStatus.ready,
         targetlib_pb.SubscriptionStatus.SUBSCRIPTION_STATUS_FAILED =>
-          RuntimeSubscriptionStatus.failed,
+        RuntimeSubscriptionStatus.failed,
         _ => RuntimeSubscriptionStatus.idle,
       },
       nodes: [
@@ -330,7 +344,7 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
             name: node.name,
             type: node.type,
             isAvailable:
-                node.phase ==
+            node.phase ==
                 targetlib_pb
                     .SubscriptionNodePhase
                     .SUBSCRIPTION_NODE_PHASE_READY,
@@ -359,9 +373,10 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
     );
   }
 
-  DateTime? _dateFromUnixMilliseconds(int value) => value <= 0
-      ? null
-      : DateTime.fromMillisecondsSinceEpoch(value, isUtc: true);
+  DateTime? _dateFromUnixMilliseconds(int value) =>
+      value <= 0
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(value, isUtc: true);
 
   @override
   Future<void> stop() => _serialize(_stopLocked);
@@ -500,57 +515,60 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
   }
 
   @override
-  Future<void> reinstallService() => _serialize(() async {
-    final basePath = (await _resolveBaseDirectory()).path;
-    final workingPath = await _resolveWorkingPath();
-    final tempPath = await _resolveTempPath();
+  Future<void> reinstallService() =>
+      _serialize(() async {
+        final basePath = (await _resolveBaseDirectory()).path;
+        final workingPath = await _resolveWorkingPath();
+        final tempPath = await _resolveTempPath();
 
-    // Release the in-process daemon before replacing its registered binary.
-    await _shutdownTransport();
-    try {
-      await _runtime.serviceManager.run(
-        'stop',
-        basePath: basePath,
-        workingPath: workingPath,
-        tempPath: tempPath,
-        locale: _settings.serviceLocale,
-        refreshExecutable: false,
-      );
-    } on Object catch (error) {
-      // The service may not be installed or may already be stopped.
-      AppLogger.info('Service stop skipped: $error', source: 'TargetLib');
-    }
-    try {
-      await _runtime.serviceManager.run(
-        'uninstall',
-        basePath: basePath,
-        workingPath: workingPath,
-        tempPath: tempPath,
-        locale: _settings.serviceLocale,
-        refreshExecutable: false,
-      );
-    } on Object catch (error) {
-      // Uninstall is intentionally best effort: a missing service should not
-      // prevent the subsequent install from repairing the installation.
-      AppLogger.info('Service uninstall skipped: $error', source: 'TargetLib');
-    }
-    await _runtime.serviceManager.installAndStart(
-      basePath: basePath,
-      workingPath: workingPath,
-      tempPath: tempPath,
-      locale: _settings.serviceLocale,
-    );
-  });
+        // Release the in-process daemon before replacing its registered binary.
+        await _shutdownTransport();
+        try {
+          await _runtime.serviceManager.run(
+            'stop',
+            basePath: basePath,
+            workingPath: workingPath,
+            tempPath: tempPath,
+            locale: _settings.serviceLocale,
+            refreshExecutable: false,
+          );
+        } on Object catch (error) {
+          // The service may not be installed or may already be stopped.
+          AppLogger.info('Service stop skipped: $error', source: 'TargetLib');
+        }
+        try {
+          await _runtime.serviceManager.run(
+            'uninstall',
+            basePath: basePath,
+            workingPath: workingPath,
+            tempPath: tempPath,
+            locale: _settings.serviceLocale,
+            refreshExecutable: false,
+          );
+        } on Object catch (error) {
+          // Uninstall is intentionally best effort: a missing service should not
+          // prevent the subsequent install from repairing the installation.
+          AppLogger.info(
+              'Service uninstall skipped: $error', source: 'TargetLib');
+        }
+        await _runtime.serviceManager.installAndStart(
+          basePath: basePath,
+          workingPath: workingPath,
+          tempPath: tempPath,
+          locale: _settings.serviceLocale,
+        );
+      });
 
   @override
-  Future<void> dispose() => _serialize(() async {
-    if (_disposed) return;
-    await _stopLocked();
-    await _shutdownTransport();
-    _disposed = true;
-    await _snapshots.close();
-    await _subscriptionChanges.close();
-  });
+  Future<void> dispose() =>
+      _serialize(() async {
+        if (_disposed) return;
+        await _stopLocked();
+        await _shutdownTransport();
+        _disposed = true;
+        await _snapshots.close();
+        await _subscriptionChanges.close();
+      });
 
   Future<Directory> _resolveBaseDirectory() async {
     final path = await _runtime.resolveBasePath(
@@ -647,7 +665,7 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
     );
     _listen(
       manager.subscribeSubscriptionEvents(Empty(), options: options),
-      (_) => _subscriptionChanges.add(null),
+          (_) => _subscriptionChanges.add(null),
       label: 'SubscribeSubscriptionEvents',
     );
     _listen(
@@ -671,11 +689,10 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
     });
   }
 
-  StreamSubscription<Object?> _listen<T>(
-    Stream<T> stream,
-    void Function(T) onData, {
-    required String label,
-  }) {
+  StreamSubscription<Object?> _listen<T>(Stream<T> stream,
+      void Function(T) onData, {
+        required String label,
+      }) {
     final subscription = stream.listen(
       onData,
       onError: (Object error, StackTrace stackTrace) {
@@ -696,13 +713,13 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
   void _applyManagerState(targetlib_pb.ServiceState status) {
     final lifecycle = switch (status.state) {
       targetlib_pb.ServiceStateType.SERVICE_STATE_STARTING =>
-        CoreLifecycle.starting,
+      CoreLifecycle.starting,
       targetlib_pb.ServiceStateType.SERVICE_STATE_RUNNING =>
-        CoreLifecycle.running,
+      CoreLifecycle.running,
       targetlib_pb.ServiceStateType.SERVICE_STATE_STOPPING =>
-        CoreLifecycle.stopping,
+      CoreLifecycle.stopping,
       targetlib_pb.ServiceStateType.SERVICE_STATE_FAILED =>
-        CoreLifecycle.failed,
+      CoreLifecycle.failed,
       _ => CoreLifecycle.stopped,
     };
     _setRuntimeStreamsEnabled(lifecycle == CoreLifecycle.running);
@@ -756,7 +773,7 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
     }
 
     _lifecycleTail = _lifecycleTail.then<void>(
-      (_) => run(),
+          (_) => run(),
       onError: (_, _) => run(),
     );
     return completer.future;
@@ -791,21 +808,21 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
     }
   }
 
-  static LogLevel _logLevel(targetlib_pb.LogLevel level) => switch (level) {
-    targetlib_pb.LogLevel.LOG_LEVEL_WARN => LogLevel.warning,
-    targetlib_pb.LogLevel.LOG_LEVEL_ERROR ||
-    targetlib_pb.LogLevel.LOG_LEVEL_FATAL ||
-    targetlib_pb.LogLevel.LOG_LEVEL_PANIC => LogLevel.error,
-    _ => LogLevel.info,
-  };
+  static LogLevel _logLevel(targetlib_pb.LogLevel level) =>
+      switch (level) {
+        targetlib_pb.LogLevel.LOG_LEVEL_WARN => LogLevel.warning,
+        targetlib_pb.LogLevel.LOG_LEVEL_ERROR ||
+        targetlib_pb.LogLevel.LOG_LEVEL_FATAL ||
+        targetlib_pb.LogLevel.LOG_LEVEL_PANIC => LogLevel.error,
+        _ => LogLevel.info,
+      };
 
-  static void _forwardTargetLibLog(
-    String level,
-    String message, {
-    Object? error,
-    StackTrace? stackTrace,
-    String? source,
-  }) {
+  static void _forwardTargetLibLog(String level,
+      String message, {
+        Object? error,
+        StackTrace? stackTrace,
+        String? source,
+      }) {
     final origin = source ?? 'TargetLib';
     switch (level) {
       case 'DEBUG':
@@ -830,23 +847,22 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
   }
 
   static CoreLatencyResult _coreLatencyResult(
-    targetlib_pb.LatencyTestResult result,
-  ) {
+      targetlib_pb.LatencyTestResult result,) {
     final testedAt = result.testedAtUnixMs.toInt();
     return CoreLatencyResult(
       outboundId: result.outboundTag,
       status: switch (result.status) {
         targetlib_pb.LatencyTestStatus.LATENCY_TEST_STATUS_SUCCESS =>
-          CoreLatencyStatus.success,
+        CoreLatencyStatus.success,
         targetlib_pb.LatencyTestStatus.LATENCY_TEST_STATUS_TIMEOUT =>
-          CoreLatencyStatus.timeout,
+        CoreLatencyStatus.timeout,
         targetlib_pb.LatencyTestStatus.LATENCY_TEST_STATUS_NOT_FOUND =>
-          CoreLatencyStatus.notFound,
+        CoreLatencyStatus.notFound,
         _ => CoreLatencyStatus.failed,
       },
       delayMilliseconds:
-          result.status ==
-              targetlib_pb.LatencyTestStatus.LATENCY_TEST_STATUS_SUCCESS
+      result.status ==
+          targetlib_pb.LatencyTestStatus.LATENCY_TEST_STATUS_SUCCESS
           ? result.delayMilliseconds
           : null,
       testedAt: testedAt > 0
