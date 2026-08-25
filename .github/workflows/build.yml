@@ -1,0 +1,52 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout Target
+        uses: actions/checkout@v4
+        with:
+          path: Target
+
+      - name: Checkout TargetLib
+        uses: actions/checkout@v4
+        with:
+          repository: TargetProxy/TargetLib
+          path: TargetLib
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: true
+          cache-dependency-path: TargetLib/go.sum
+
+      - name: Build TargetLib
+        working-directory: TargetLib
+        shell: pwsh
+        run: .\scripts\build.ps1 -SkipTargetSync
+
+      - name: Get Flutter dependencies
+        working-directory: Target
+        run: flutter pub get
+
+      - name: Build Windows
+        working-directory: Target
+        run: flutter build windows --release
