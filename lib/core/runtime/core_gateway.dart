@@ -22,6 +22,7 @@ abstract class CoreGateway {
   Future<int> closeAllConnections();
   Future<int> refreshRuleSets();
   Future<void> clearLogs();
+  Future<void> reinstallService();
 
   /// Queries the egress IP geolocation through the backend.
   Future<IpInfo> fetchIpInfo();
@@ -63,7 +64,6 @@ class UnavailableCoreGateway implements CoreGateway {
   Future<void> configure(AppSettings settings) => _unavailable();
 
   @override
-
   @override
   Future<void> setRawConfig(String? config) => _unavailable();
 
@@ -96,6 +96,9 @@ class UnavailableCoreGateway implements CoreGateway {
 
   @override
   Future<void> clearLogs() async {}
+
+  @override
+  Future<void> reinstallService() => _unavailable();
 
   @override
   Future<IpInfo> fetchIpInfo() => _unavailable();

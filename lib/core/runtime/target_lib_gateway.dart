@@ -6,38 +6,29 @@ import 'dart:io';
 
 import 'package:fixnum/fixnum.dart';
 import 'package:grpc/grpc.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 import 'package:protobuf/well_known_types/google/protobuf/empty.pb.dart';
 
 import '../../data/models/app_settings.dart';
 import '../../data/models/ip_info.dart';
 import '../../data/models/proxy_group.dart';
 import '../../data/models/proxy_node.dart';
-import '../../data/storage/app_storage_paths.dart';
 import '../logging/ansi_escape.dart';
 import '../logging/app_logger.dart';
 import 'core_gateway.dart';
 import 'core_models.dart';
-import 'grpc/generated/started_service.pb.dart' as daemon_pb;
-import 'grpc/generated/started_service.pbgrpc.dart' hide LogLevel;
-import 'grpc/generated/api/TargetLib/targetlib.pb.dart' as targetlib_pb;
-import 'grpc/generated/api/TargetLib/targetlib.pbgrpc.dart' hide ProxyMode;
+import 'package:targetlib/targetlib.dart' as targetlib_pb;
+import 'package:targetlib/targetlib.dart' hide ProxyMode, LogLevel;
 import 'subscription_gateway.dart';
-import 'target_lib_service_manager.dart';
 
 class TargetLibGateway implements CoreGateway, SubscriptionGateway {
-  TargetLibGateway({AppStoragePaths? storagePaths, Directory? workingDirectory})
-    : _injectedPaths = storagePaths,
-      _workingDirectory = workingDirectory;
+  TargetLibGateway({Directory? workingDirectory})
+    : _workingDirectory = workingDirectory {
+    TargetLibLog.sink = _forwardTargetLibLog;
+  }
 
-  /// Test-only override. When provided, this directory is used as the
-  /// isolated AppStoragePaths root so tests never touch the real
-  /// platform support directory.
-  final AppStoragePaths? _injectedPaths;
+  /// Test-only override for the TargetLib runtime root.
   final Directory? _workingDirectory;
-
-  AppStoragePaths? _resolvedPaths;
-  Future<AppStoragePaths>? _pathsFuture;
 
   final StreamController<CoreSnapshot> _snapshots =
       StreamController<CoreSnapshot>.broadcast();
@@ -51,13 +42,9 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
 
   AppSettings _settings = const AppSettings();
   String? _rawConfig;
-  final TargetLibServiceManager _serviceManager = TargetLibServiceManager();
   TargetLibClient? _manager;
-  Process? _daemonProcess;
-  ClientChannel? _channel;
-  StartedServiceClient? _daemon;
+  final TargetLibRuntime _runtime = TargetLibRuntime();
   CallOptions? _callOptions;
-  String? _socketPath;
   Future<void> _lifecycleTail = Future<void>.value();
   CoreSnapshot _current = const CoreSnapshot(
     lifecycle: CoreLifecycle.stopped,
@@ -69,9 +56,7 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
   String get name => 'TargetLib';
 
   @override
-  bool get isAvailable =>
-      !_disposed &&
-      (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+  bool get isAvailable => !_disposed && TargetLibRuntime.isSupported;
 
   @override
   Stream<CoreSnapshot> get snapshots => _snapshots.stream;
@@ -134,6 +119,14 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
       ),
     );
     try {
+      if (Platform.isAndroid) {
+        final granted = await Targetlib().requestVpnPermission();
+        if (!granted) {
+          throw const CoreUnavailableException(
+            'Android VPN permission was not granted.',
+          );
+        }
+      }
       await _ensureConnected();
       final manager = _manager!;
       final state = await manager.getState(Empty(), options: _callOptions);
@@ -165,7 +158,7 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
       settings: targetlib_pb.BuildConfigSettings(
         listenAddress: _settings.listenAddress,
         mixedPort: _settings.mixedPort,
-        proxyMode: _settings.proxyMode == ProxyMode.tun
+        proxyMode: Platform.isAndroid || _settings.proxyMode == ProxyMode.tun
             ? targetlib_pb.ProxyMode.PROXY_MODE_TUN
             : targetlib_pb.ProxyMode.PROXY_MODE_MIXED,
         ipv6: _settings.ipv6,
@@ -393,6 +386,12 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
     await manager.stop(Empty(), options: _callOptions);
     _groups.clear();
     _connections.clear();
+    if (Platform.isAndroid) {
+      // The Android daemon lives inside TargetlibVpnService, which hands the
+      // core a one-shot TUN fd per session. Tear the service down with the
+      // core so the next start re-establishes a fresh tunnel.
+      await _shutdownTransport();
+    }
     _publish(
       const CoreSnapshot(
         lifecycle: CoreLifecycle.stopped,
@@ -403,13 +402,21 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
 
   @override
   Future<void> selectOutbound(String groupId, String outboundId) async {
-    final daemon = _requireDaemon('selecting an outbound');
-    await daemon.selectOutbound(
-      daemon_pb.SelectOutboundRequest(
-        groupTag: groupId,
+    final manager = _manager;
+    if (manager == null) {
+      throw const CoreUnavailableException(
+        'Start TargetLib before selecting an outbound.',
+      );
+    }
+    final daemonGroup = _groups.containsKey(groupId) ? groupId : 'proxy';
+    await manager.selectOutbound(
+      targetlib_pb.SelectOutboundRequest(
+        groupTag: daemonGroup,
         outboundTag: outboundId,
       ),
-      options: _callOptions,
+      options: (_callOptions ?? CallOptions()).mergedWith(
+        CallOptions(timeout: const Duration(seconds: 5)),
+      ),
     );
   }
 
@@ -459,18 +466,28 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
 
   @override
   Future<void> closeConnection(String connectionId) async {
-    await _requireDaemon('closing a connection').closeConnection(
-      daemon_pb.CloseConnectionRequest(id: connectionId),
+    final manager = _manager;
+    if (manager == null) {
+      throw const CoreUnavailableException(
+        'Start TargetLib before closing a connection.',
+      );
+    }
+    await manager.closeConnection(
+      targetlib_pb.CloseConnectionRequest(id: connectionId),
       options: _callOptions,
     );
   }
 
   @override
   Future<int> closeAllConnections() async {
+    final manager = _manager;
+    if (manager == null) {
+      throw const CoreUnavailableException(
+        'Start TargetLib before closing connections.',
+      );
+    }
     final count = _connections.length;
-    await _requireDaemon(
-      'closing connections',
-    ).closeAllConnections(Empty(), options: _callOptions);
+    await manager.closeAllConnections(Empty(), options: _callOptions);
     return count;
   }
 
@@ -479,11 +496,51 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
 
   @override
   Future<void> clearLogs() async {
-    final daemon = _daemon;
-    if (daemon != null) {
-      await daemon.clearLogs(Empty(), options: _callOptions);
-    }
+    AppLogger.clear();
   }
+
+  @override
+  Future<void> reinstallService() => _serialize(() async {
+    final basePath = (await _resolveBaseDirectory()).path;
+    final workingPath = await _resolveWorkingPath();
+    final tempPath = await _resolveTempPath();
+
+    // Release the in-process daemon before replacing its registered binary.
+    await _shutdownTransport();
+    try {
+      await _runtime.serviceManager.run(
+        'stop',
+        basePath: basePath,
+        workingPath: workingPath,
+        tempPath: tempPath,
+        locale: _settings.serviceLocale,
+        refreshExecutable: false,
+      );
+    } on Object catch (error) {
+      // The service may not be installed or may already be stopped.
+      AppLogger.info('Service stop skipped: $error', source: 'TargetLib');
+    }
+    try {
+      await _runtime.serviceManager.run(
+        'uninstall',
+        basePath: basePath,
+        workingPath: workingPath,
+        tempPath: tempPath,
+        locale: _settings.serviceLocale,
+        refreshExecutable: false,
+      );
+    } on Object catch (error) {
+      // Uninstall is intentionally best effort: a missing service should not
+      // prevent the subsequent install from repairing the installation.
+      AppLogger.info('Service uninstall skipped: $error', source: 'TargetLib');
+    }
+    await _runtime.serviceManager.installAndStart(
+      basePath: basePath,
+      workingPath: workingPath,
+      tempPath: tempPath,
+      locale: _settings.serviceLocale,
+    );
+  });
 
   @override
   Future<void> dispose() => _serialize(() async {
@@ -495,42 +552,12 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
     await _subscriptionChanges.close();
   });
 
-  // ---------------------------------------------------------------------------
-  // path_provider-aware storage resolution
-  // ---------------------------------------------------------------------------
-
-  /// Returns the canonical [AppStoragePaths], lazily resolved via
-  /// `path_provider` on first use.  Tests can inject an isolated
-  /// `workingDirectory` which is wrapped as a synthetic [AppStoragePaths]
-  /// so they never touch the real platform support directory.
-  Future<AppStoragePaths> _resolveStoragePaths() async {
-    if (_resolvedPaths != null) return _resolvedPaths!;
-    if (_pathsFuture != null) return await _pathsFuture!;
-    final future = () async {
-      final injected = _injectedPaths;
-      if (injected != null) return injected;
-      final working = _workingDirectory;
-      if (working != null) {
-        return AppStoragePaths.fromRoot(working);
-      }
-      // Primary: let AppStoragePaths use path_provider's
-      // getApplicationSupportDirectory internally.
-      return AppStoragePaths.resolve();
-    }();
-    _pathsFuture = future;
-    try {
-      _resolvedPaths = await future;
-      return _resolvedPaths!;
-    } finally {
-      _pathsFuture = null;
-    }
-  }
-
   Future<Directory> _resolveBaseDirectory() async {
-    final override = _settings.serviceBasePath.trim();
-    if (override.isNotEmpty) return Directory(override);
-    final paths = await _resolveStoragePaths();
-    return paths.coreDirectory;
+    final path = await _runtime.resolveBasePath(
+      override: _settings.serviceBasePath,
+      rootOverride: _workingDirectory?.path,
+    );
+    return Directory(path);
   }
 
   Future<String> _resolveCacheFilePath() async {
@@ -548,64 +575,29 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
         stackTrace: stackTrace,
       );
     }
-    return '${base.path}${Platform.pathSeparator}cache.db';
+    return p.join(base.path, 'cache.db');
   }
 
   Future<String> _resolveWorkingPath() async {
     final override = _settings.serviceWorkingPath.trim();
     if (override.isNotEmpty) return override;
     // When no override is set, let TargetLib default to basePath.
-    // Return empty so TargetLibServiceManager skips the flag.
+    // Return empty so the TargetLib runtime uses its default working path.
     return '';
   }
 
   Future<String> _resolveTempPath() async {
     final override = _settings.serviceTempPath.trim();
     if (override.isNotEmpty) return override;
-    // Prefer path_provider's cache/temp directory as TargetLib scratch space.
-    try {
-      final cacheDir = await getApplicationCacheDirectory();
-      if (cacheDir.path.trim().isNotEmpty) {
-        final targetCache = Directory(
-          '${cacheDir.path}${Platform.pathSeparator}Target',
-        );
-        await targetCache.create(recursive: true);
-        return targetCache.path;
-      }
-    } on Object catch (_) {}
-    try {
-      final tmp = await getTemporaryDirectory();
-      if (tmp.path.trim().isNotEmpty) {
-        final targetTmp = Directory(
-          '${tmp.path}${Platform.pathSeparator}Target',
-        );
-        await targetTmp.create(recursive: true);
-        return targetTmp.path;
-      }
-    } on Object catch (error, stackTrace) {
-      AppLogger.warning(
-        'path_provider temp resolve failed',
-        source: 'TargetLib',
-        error: error,
-        stackTrace: stackTrace,
-      );
-    }
-    return '';
+    // Resolve the TargetLib scratch directory through the plugin runtime.
+    return _runtime.resolveTempPath(override);
   }
 
   Future<void> _ensureCore() async {
-    if (_daemonProcess != null) return;
     final baseDir = await _resolveBaseDirectory();
-    await baseDir.create(recursive: true);
-    _socketPath = '${baseDir.path}${Platform.pathSeparator}command.sock';
-    if (await File(_socketPath!).exists()) return;
     final workingPath = await _resolveWorkingPath();
     final tempPath = await _resolveTempPath();
-    AppLogger.info(
-      'Launching TargetLib base=$baseDir working=$workingPath temp=$tempPath',
-      source: 'TargetLib',
-    );
-    _daemonProcess = await _serviceManager.launch(
+    await _runtime.ensureConnected(
       basePath: baseDir.path,
       workingPath: workingPath,
       tempPath: tempPath,
@@ -624,68 +616,28 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
       // behind. _ensureCore treats an existing socket as a service-owned
       // endpoint, so recover once by removing the stale endpoint and starting
       // the bundled daemon ourselves.
-      if (_daemonProcess != null || _socketPath == null) rethrow;
+      if (_runtime.connection != null || _runtime.socketPath == null) rethrow;
       AppLogger.warning(
         'Existing TargetLib command socket is unreachable; restarting daemon',
         source: 'TargetLib',
         error: firstError,
         stackTrace: stackTrace,
       );
-      final socket = File(_socketPath!);
-      if (await socket.exists()) await socket.delete();
-      final baseDir = await _resolveBaseDirectory();
-      final workingPath = await _resolveWorkingPath();
-      final tempPath = await _resolveTempPath();
-      _daemonProcess = await _serviceManager.launch(
-        basePath: baseDir.path,
-        workingPath: workingPath,
-        tempPath: tempPath,
-        locale: _settings.serviceLocale,
-      );
-      await _connectCommandServer();
+      await _ensureCore();
     }
   }
 
   Future<void> _connectCommandServer() async {
-    final channel = ClientChannel(
-      InternetAddress(_socketPath!, type: InternetAddressType.unix),
-      port: 0,
-      options: const ChannelOptions(credentials: ChannelCredentials.insecure()),
-    );
-    _channel = channel;
-    _daemon = StartedServiceClient(channel);
-    _manager = TargetLibClient(channel);
-    _callOptions = CallOptions();
-    Object? lastError;
-    final deadline = DateTime.now().add(const Duration(seconds: 5));
-    while (DateTime.now().isBefore(deadline)) {
-      try {
-        await _manager!
-            .getVersion(Empty(), options: _callOptions)
-            .timeout(const Duration(seconds: 1));
-        _subscribeCommandStreams();
-        return;
-      } on Object catch (error) {
-        lastError = error;
-        await Future<void>.delayed(const Duration(milliseconds: 100));
-      }
+    final connection = _runtime.connection;
+    if (connection == null) {
+      throw StateError('TargetLib runtime is not connected.');
     }
-    _channel = null;
-    _daemon = null;
-    _manager = null;
-    _callOptions = null;
-    try {
-      await channel.shutdown();
-    } on Object {
-      // Preserve the handshake error, which is the useful failure here.
-    }
-    throw StateError(
-      'TargetLib command server did not become ready: $lastError',
-    );
+    _manager = connection.client;
+    _callOptions = connection.options;
+    _subscribeCommandStreams();
   }
 
   void _subscribeCommandStreams() {
-    final daemon = _daemon!;
     final manager = _manager!;
     final options = _callOptions;
     _listen(
@@ -699,17 +651,9 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
       label: 'SubscribeSubscriptionEvents',
     );
     _listen(
-      daemon.subscribeLog(Empty(), options: options),
+      manager.subscribeLogs(Empty(), options: options),
       _applyLogs,
-      label: 'SubscribeLog',
-    );
-    _listen(
-      daemon.subscribeStatus(
-        daemon_pb.SubscribeStatusRequest(interval: Int64(1000)),
-        options: options,
-      ),
-      _applyStatus,
-      label: 'SubscribeStatus',
+      label: 'SubscribeLogs',
     );
   }
 
@@ -723,26 +667,7 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
         _subscriptions.remove(subscription);
         await subscription.cancel();
       }
-      if (!enabled || _manager == null || _daemon == null || _disposed) return;
-      final daemon = _daemon!;
-      final options = _callOptions;
-      _runtimeSubscriptions.add(
-        _listen(
-          daemon.subscribeGroups(Empty(), options: options),
-          _applyGroups,
-          label: 'SubscribeGroups',
-        ),
-      );
-      _runtimeSubscriptions.add(
-        _listen(
-          daemon.subscribeConnections(
-            daemon_pb.SubscribeConnectionsRequest(interval: Int64(1000)),
-            options: options,
-          ),
-          _applyConnections,
-          label: 'SubscribeConnections',
-        ),
-      );
+      if (!enabled || _manager == null || _disposed) return;
     });
   }
 
@@ -793,95 +718,19 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
     );
   }
 
-  void _applyLogs(daemon_pb.Log batch) {
+  void _applyLogs(targetlib_pb.LogBatch batch) {
     if (batch.reset) AppLogger.clear();
     for (final message in batch.messages) {
+      if (message.level == targetlib_pb.LogLevel.LOG_LEVEL_DEBUG ||
+          message.level == targetlib_pb.LogLevel.LOG_LEVEL_TRACE) {
+        continue;
+      }
       AppLogger.log(
         _logLevel(message.level),
         stripAnsiEscapeSequences(message.message),
         source: 'gRPC',
       );
     }
-  }
-
-  void _applyStatus(daemon_pb.Status status) {
-    _publish(
-      _copyCurrent(
-        traffic: TrafficSnapshot(
-          uploadBytes: status.uplinkTotal.toInt(),
-          downloadBytes: status.downlinkTotal.toInt(),
-          activeConnections: _connections.length,
-        ),
-      ),
-    );
-  }
-
-  void _applyGroups(daemon_pb.Groups value) {
-    _groups
-      ..clear()
-      ..addEntries(
-        value.group.map((group) {
-          final nodes = group.items
-              .map((item) {
-                final latency = item.urlTestDelay > 0
-                    ? item.urlTestDelay
-                    : null;
-                return ProxyNode(
-                  id: item.tag,
-                  name: item.tag,
-                  type: item.type,
-                  latencyMs: latency,
-                  isSelected: item.tag == group.selected,
-                );
-              })
-              .toList(growable: false);
-          return MapEntry(
-            group.tag,
-            ProxyGroup(
-              id: group.tag,
-              name: group.tag,
-              type: group.type,
-              selectedNodeId: group.selected,
-              nodes: nodes,
-            ),
-          );
-        }),
-      );
-    _publish(_copyCurrent(proxyGroups: _groups.values.toList()));
-  }
-
-  void _applyConnections(daemon_pb.ConnectionEvents batch) {
-    if (batch.reset) _connections.clear();
-    for (final event in batch.events) {
-      final id = event.id.isNotEmpty ? event.id : event.connection.id;
-      if (event.type == daemon_pb.ConnectionEventType.CONNECTION_EVENT_CLOSED) {
-        _connections.remove(id);
-        continue;
-      }
-      final value = event.connection;
-      _connections[id] = CoreConnection(
-        id: id,
-        destination: value.destination,
-        domain: value.domain,
-        outbound: value.outbound,
-        network: value.network,
-        protocol: value.protocol,
-        uplinkTotal: value.uplinkTotal.toInt(),
-        downlinkTotal: value.downlinkTotal.toInt(),
-        createdAt: value.createdAt.toInt(),
-        closedAt: value.closedAt.toInt(),
-      );
-    }
-    _publish(
-      _copyCurrent(
-        connections: _connections.values.toList(),
-        traffic: TrafficSnapshot(
-          uploadBytes: _current.traffic.uploadBytes,
-          downloadBytes: _current.traffic.downloadBytes,
-          activeConnections: _connections.length,
-        ),
-      ),
-    );
   }
 
   Future<void> _shutdownTransport() async {
@@ -891,29 +740,9 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
     for (final subscription in subscriptions) {
       await subscription.cancel();
     }
-    final channel = _channel;
-    _channel = null;
-    _daemon = null;
     _manager = null;
     _callOptions = null;
-    await channel?.shutdown();
-    final process = _daemonProcess;
-    _daemonProcess = null;
-    if (process != null) {
-      process.kill();
-      await process.exitCode.timeout(
-        const Duration(seconds: 2),
-        onTimeout: () => -1,
-      );
-    }
-  }
-
-  StartedServiceClient _requireDaemon(String operation) {
-    final daemon = _daemon;
-    if (daemon == null) {
-      throw CoreUnavailableException('Start TargetLib before $operation.');
-    }
-    return daemon;
+    await _runtime.close();
   }
 
   Future<T> _serialize<T>(Future<T> Function() operation) {
@@ -962,15 +791,43 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
     }
   }
 
-  static LogLevel _logLevel(daemon_pb.LogLevel level) => switch (level) {
-    daemon_pb.LogLevel.TRACE => LogLevel.verbose,
-    daemon_pb.LogLevel.DEBUG => LogLevel.debug,
-    daemon_pb.LogLevel.WARN => LogLevel.warning,
-    daemon_pb.LogLevel.ERROR ||
-    daemon_pb.LogLevel.FATAL ||
-    daemon_pb.LogLevel.PANIC => LogLevel.error,
+  static LogLevel _logLevel(targetlib_pb.LogLevel level) => switch (level) {
+    targetlib_pb.LogLevel.LOG_LEVEL_WARN => LogLevel.warning,
+    targetlib_pb.LogLevel.LOG_LEVEL_ERROR ||
+    targetlib_pb.LogLevel.LOG_LEVEL_FATAL ||
+    targetlib_pb.LogLevel.LOG_LEVEL_PANIC => LogLevel.error,
     _ => LogLevel.info,
   };
+
+  static void _forwardTargetLibLog(
+    String level,
+    String message, {
+    Object? error,
+    StackTrace? stackTrace,
+    String? source,
+  }) {
+    final origin = source ?? 'TargetLib';
+    switch (level) {
+      case 'DEBUG':
+        AppLogger.debug(message, source: origin);
+      case 'WARN':
+        AppLogger.warning(
+          message,
+          source: origin,
+          error: error,
+          stackTrace: stackTrace,
+        );
+      case 'ERROR':
+        AppLogger.error(
+          message,
+          source: origin,
+          error: error,
+          stackTrace: stackTrace,
+        );
+      default:
+        AppLogger.info(message, source: origin);
+    }
+  }
 
   static CoreLatencyResult _coreLatencyResult(
     targetlib_pb.LatencyTestResult result,

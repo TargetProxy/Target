@@ -43,8 +43,12 @@ add_dependencies(${BINARY_NAME} flutter_assemble)
 # application support directory before launching or installing the service.
 set(TARGETLIB_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/../../../TargetLib/build/TargetLib.exe")
 if(EXISTS "${TARGETLIB_SOURCE}")
-  add_custom_command(TARGET ${BINARY_NAME} POST_BUILD
+  add_custom_target(bundle_targetlib ALL
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
       "${TARGETLIB_SOURCE}"
-      "$<TARGET_FILE_DIR:${BINARY_NAME}>/TargetLib.exe")
+      "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/TargetLib.exe"
+    DEPENDS "${TARGETLIB_SOURCE}"
+    COMMENT "Bundling TargetLib.exe"
+    VERBATIM)
+  add_dependencies(${BINARY_NAME} bundle_targetlib)
 endif()

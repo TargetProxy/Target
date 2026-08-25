@@ -224,6 +224,11 @@ class CoreNotifier extends Notifier<CoreState> {
     );
   }
 
+  Future<void> reinstallService() async {
+    if (!state.available) return;
+    await _run(_gateway!.reinstallService, operationName: 'reinstall service');
+  }
+
   Future<void> _refresh() async {
     _applySnapshot(await _gateway!.current());
   }

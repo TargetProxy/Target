@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -440,10 +442,11 @@ class _Configuration extends ConsumerWidget {
         _InfoCard(
           rows: [
             ('Proxy mode', settings.proxyMode.label),
-            ('Listen address', settings.listenAddress),
-            ('Mixed port', '${settings.mixedPort}'),
+            if (!Platform.isAndroid) ('Listen address', settings.listenAddress),
+            if (!Platform.isAndroid) ('Mixed port', '${settings.mixedPort}'),
             ('IPv6', settings.ipv6 ? 'Enabled' : 'Disabled'),
-            if (settings.systemProxy) ('System proxy', 'Enabled'),
+            if (!Platform.isAndroid && settings.systemProxy)
+              ('System proxy', 'Enabled'),
           ],
         ),
         const _SectionTitle(icon: Icons.code, title: 'Configuration source'),

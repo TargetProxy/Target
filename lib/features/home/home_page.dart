@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,9 +7,8 @@ import 'package:go_router/go_router.dart';
 import '../../app/router.dart';
 import '../../core/runtime/core_notifier.dart';
 import '../../core/runtime/core_models.dart';
-import '../../core/runtime/target_lib_service_manager.dart';
+import 'package:targetlib/targetlib.dart';
 import '../../data/models/app_settings.dart' as settings_models;
-import '../../data/storage/app_storage_paths.dart';
 import '../settings/application/settings_notifier.dart';
 import '../../data/models/ip_info.dart';
 import '../../core/widgets/target_page_layout.dart';
@@ -35,27 +36,24 @@ class _HomePageState extends ConsumerState<HomePage> {
   bool _serviceInstalling = false;
   TargetLibServiceStatus? _serviceStatus;
   String? _serviceInstallError;
-  final _serviceManager = TargetLibServiceManager();
+  final _serviceController = TargetLibServiceController();
 
   @override
   void initState() {
     super.initState();
     _fetchIpInfo();
-    _checkTargetLibService();
+    if (Platform.isAndroid) {
+      _serviceChecking = false;
+    } else {
+      _checkTargetLibService();
+    }
   }
 
   Future<void> _checkTargetLibService() async {
     try {
       final settings = ref.read(settingsProvider).settings;
-      final paths = await AppStoragePaths.resolve();
-      final result = await _serviceManager.run(
-        'status',
-        basePath: settings.serviceBasePath.isEmpty
-            ? paths.coreDirectory.path
-            : settings.serviceBasePath,
-        // Status is queried without elevation (sc.exe on Windows), so this
-        // never triggers a UAC prompt.
-        elevated: false,
+      final result = await _serviceController.status(
+        basePath: settings.serviceBasePath,
       );
       if (mounted) {
         setState(() {
@@ -91,11 +89,8 @@ class _HomePageState extends ConsumerState<HomePage> {
     });
     try {
       final settings = ref.read(settingsProvider).settings;
-      final paths = await AppStoragePaths.resolve();
-      await _serviceManager.installAndStart(
-        basePath: settings.serviceBasePath.isEmpty
-            ? paths.coreDirectory.path
-            : settings.serviceBasePath,
+      await _serviceController.installAndStart(
+        basePath: settings.serviceBasePath,
         workingPath: settings.serviceWorkingPath,
         tempPath: settings.serviceTempPath,
         locale: settings.serviceLocale,
@@ -123,12 +118,8 @@ class _HomePageState extends ConsumerState<HomePage> {
     });
     try {
       final settings = ref.read(settingsProvider).settings;
-      final paths = await AppStoragePaths.resolve();
-      await _serviceManager.run(
-        'start',
-        basePath: settings.serviceBasePath.isEmpty
-            ? paths.coreDirectory.path
-            : settings.serviceBasePath,
+      await _serviceController.start(
+        basePath: settings.serviceBasePath,
         workingPath: settings.serviceWorkingPath,
         tempPath: settings.serviceTempPath,
         locale: settings.serviceLocale,
@@ -256,28 +247,37 @@ class _HomePageState extends ConsumerState<HomePage> {
                               style: theme.textTheme.labelLarge,
                             ),
                             const SizedBox(height: 8),
-                            SegmentedButton<settings_models.ProxyMode>(
-                              segments: const [
-                                ButtonSegment(
-                                  value: settings_models.ProxyMode.mixed,
-                                  icon: Icon(Icons.lan_outlined),
-                                  label: Text('Mixed'),
-                                ),
-                                ButtonSegment(
-                                  value: settings_models.ProxyMode.tun,
-                                  icon: Icon(Icons.vpn_lock_outlined),
-                                  label: Text('TUN'),
-                                ),
-                              ],
-                              selected: {core.settings.proxyMode},
-                              onSelectionChanged: core.busy
-                                  ? null
-                                  : (selected) {
-                                      if (selected.isNotEmpty) {
-                                        _changeProxyMode(selected.first);
-                                      }
-                                    },
-                            ),
+                            if (Platform.isAndroid)
+                              const Row(
+                                children: [
+                                  Icon(Icons.vpn_lock_outlined, size: 20),
+                                  SizedBox(width: 8),
+                                  Text('VPN (TUN)'),
+                                ],
+                              )
+                            else
+                              SegmentedButton<settings_models.ProxyMode>(
+                                segments: const [
+                                  ButtonSegment(
+                                    value: settings_models.ProxyMode.mixed,
+                                    icon: Icon(Icons.lan_outlined),
+                                    label: Text('Mixed'),
+                                  ),
+                                  ButtonSegment(
+                                    value: settings_models.ProxyMode.tun,
+                                    icon: Icon(Icons.vpn_lock_outlined),
+                                    label: Text('TUN'),
+                                  ),
+                                ],
+                                selected: {core.settings.proxyMode},
+                                onSelectionChanged: core.busy
+                                    ? null
+                                    : (selected) {
+                                        if (selected.isNotEmpty) {
+                                          _changeProxyMode(selected.first);
+                                        }
+                                      },
+                              ),
                             const SizedBox(height: 14),
                             FilledButton(
                               onPressed: core.busy || !core.available
@@ -331,6 +331,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                       onTestLatency: _testProxies,
                       onRefreshRuleSets: _refreshRuleSets,
                       onCloseConnections: _closeConnections,
+                      onReinstallService: _reinstallService,
                     ),
                   ],
                 ),
@@ -366,6 +367,43 @@ class _HomePageState extends ConsumerState<HomePage> {
           ),
         ),
       );
+  }
+
+  Future<void> _reinstallService() async {
+    if (ref.read(coreProvider).busy) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Force reinstall service?'),
+        content: const Text(
+          'TargetLib will stop, uninstall, and install again with '
+          'administrator permission.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Reinstall'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await ref.read(coreProvider.notifier).reinstallService();
+    if (!mounted) return;
+    final core = ref.read(coreProvider);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          core.lifecycle == CoreLifecycle.failed
+              ? core.message
+              : 'TargetLib service reinstalled.',
+        ),
+      ),
+    );
   }
 
   Future<void> _changeProxyMode(settings_models.ProxyMode mode) async {

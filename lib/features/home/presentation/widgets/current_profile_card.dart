@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/theme/app_spacing.dart';
@@ -52,7 +54,9 @@ class CurrentProfileCard extends StatelessWidget {
                   : Icons.place_outlined,
               label: isTun ? 'Privilege' : 'Listen',
               value: isTun
-                  ? 'Elevate on demand'
+                  ? Platform.isAndroid
+                        ? 'VPN service'
+                        : 'Elevate on demand'
                   : '${core.settings.listenAddress}:${core.settings.mixedPort}',
             ),
           ],

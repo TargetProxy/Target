@@ -9,6 +9,7 @@ class QuickActionsGrid extends StatelessWidget {
     required this.onTestLatency,
     required this.onRefreshRuleSets,
     required this.onCloseConnections,
+    required this.onReinstallService,
     required this.enabled,
     super.key,
   });
@@ -16,6 +17,7 @@ class QuickActionsGrid extends StatelessWidget {
   final VoidCallback onTestLatency;
   final VoidCallback onRefreshRuleSets;
   final VoidCallback onCloseConnections;
+  final VoidCallback onReinstallService;
   final bool enabled;
 
   @override
@@ -88,6 +90,14 @@ class QuickActionsGrid extends StatelessWidget {
                     icon: Icons.receipt_long_outlined,
                     label: 'View Logs',
                     onTap: () => context.go(AppRoute.logs.path),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.smallGap),
+                Expanded(
+                  child: _QuickAction(
+                    icon: Icons.sync_lock_outlined,
+                    label: 'Reinstall Service',
+                    onTap: onReinstallService,
                   ),
                 ),
               ],

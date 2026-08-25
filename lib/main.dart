@@ -10,6 +10,7 @@ import 'core/logging/app_logger.dart';
 import 'data/storage/app_storage_paths.dart';
 import 'data/storage/json_file_store.dart';
 import 'features/settings/data/settings_store.dart';
+import 'data/models/app_settings.dart';
 
 export 'app/target_app.dart';
 
@@ -43,7 +44,14 @@ Future<void> main() async {
       AppLogger.info('Target initialization started');
       final paths = await AppStoragePaths.resolve();
       final settingsStore = SettingsStore(JsonFileStore(paths.settingsFile));
-      final settings = await settingsStore.load();
+      var settings = await settingsStore.load();
+      if (Platform.isAndroid && settings.proxyMode != ProxyMode.tun) {
+        settings = settings.copyWith(
+          proxyMode: ProxyMode.tun,
+          systemProxy: false,
+        );
+        await settingsStore.save(settings);
+      }
 
       AppLogger.info('Target initialization completed');
       runApp(

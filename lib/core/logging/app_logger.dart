@@ -18,9 +18,6 @@ abstract final class AppLogger {
     ),
   );
 
-  static void trace(String message, {String source = 'APP'}) =>
-      _record(message, LogLevel.verbose, source);
-
   static void debug(String message, {String source = 'APP'}) =>
       _record(message, LogLevel.debug, source);
 
