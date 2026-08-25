@@ -85,13 +85,13 @@ jobs:
       - name: Build TargetLib
         if: matrix.targetlib == true
         working-directory: TargetLib
-        shell: bash
+        shell: pwsh
         run: |
-          if [ "${{ matrix.target }}" = "windows" ]; then
-            go build -trimpath -buildvcs=false -o build/TargetLib.exe ./cmd/TargetLib
-          else
-            go build -trimpath -buildvcs=false -o build/TargetLib ./cmd/TargetLib
-          fi
+          if ("${{ matrix.target }}" -eq "windows") {
+            .\scripts\build.ps1 -SkipTargetSync
+          } else {
+            .\scripts\build.ps1 -OutputPath build/TargetLib -SkipTargetSync
+          }
 
       - name: Generate Apple project
         if: matrix.generate != ''
