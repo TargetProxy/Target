@@ -1,25 +1,25 @@
 // ignore_for_file: prefer_initializing_formals
 
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:fixnum/fixnum.dart';
 import 'package:grpc/grpc.dart';
-import 'package:path/path.dart' as p;
 import 'package:protobuf/well_known_types/google/protobuf/empty.pb.dart';
 
 import '../../data/models/app_settings.dart';
 import '../../data/models/ip_info.dart';
 import '../../data/models/proxy_group.dart';
 import '../../data/models/proxy_node.dart';
+import '../../data/models/runtime_settings.dart';
 import '../logging/ansi_escape.dart';
 import '../logging/app_logger.dart';
 import '../platform/app_platform.dart';
 import 'core_gateway.dart';
 import 'core_models.dart';
 import 'package:targetlib/targetlib.dart' as targetlib_pb;
-import 'package:targetlib/targetlib.dart' hide ProxyMode, LogLevel;
+import 'package:targetlib/targetlib.dart'
+    hide ProxyMode, RouteMode, RuntimeSettings, LogLevel;
 import 'subscription_gateway.dart';
 
 class TargetLibGateway implements CoreGateway, SubscriptionGateway {
@@ -37,18 +37,16 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
       StreamController<CoreSnapshot>.broadcast();
   final StreamController<void> _subscriptionChanges =
       StreamController<void>.broadcast();
-  final Map<String, ProxyGroup> _groups = {};
   final Map<String, CoreConnection> _connections = {};
   final List<StreamSubscription<Object?>> _subscriptions = [];
   final List<StreamSubscription<Object?>> _runtimeSubscriptions = [];
   Future<void> _runtimeStreamTail = Future<void>.value();
 
   AppSettings _settings = const AppSettings();
-  String? _rawConfig;
   TargetLibClient? _manager;
   final TargetLibRuntime _runtime = TargetLibRuntime();
   CallOptions? _callOptions;
-  Future<void> _lifecycleTail = Future<void>.value();
+  Future<void>? _connectionTask;
   CoreSnapshot _current = const CoreSnapshot(
     lifecycle: CoreLifecycle.stopped,
     message: 'TargetLib is ready.',
@@ -97,18 +95,68 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
   }
 
   @override
-  Future<void> configure(AppSettings settings) => _serialize(() async {
+  Future<void> configureHost(AppSettings settings) => _serialize(() async {
     _settings = settings;
-    await _reloadIfRunning();
   });
 
   @override
-  @override
-  Future<void> setRawConfig(String? config) => _serialize(() async {
-    _rawConfig = config?.trim().isEmpty == true ? null : config?.trim();
-    if (_rawConfig != null) await _clearActiveSubscription();
-    await _reloadIfRunning();
+  Future<RuntimeSettings> getRuntimeConfig() => _serialize(() async {
+    await _ensureConnected();
+    final result = await _manager!.getRuntimeConfig(
+      Empty(),
+      options: _callOptions,
+    );
+    return _runtimeSettings(result);
   });
+
+  @override
+  Future<RuntimeSettings> updateRuntimeConfig(RuntimeSettings settings) =>
+      _serialize(() async {
+        await _ensureConnected();
+        final result = await _manager!.updateRuntimeConfig(
+          targetlib_pb.UpdateRuntimeConfigRequest(
+            settings: _protoRuntimeSettings(settings),
+          ),
+          options: (_callOptions ?? CallOptions()).mergedWith(
+            CallOptions(timeout: const Duration(seconds: 30)),
+          ),
+        );
+        return _runtimeSettings(result);
+      });
+
+  targetlib_pb.RuntimeSettings _protoRuntimeSettings(
+    RuntimeSettings settings,
+  ) => targetlib_pb.RuntimeSettings(
+    listenAddress: settings.listenAddress,
+    mixedPort: settings.mixedPort,
+    proxyMode: switch (settings.proxyMode) {
+      ProxyMode.mixed => targetlib_pb.ProxyMode.PROXY_MODE_MIXED,
+      ProxyMode.tun => targetlib_pb.ProxyMode.PROXY_MODE_TUN,
+    },
+    routeMode: switch (settings.routeMode) {
+      RouteMode.all => targetlib_pb.RouteMode.ROUTE_MODE_ALL,
+      RouteMode.rule => targetlib_pb.RouteMode.ROUTE_MODE_RULE,
+      RouteMode.direct => targetlib_pb.RouteMode.ROUTE_MODE_DIRECT,
+    },
+    ipv6: settings.ipv6,
+  );
+
+  RuntimeSettings _runtimeSettings(targetlib_pb.RuntimeConfig source) {
+    final settings = source.settings;
+    return RuntimeSettings(
+      listenAddress: settings.listenAddress,
+      mixedPort: settings.mixedPort,
+      proxyMode: settings.proxyMode == targetlib_pb.ProxyMode.PROXY_MODE_TUN
+          ? ProxyMode.tun
+          : ProxyMode.mixed,
+      routeMode: switch (settings.routeMode) {
+        targetlib_pb.RouteMode.ROUTE_MODE_ALL => RouteMode.all,
+        targetlib_pb.RouteMode.ROUTE_MODE_DIRECT => RouteMode.direct,
+        _ => RouteMode.rule,
+      },
+      ipv6: settings.ipv6,
+    );
+  }
 
   @override
   Future<void> start() => _serialize(_startLocked);
@@ -136,10 +184,7 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
       if (state.state == targetlib_pb.ServiceStateType.SERVICE_STATE_RUNNING) {
         return;
       }
-      await manager.applyRuntimeSettings(
-        await _buildConfigRequest(),
-        options: _callOptions,
-      );
+      await manager.start(Empty(), options: _callOptions);
       _publish(
         _copyCurrent(
           lifecycle: CoreLifecycle.running,
@@ -149,45 +194,6 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
     } on Object {
       rethrow;
     }
-  }
-
-  Future<targetlib_pb.BuildConfigRequest> _buildConfigRequest() async {
-    final manager = _manager;
-    if (manager == null) {
-      throw const CoreUnavailableException('TargetLib is not connected.');
-    }
-    final cacheFilePath = await _resolveCacheFilePath();
-    final request = targetlib_pb.BuildConfigRequest(
-      settings: targetlib_pb.BuildConfigSettings(
-        listenAddress: _settings.listenAddress,
-        mixedPort: _settings.mixedPort,
-        proxyMode: _capabilities.vpnOnly || _settings.proxyMode == ProxyMode.tun
-            ? targetlib_pb.ProxyMode.PROXY_MODE_TUN
-            : targetlib_pb.ProxyMode.PROXY_MODE_MIXED,
-        ipv6: _settings.ipv6,
-        cacheFilePath: cacheFilePath,
-      ),
-    );
-    final rawConfig = _rawConfig;
-    if (rawConfig != null) {
-      request.rawConfig = utf8.encode(rawConfig);
-    }
-    // Without an explicit source the backend builds from its persisted
-    // active subscription and falls back to a default direct-only config.
-    return request;
-  }
-
-  Future<void> _reloadIfRunning() async {
-    final manager = _manager;
-    if (manager == null) return;
-    final state = await manager.getState(Empty(), options: _callOptions);
-    if (state.state != targetlib_pb.ServiceStateType.SERVICE_STATE_RUNNING) {
-      return;
-    }
-    await manager.applyRuntimeSettings(
-      await _buildConfigRequest(),
-      options: _callOptions,
-    );
   }
 
   @override
@@ -230,7 +236,11 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
         activate: activate,
         updateNow: updateNow,
       ),
-      options: _callOptions,
+      options: updateNow
+          ? (_callOptions ?? CallOptions()).mergedWith(
+              CallOptions(timeout: const Duration(seconds: 45)),
+            )
+          : _callOptions,
     );
     return _runtimeSubscription(view);
   });
@@ -281,17 +291,7 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
       targetlib_pb.SetActiveSubscriptionRequest(id: normalized ?? ''),
       options: _callOptions,
     );
-    if (normalized != null) _rawConfig = null;
   });
-
-  Future<void> _clearActiveSubscription() async {
-    final manager = _manager;
-    if (manager == null) return;
-    await manager.setActiveSubscription(
-      targetlib_pb.SetActiveSubscriptionRequest(),
-      options: _callOptions,
-    );
-  }
 
   /// Queries the egress IP geolocation through the TargetLib backend.
   @override
@@ -326,26 +326,7 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
           RuntimeSubscriptionStatus.failed,
         _ => RuntimeSubscriptionStatus.idle,
       },
-      nodes: [
-        for (final node in view.nodes)
-          ProxyNode(
-            id: node.id,
-            name: node.name,
-            type: node.type,
-            isAvailable:
-                node.phase ==
-                targetlib_pb
-                    .SubscriptionNodePhase
-                    .SUBSCRIPTION_NODE_PHASE_READY,
-            metadata: {
-              'server': node.server,
-              'port': node.port,
-              'group': node.group,
-              'groups': node.groups.toList(),
-              if (node.errorMessage.isNotEmpty) 'error': node.errorMessage,
-            },
-          ),
-      ],
+      profile: _runtimeProfile(view.profile),
       errorCode: view.errorCode.isEmpty ? null : view.errorCode,
       errorMessage: view.errorMessage.isEmpty ? null : view.errorMessage,
       updatedAt: _dateFromUnixMilliseconds(view.updatedAtUnixMs.toInt()),
@@ -359,6 +340,67 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
       movedPermanentlyTo: view.movedPermanentlyTo.isEmpty
           ? null
           : view.movedPermanentlyTo,
+    );
+  }
+
+  RuntimeProfile _runtimeProfile(targetlib_pb.ProfileView source) {
+    final nodes = <ProxyNode>[
+      for (final node in source.nodes)
+        ProxyNode(
+          id: node.tag,
+          name: node.name.isEmpty ? node.tag : node.name,
+          type: node.type,
+          isAvailable:
+              node.phase ==
+              targetlib_pb.ProfileNodePhase.PROFILE_NODE_PHASE_READY,
+          metadata: {
+            'server': node.server,
+            'port': node.port,
+            'groups': node.groupTags.toList(),
+            if (node.errorMessage.isNotEmpty) 'error': node.errorMessage,
+          },
+        ),
+    ];
+    final candidates = <String, ProxyNode>{
+      for (final node in nodes) node.id: node,
+      for (final outbound in source.customOutbounds)
+        if (outbound.tag.isNotEmpty)
+          outbound.tag: ProxyNode(
+            id: outbound.tag,
+            name: outbound.tag,
+            type: outbound.type,
+            metadata: const {'source': 'profile'},
+          ),
+    };
+    final groups = <ProxyGroup>[
+      for (final group in source.groups)
+        ProxyGroup(
+          id: group.tag,
+          name: group.tag,
+          type: group.type,
+          selectedNodeId: candidates.containsKey(group.defaultTag)
+              ? group.defaultTag
+              : null,
+          nodes: [for (final tag in group.memberTags) ?candidates[tag]],
+        ),
+    ];
+    RuntimeProfileObject object(targetlib_pb.ProfileObject source) =>
+        RuntimeProfileObject(tag: source.tag, type: source.type);
+    return RuntimeProfile(
+      nodes: nodes,
+      groups: groups,
+      customOutbounds: source.customOutbounds.map(object).toList(),
+      customInbounds: source.customInbounds.map(object).toList(),
+      routeRuleCount: source.routeRuleCount,
+      dns: source.hasDns()
+          ? RuntimeProfileDns(
+              servers: source.dns.servers.map(object).toList(),
+              ruleCount: source.dns.ruleCount,
+              finalTag: source.dns.finalServer.isEmpty
+                  ? null
+                  : source.dns.finalServer,
+            )
+          : null,
     );
   }
 
@@ -387,7 +429,6 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
       ),
     );
     await manager.stop(Empty(), options: _callOptions);
-    _groups.clear();
     _connections.clear();
     if (_capabilities.platform == AppPlatform.android) {
       // The Android daemon lives inside TargetlibVpnService, which hands the
@@ -411,10 +452,9 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
         'Start TargetLib before selecting an outbound.',
       );
     }
-    final daemonGroup = _groups.containsKey(groupId) ? groupId : 'proxy';
     await manager.selectOutbound(
       targetlib_pb.SelectOutboundRequest(
-        groupTag: daemonGroup,
+        groupTag: groupId,
         outboundTag: outboundId,
       ),
       options: (_callOptions ?? CallOptions()).mergedWith(
@@ -563,24 +603,6 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
     return Directory(path);
   }
 
-  Future<String> _resolveCacheFilePath() async {
-    // Cache lives alongside the base directory so it survives re-installs
-    // and follows the user's custom basePath when set.
-    final base = await _resolveBaseDirectory();
-    // Ensure the base exists so the cache file's parent is ready.
-    try {
-      await base.create(recursive: true);
-    } on Object catch (error, stackTrace) {
-      AppLogger.warning(
-        'Failed to create TargetLib base directory',
-        source: 'TargetLib',
-        error: error,
-        stackTrace: stackTrace,
-      );
-    }
-    return p.join(base.path, 'cache.db');
-  }
-
   Future<String> _resolveWorkingPath() async {
     final override = _settings.serviceWorkingPath.trim();
     if (override.isNotEmpty) return override;
@@ -610,24 +632,27 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
 
   Future<void> _ensureConnected() async {
     if (_manager != null) return;
+    final activeTask = _connectionTask;
+    if (activeTask != null) {
+      await activeTask;
+      return;
+    }
+
+    final task = _connectAndSubscribe();
+    _connectionTask = task;
+    try {
+      await task;
+    } finally {
+      if (identical(_connectionTask, task)) {
+        _connectionTask = null;
+      }
+    }
+  }
+
+  Future<void> _connectAndSubscribe() async {
     _ensureAvailable();
     await _ensureCore();
-    try {
-      await _connectCommandServer();
-    } on Object catch (firstError, stackTrace) {
-      // A daemon terminated outside the app can leave its Unix socket file
-      // behind. _ensureCore treats an existing socket as a service-owned
-      // endpoint, so recover once by removing the stale endpoint and starting
-      // the bundled daemon ourselves.
-      if (_runtime.connection != null || _runtime.socketPath == null) rethrow;
-      AppLogger.warning(
-        'Existing TargetLib command socket is unreachable; restarting daemon',
-        source: 'TargetLib',
-        error: firstError,
-        stackTrace: stackTrace,
-      );
-      await _ensureCore();
-    }
+    await _connectCommandServer();
   }
 
   Future<void> _connectCommandServer() async {
@@ -748,22 +773,10 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
     await _runtime.close();
   }
 
-  Future<T> _serialize<T>(Future<T> Function() operation) {
-    final completer = Completer<T>();
-    Future<void> run() async {
-      try {
-        completer.complete(await operation());
-      } on Object catch (error, stackTrace) {
-        completer.completeError(error, stackTrace);
-      }
-    }
-
-    _lifecycleTail = _lifecycleTail.then<void>(
-      (_) => run(),
-      onError: (_, _) => run(),
-    );
-    return completer.future;
-  }
+  /// Starts each RPC immediately. The returned future represents only this
+  /// operation; unrelated requests must not wait behind a slow RPC such as
+  /// IP geolocation.
+  Future<T> _serialize<T>(Future<T> Function() operation) => operation();
 
   CoreSnapshot _copyCurrent({
     CoreLifecycle? lifecycle,

@@ -25,65 +25,28 @@ class ProxyCatalogNotifier extends Notifier<ProxyCatalogState> {
     state = const ProxyCatalogState();
   }
 
-  void replaceNodes(List<ProxyNode> sourceNodes) {
-    if (sourceNodes.isEmpty) {
-      return;
-    }
-
+  void replaceGroups(List<ProxyGroup> sourceGroups) {
     final previousSelections = {
       for (final group in state.groups) group.id: group.selectedNodeId,
     };
-    final nodes = _mergeLatency(sourceNodes);
-    final nextGroups = <ProxyGroup>[
-      ProxyGroup(
-        id: 'all',
-        name: 'All',
-        type: 'select',
-        selectedNodeId: _restoreSelection(previousSelections['all'], nodes),
-        nodes: _markSelected(nodes, previousSelections['all']),
-      ),
-    ];
-
-    final grouped = <String, List<ProxyNode>>{};
-    for (final node in nodes) {
-      final groupName = node.metadata['group'] as String?;
-      if (groupName == null || groupName.isEmpty) {
-        continue;
-      }
-      grouped.putIfAbsent(groupName, () => []).add(node);
-    }
-
-    for (final entry in grouped.entries) {
-      final id = _groupId(entry.key);
-      final selected = _restoreSelection(previousSelections[id], entry.value);
-      nextGroups.add(
-        ProxyGroup(
-          id: id,
-          name: entry.key,
-          type: 'select',
-          selectedNodeId: selected,
-          nodes: _markSelected(entry.value, selected),
-        ),
-      );
-    }
-
-    final directNode = const ProxyNode(
-      id: 'direct',
-      name: 'Direct',
-      type: 'direct',
-      metadata: {'source': 'builtin'},
+    state = ProxyCatalogState(
+      groups: [
+        for (final group in sourceGroups)
+          _mergeGroup(group, previousSelections[group.id]),
+      ],
     );
-    nextGroups.add(
-      ProxyGroup(
-        id: 'direct',
-        name: 'Direct',
-        type: 'select',
-        selectedNodeId: 'direct',
-        nodes: [directNode],
-      ),
-    );
+  }
 
-    state = ProxyCatalogState(groups: nextGroups);
+  ProxyGroup _mergeGroup(ProxyGroup source, String? previousSelection) {
+    final nodes = _mergeLatency(source.nodes);
+    final selected = _restoreSelection(
+      previousSelection ?? source.selectedNodeId,
+      nodes,
+    );
+    return source.copyWith(
+      selectedNodeId: selected,
+      nodes: _markSelected(nodes, selected),
+    );
   }
 
   void selectNode(String groupId, String nodeId) {
@@ -126,14 +89,6 @@ class ProxyCatalogNotifier extends Notifier<ProxyCatalogState> {
     return [
       for (final node in nodes) node.copyWith(isSelected: node.id == selected),
     ];
-  }
-
-  String _groupId(String name) {
-    final normalized = name
-        .toLowerCase()
-        .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
-        .replaceAll(RegExp(r'^-+|-+$'), '');
-    return normalized.isEmpty ? 'group' : normalized;
   }
 }
 

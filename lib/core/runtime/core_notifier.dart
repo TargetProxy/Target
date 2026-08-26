@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../data/models/app_settings.dart';
+import '../../data/models/runtime_settings.dart';
 import '../../data/models/proxy_group.dart';
 import '../../features/settings/application/settings_notifier.dart';
 import '../logging/app_logger.dart';
@@ -23,7 +23,7 @@ class CoreState {
   const CoreState({
     this.lifecycle = CoreLifecycle.unavailable,
     this.message = 'TargetLib is not initialized yet.',
-    this.settings = const AppSettings(),
+    this.settings = const RuntimeSettings(),
     this.traffic = TrafficSnapshot.zero,
     this.connections = const [],
     this.proxyGroups = const [],
@@ -34,7 +34,7 @@ class CoreState {
 
   final CoreLifecycle lifecycle;
   final String message;
-  final AppSettings settings;
+  final RuntimeSettings settings;
   final TrafficSnapshot traffic;
   final List<CoreConnection> connections;
   final List<ProxyGroup> proxyGroups;
@@ -56,15 +56,16 @@ class CoreState {
   CoreState copyWith({
     CoreLifecycle? lifecycle,
     String? message,
-    AppSettings? settings,
+    RuntimeSettings? settings,
     TrafficSnapshot? traffic,
     List<CoreConnection>? connections,
     List<ProxyGroup>? proxyGroups,
     bool? busy,
+    bool clearMessage = false,
   }) {
     return CoreState(
       lifecycle: lifecycle ?? this.lifecycle,
-      message: message ?? this.message,
+      message: clearMessage ? '' : message ?? this.message,
       settings: settings ?? this.settings,
       traffic: traffic ?? this.traffic,
       connections: connections ?? this.connections,
@@ -80,7 +81,7 @@ class CoreNotifier extends Notifier<CoreState> {
   CoreGateway? _gateway;
   StreamSubscription<CoreSnapshot>? _subscription;
   Future<void> Function()? _startupBarrier;
-  AppSettings? _pendingConfiguration;
+  RuntimeSettings? _pendingConfiguration;
   Future<void>? _configurationTask;
 
   @override
@@ -93,18 +94,14 @@ class CoreNotifier extends Notifier<CoreState> {
       unawaited(_subscription?.cancel());
       unawaited(gateway.dispose());
     });
-    return CoreState(
-      available: gateway.isAvailable,
-      backendName: gateway.name,
-      settings: ref.read(settingsProvider).settings,
-    );
+    return CoreState(available: gateway.isAvailable, backendName: gateway.name);
   }
 
   void setStartupBarrier(Future<void> Function() barrier) {
     _startupBarrier = barrier;
   }
 
-  Future<void> configure(AppSettings settings) async {
+  Future<void> updateRuntimeConfig(RuntimeSettings settings) async {
     state = state.copyWith(settings: settings);
     if (!state.available) {
       return;
@@ -116,14 +113,7 @@ class CoreNotifier extends Notifier<CoreState> {
       return;
     }
 
-    final task = _run(() async {
-      while (true) {
-        final next = _pendingConfiguration;
-        if (next == null) return;
-        _pendingConfiguration = null;
-        await _gateway!.configure(next);
-      }
-    });
+    final task = _applyPendingRuntimeConfig();
     _configurationTask = task;
     try {
       await task;
@@ -134,9 +124,44 @@ class CoreNotifier extends Notifier<CoreState> {
     }
   }
 
-  Future<void> setRawConfig(String? config) async {
-    if (!state.available) return;
-    await _run(() => _gateway!.setRawConfig(config));
+  Future<void> _applyPendingRuntimeConfig() async {
+    state = state.copyWith(busy: true);
+    try {
+      while (true) {
+        final next = _pendingConfiguration;
+        if (next == null) return;
+        _pendingConfiguration = null;
+        final applied = await _gateway!.updateRuntimeConfig(next);
+        state = state.copyWith(settings: applied, clearMessage: true);
+      }
+    } on Object catch (error, stackTrace) {
+      AppLogger.error(
+        'Core update runtime config failed',
+        source: 'core',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      try {
+        final actual = await _gateway!.getRuntimeConfig();
+        final snapshot = await _gateway!.current();
+        state = state.copyWith(
+          lifecycle: snapshot.lifecycle,
+          message: error.toString(),
+          traffic: snapshot.traffic,
+          connections: snapshot.connections,
+          proxyGroups: snapshot.proxyGroups,
+          settings: actual,
+        );
+      } on Object catch (refreshError, refreshStackTrace) {
+        _setFailure(
+          refreshError,
+          refreshStackTrace,
+          operationName: 'refresh runtime config after update failure',
+        );
+      }
+    } finally {
+      state = state.copyWith(busy: false);
+    }
   }
 
   Future<void> start() async {
@@ -144,7 +169,7 @@ class CoreNotifier extends Notifier<CoreState> {
     AppLogger.info('Connect requested using ${state.backendName}');
     await _run(() async {
       await _startupBarrier?.call();
-      await _gateway!.configure(state.settings);
+      await _gateway!.configureHost(ref.read(settingsProvider).settings);
       await _gateway!.start();
     }, operationName: 'connect');
   }
@@ -233,7 +258,26 @@ class CoreNotifier extends Notifier<CoreState> {
   }
 
   Future<void> _refresh() async {
-    _applySnapshot(await _gateway!.current());
+    // build() schedules this method before Riverpod publishes the initial
+    // notifier state. Yield once before reading state.
+    await Future<void>.value();
+    if (!state.available) {
+      _applySnapshot(await _gateway!.current());
+      return;
+    }
+    await _gateway!.configureHost(ref.read(settingsProvider).settings);
+    final settings = await _gateway!.getRuntimeConfig();
+    final snapshot = await _gateway!.current();
+    _applySnapshot(
+      CoreSnapshot(
+        lifecycle: snapshot.lifecycle,
+        message: snapshot.message,
+        traffic: snapshot.traffic,
+        connections: snapshot.connections,
+        proxyGroups: snapshot.proxyGroups,
+        runtimeSettings: settings,
+      ),
+    );
   }
 
   Future<void> _run(
@@ -291,12 +335,14 @@ class CoreNotifier extends Notifier<CoreState> {
   }
 
   void _applySnapshot(CoreSnapshot snapshot) {
+    final runtimeSettings = snapshot.runtimeSettings;
     state = state.copyWith(
       lifecycle: snapshot.lifecycle,
       message: snapshot.message,
       traffic: snapshot.traffic,
       connections: snapshot.connections,
       proxyGroups: snapshot.proxyGroups,
+      settings: runtimeSettings,
     );
   }
 }

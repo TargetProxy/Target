@@ -8,13 +8,10 @@ import '../../../data/models/proxy_group.dart';
 import '../../../data/models/proxy_node.dart';
 import 'proxy_catalog.dart';
 
-enum ProxyMode { rule, global, direct }
-
 /// Immutable snapshot of the proxies workspace.
 @immutable
 class ProxiesState {
   const ProxiesState({
-    this.mode = ProxyMode.rule,
     this.groups = const [],
     this.selectedGroupIndex = 0,
     this.searchQuery = '',
@@ -23,7 +20,6 @@ class ProxiesState {
     this.lastError,
   });
 
-  final ProxyMode mode;
   final List<ProxyGroup> groups;
   final int selectedGroupIndex;
   final String searchQuery;
@@ -65,7 +61,6 @@ class ProxiesState {
   }
 
   ProxiesState copyWith({
-    ProxyMode? mode,
     List<ProxyGroup>? groups,
     int? selectedGroupIndex,
     String? searchQuery,
@@ -75,7 +70,6 @@ class ProxiesState {
     bool clearError = false,
   }) {
     return ProxiesState(
-      mode: mode ?? this.mode,
       groups: groups ?? this.groups,
       selectedGroupIndex: selectedGroupIndex ?? this.selectedGroupIndex,
       searchQuery: searchQuery ?? this.searchQuery,
@@ -108,10 +102,6 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
     );
     result = _syncFromCore(result, ref.read(coreProvider));
     return result;
-  }
-
-  void setMode(ProxyMode mode) {
-    state = state.copyWith(mode: mode);
   }
 
   void selectGroup(int index) {

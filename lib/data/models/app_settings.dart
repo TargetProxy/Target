@@ -23,35 +23,10 @@ extension ThemeModeOptionParsing on ThemeModeOption {
   }
 }
 
-enum ProxyMode {
-  mixed,
-  tun;
-
-  String get label => switch (this) {
-    ProxyMode.mixed => 'Mixed',
-    ProxyMode.tun => 'TUN',
-  };
-}
-
-extension ProxyModeParsing on ProxyMode {
-  static ProxyMode fromName(String? name) {
-    for (final value in ProxyMode.values) {
-      if (value.name == name) {
-        return value;
-      }
-    }
-    return ProxyMode.mixed;
-  }
-}
-
 @immutable
 class AppSettings {
   const AppSettings({
     this.themeMode = ThemeModeOption.system,
-    this.listenAddress = '127.0.0.1',
-    this.mixedPort = 2080,
-    this.proxyMode = ProxyMode.mixed,
-    this.ipv6 = false,
     this.systemProxy = true,
     this.serviceBasePath = '',
     this.serviceWorkingPath = '',
@@ -60,10 +35,6 @@ class AppSettings {
   });
 
   final ThemeModeOption themeMode;
-  final String listenAddress;
-  final int mixedPort;
-  final ProxyMode proxyMode;
-  final bool ipv6;
   final bool systemProxy;
   final String serviceBasePath;
   final String serviceWorkingPath;
@@ -72,10 +43,6 @@ class AppSettings {
 
   AppSettings copyWith({
     ThemeModeOption? themeMode,
-    String? listenAddress,
-    int? mixedPort,
-    ProxyMode? proxyMode,
-    bool? ipv6,
     bool? systemProxy,
     String? serviceBasePath,
     String? serviceWorkingPath,
@@ -84,10 +51,6 @@ class AppSettings {
   }) {
     return AppSettings(
       themeMode: themeMode ?? this.themeMode,
-      listenAddress: listenAddress ?? this.listenAddress,
-      mixedPort: mixedPort ?? this.mixedPort,
-      proxyMode: proxyMode ?? this.proxyMode,
-      ipv6: ipv6 ?? this.ipv6,
       systemProxy: systemProxy ?? this.systemProxy,
       serviceBasePath: serviceBasePath ?? this.serviceBasePath,
       serviceWorkingPath: serviceWorkingPath ?? this.serviceWorkingPath,

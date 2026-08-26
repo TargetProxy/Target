@@ -1,3 +1,4 @@
+import '../../data/models/proxy_group.dart';
 import '../../data/models/proxy_node.dart';
 
 class RuntimeSubscriptionSnapshot {
@@ -21,7 +22,7 @@ class RuntimeSubscription {
     required this.autoUpdate,
     required this.updateIntervalSeconds,
     required this.status,
-    this.nodes = const [],
+    this.profile = const RuntimeProfile(),
     this.errorCode,
     this.errorMessage,
     this.updatedAt,
@@ -42,7 +43,7 @@ class RuntimeSubscription {
   final bool autoUpdate;
   final int updateIntervalSeconds;
   final RuntimeSubscriptionStatus status;
-  final List<ProxyNode> nodes;
+  final RuntimeProfile profile;
   final String? errorCode;
   final String? errorMessage;
   final DateTime? updatedAt;
@@ -54,6 +55,43 @@ class RuntimeSubscription {
   final String? webPageUrl;
   final String? supportUrl;
   final String? movedPermanentlyTo;
+}
+
+class RuntimeProfile {
+  const RuntimeProfile({
+    this.nodes = const [],
+    this.groups = const [],
+    this.customOutbounds = const [],
+    this.customInbounds = const [],
+    this.routeRuleCount = 0,
+    this.dns,
+  });
+
+  final List<ProxyNode> nodes;
+  final List<ProxyGroup> groups;
+  final List<RuntimeProfileObject> customOutbounds;
+  final List<RuntimeProfileObject> customInbounds;
+  final int routeRuleCount;
+  final RuntimeProfileDns? dns;
+}
+
+class RuntimeProfileObject {
+  const RuntimeProfileObject({required this.tag, required this.type});
+
+  final String tag;
+  final String type;
+}
+
+class RuntimeProfileDns {
+  const RuntimeProfileDns({
+    required this.servers,
+    required this.ruleCount,
+    this.finalTag,
+  });
+
+  final List<RuntimeProfileObject> servers;
+  final int ruleCount;
+  final String? finalTag;
 }
 
 class RuntimeSubscriptionUpdate {
@@ -93,6 +131,6 @@ abstract interface class SubscriptionGateway {
 
   Future<RuntimeSubscriptionUpdate> updateSubscription(String id);
 
-  /// Selects the subscription used by TargetLib BuildConfig.
+  /// Selects the subscription used by TargetLib runtime configuration.
   Future<void> activateSubscription(String? id);
 }

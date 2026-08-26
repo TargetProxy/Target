@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/utils/format_bytes.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../data/models/subscription.dart';
+import '../../../data/models/runtime_settings.dart';
+import '../../../core/runtime/core_notifier.dart';
 import '../../../core/platform/app_platform.dart';
 import '../../proxies/application/proxies_notifier.dart';
 import '../../settings/application/settings_notifier.dart';
@@ -12,7 +14,7 @@ import '../../subscriptions/presentation/widgets/add_subscription_sheet.dart';
 import '../../maps/application/proxy_country_map.dart';
 import '../../maps/presentation/widgets/abstract_world_map.dart';
 
-enum _ProfileSection { overview, proxies, configuration }
+enum _ProfileSection { overview, proxies, nodes }
 
 class ProfilesWorkspacePage extends ConsumerStatefulWidget {
   const ProfilesWorkspacePage({super.key});
@@ -331,9 +333,9 @@ class _ProfileDetail extends ConsumerWidget {
                 label: Text('Proxies'),
               ),
               ButtonSegment(
-                value: _ProfileSection.configuration,
-                icon: Icon(Icons.code),
-                label: Text('Configuration'),
+                value: _ProfileSection.nodes,
+                icon: Icon(Icons.account_tree_outlined),
+                label: Text('Nodes'),
               ),
             ],
             selected: {section},
@@ -345,7 +347,7 @@ class _ProfileDetail extends ConsumerWidget {
           child: switch (section) {
             _ProfileSection.overview => _Overview(profile: profile),
             _ProfileSection.proxies => const _Policy(),
-            _ProfileSection.configuration => _Configuration(profile: profile),
+            _ProfileSection.nodes => _NodeSnapshot(profile: profile),
           },
         ),
       ],
@@ -371,7 +373,6 @@ class _Overview extends ConsumerWidget {
         _InfoCard(
           rows: [
             ('Status', profile.enabled ? 'Active' : 'Inactive'),
-            ('Format', profile.formatHint.name),
             ('Nodes', '${profile.nodeCount}'),
             (
               'Last updated',
@@ -433,31 +434,35 @@ class _Overview extends ConsumerWidget {
   }
 }
 
-class _Configuration extends ConsumerWidget {
-  const _Configuration({required this.profile});
+class _NodeSnapshot extends ConsumerWidget {
+  const _NodeSnapshot({required this.profile});
 
   final Subscription profile;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider).settings;
+    final runtime = ref.watch(coreProvider).settings;
     final capabilities = ref.watch(appCapabilitiesProvider);
     return _SectionScroll(
       children: [
-        const _SectionTitle(icon: Icons.tune, title: 'Runtime configuration'),
+        const _SectionTitle(icon: Icons.tune, title: 'Runtime settings'),
         _InfoCard(
           rows: [
-            ('Proxy mode', settings.proxyMode.label),
+            ('Proxy mode', runtime.proxyMode.label),
+            ('Routing', runtime.routeMode.label),
             if (capabilities.supportsMixedProxy)
-              ('Listen address', settings.listenAddress),
+              ('Listen address', runtime.listenAddress),
             if (capabilities.supportsMixedProxy)
-              ('Mixed port', '${settings.mixedPort}'),
-            ('IPv6', settings.ipv6 ? 'Enabled' : 'Disabled'),
-            if (capabilities.supportsMixedProxy && settings.systemProxy)
+              ('Mixed port', '${runtime.mixedPort}'),
+            ('IPv6', runtime.ipv6 ? 'Enabled' : 'Disabled'),
+            if (capabilities.supportsMixedProxy &&
+                runtime.proxyMode == ProxyMode.mixed &&
+                settings.systemProxy)
               ('System proxy', 'Enabled'),
           ],
         ),
-        const _SectionTitle(icon: Icons.code, title: 'Configuration source'),
+        const _SectionTitle(icon: Icons.account_tree_outlined, title: 'Node snapshot'),
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -465,16 +470,16 @@ class _Configuration extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  profile.formatHint == SubscriptionFormat.singBoxJson
-                      ? 'sing-box JSON'
-                      : 'Generated from subscription',
+                  '${profile.nodeCount} nodes available from the active subscription.',
                   style: Theme.of(
                     context,
                   ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Configuration editing will use the imported profile source. Runtime options remain available in Settings.',
+                  profile.profileTitle == null
+                      ? 'Backend now exposes node information directly, so the app can work from selection and latency data without a raw config file.'
+                      : 'Backend now exposes node information directly for ${profile.profileTitle}.',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ],

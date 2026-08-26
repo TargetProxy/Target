@@ -10,7 +10,8 @@ commands, and logs.
 - Settings persistence: available
 - TargetLib subscription persistence, parsing, scheduling, and proxy catalog: available
 - TargetLib runtime lifecycle: available through FFI and gRPC
-- Runtime metrics, connections, events, and outbound groups: available
+- Runtime state, subscription events, and profile outbound groups: available
+- Live traffic and connection snapshots: awaiting backend protocol support
 - Active URLTest triggering and refreshed latency results: available
 - TargetLib logs: streamed through the authenticated gRPC command server
 - Single-instance desktop launch: repeat launches restore and focus the running

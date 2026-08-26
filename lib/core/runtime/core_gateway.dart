@@ -1,5 +1,6 @@
 import '../../data/models/app_settings.dart';
 import '../../data/models/ip_info.dart';
+import '../../data/models/runtime_settings.dart';
 import 'core_models.dart';
 
 /// Stable app-facing boundary for the native proxy core.
@@ -14,9 +15,11 @@ abstract class CoreGateway {
 
   Future<CoreSnapshot> current();
 
-  Future<void> configure(AppSettings settings);
+  Future<void> configureHost(AppSettings settings);
 
-  Future<void> setRawConfig(String? config) async {}
+  Future<RuntimeSettings> getRuntimeConfig();
+
+  Future<RuntimeSettings> updateRuntimeConfig(RuntimeSettings settings);
 
   Future<void> start();
 
@@ -75,11 +78,14 @@ class UnavailableCoreGateway implements CoreGateway {
   );
 
   @override
-  Future<void> configure(AppSettings settings) => _unavailable();
+  Future<void> configureHost(AppSettings settings) => _unavailable();
 
   @override
+  Future<RuntimeSettings> getRuntimeConfig() => _unavailable();
+
   @override
-  Future<void> setRawConfig(String? config) => _unavailable();
+  Future<RuntimeSettings> updateRuntimeConfig(RuntimeSettings settings) =>
+      _unavailable();
 
   @override
   Future<void> start() => _unavailable();

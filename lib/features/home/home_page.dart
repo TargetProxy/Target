@@ -7,7 +7,7 @@ import '../../core/runtime/core_notifier.dart';
 import '../../core/runtime/core_models.dart';
 import '../../core/platform/app_platform.dart';
 import 'package:targetlib/targetlib.dart';
-import '../../data/models/app_settings.dart' as settings_models;
+import '../../data/models/runtime_settings.dart' as runtime_models;
 import '../settings/application/settings_notifier.dart';
 import '../../data/models/ip_info.dart';
 import '../../core/widgets/target_page_layout.dart';
@@ -257,15 +257,15 @@ class _HomePageState extends ConsumerState<HomePage> {
                                 ],
                               )
                             else
-                              SegmentedButton<settings_models.ProxyMode>(
+                              SegmentedButton<runtime_models.ProxyMode>(
                                 segments: const [
                                   ButtonSegment(
-                                    value: settings_models.ProxyMode.mixed,
+                                    value: runtime_models.ProxyMode.mixed,
                                     icon: Icon(Icons.lan_outlined),
                                     label: Text('Mixed'),
                                   ),
                                   ButtonSegment(
-                                    value: settings_models.ProxyMode.tun,
+                                    value: runtime_models.ProxyMode.tun,
                                     icon: Icon(Icons.vpn_lock_outlined),
                                     label: Text('TUN'),
                                   ),
@@ -279,6 +279,39 @@ class _HomePageState extends ConsumerState<HomePage> {
                                         }
                                       },
                               ),
+                            const SizedBox(height: 14),
+                            Text(
+                              'Routing mode',
+                              style: theme.textTheme.labelLarge,
+                            ),
+                            const SizedBox(height: 8),
+                            SegmentedButton<runtime_models.RouteMode>(
+                              segments: const [
+                                ButtonSegment(
+                                  value: runtime_models.RouteMode.rule,
+                                  icon: Icon(Icons.account_tree_outlined),
+                                  label: Text('Rule'),
+                                ),
+                                ButtonSegment(
+                                  value: runtime_models.RouteMode.direct,
+                                  icon: Icon(Icons.flash_on_outlined),
+                                  label: Text('Direct'),
+                                ),
+                                ButtonSegment(
+                                  value: runtime_models.RouteMode.all,
+                                  icon: Icon(Icons.public),
+                                  label: Text('All'),
+                                ),
+                              ],
+                              selected: {core.settings.routeMode},
+                              onSelectionChanged: core.busy
+                                  ? null
+                                  : (selected) {
+                                      if (selected.isNotEmpty) {
+                                        _changeRouteMode(selected.first);
+                                      }
+                                    },
+                            ),
                             const SizedBox(height: 14),
                             FilledButton(
                               onPressed: core.busy || !core.available
@@ -417,13 +450,30 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  Future<void> _changeProxyMode(settings_models.ProxyMode mode) async {
-    final current = ref.read(settingsProvider).settings;
+  Future<void> _changeProxyMode(runtime_models.ProxyMode mode) async {
+    final current = ref.read(coreProvider).settings;
     if (current.proxyMode == mode) return;
-    final settingsNotifier = ref.read(settingsProvider.notifier);
-    settingsNotifier.setProxyMode(mode);
-    final next = ref.read(settingsProvider).settings;
-    await ref.read(coreProvider.notifier).configure(next);
+    if (mode == runtime_models.ProxyMode.tun) {
+      ref
+          .read(settingsProvider.notifier)
+          .updateSettings((settings) => settings.copyWith(systemProxy: false));
+    }
+    await ref
+        .read(coreProvider.notifier)
+        .updateRuntimeConfig(current.copyWith(proxyMode: mode));
+    if (!mounted) return;
+    final core = ref.read(coreProvider);
+    if (core.lifecycle == CoreLifecycle.failed) {
+      _showMessage(core.message, error: true);
+    }
+  }
+
+  Future<void> _changeRouteMode(runtime_models.RouteMode mode) async {
+    final current = ref.read(coreProvider).settings;
+    if (current.routeMode == mode) return;
+    await ref
+        .read(coreProvider.notifier)
+        .updateRuntimeConfig(current.copyWith(routeMode: mode));
     if (!mounted) return;
     final core = ref.read(coreProvider);
     if (core.lifecycle == CoreLifecycle.failed) {

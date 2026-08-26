@@ -80,20 +80,7 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
       try {
         final snapshot = await gateway.listSubscriptions();
         final remote = snapshot.subscriptions;
-        var activeId = snapshot.activeId;
-        if (activeId == null) {
-          RuntimeSubscription? fallback;
-          for (final item in remote) {
-            if (item.enabled) {
-              fallback = item;
-              break;
-            }
-          }
-          if (fallback != null) {
-            activeId = fallback.id;
-            unawaited(_activateFallback(gateway, fallback.id));
-          }
-        }
+        final activeId = snapshot.activeId;
         final previous = {
           for (final item in state.subscriptions) item.id: item,
         };
@@ -120,7 +107,7 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
         if (active == null) {
           catalog.clear();
         } else {
-          catalog.replaceNodes(active.nodes);
+          catalog.replaceGroups(active.profile.groups);
         }
       } on Object catch (error) {
         state = state.copyWith(
@@ -130,16 +117,6 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
       }
     });
     return _operationTail;
-  }
-
-  Future<void> _activateFallback(SubscriptionGateway gateway, String id) async {
-    try {
-      await gateway.activateSubscription(id);
-    } on Object catch (error) {
-      state = state.copyWith(
-        lastError: 'Failed to activate subscription: $error',
-      );
-    }
   }
 
   Future<bool> addSubscription(String url, {String? name}) async {
@@ -160,6 +137,7 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
           : normalizedName,
       url: trimmedUrl,
     );
+    state = state.copyWith(busy: true, clearError: true);
     try {
       final created = await gateway.addSubscription(
         id: subscription.id,
@@ -172,8 +150,8 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
           ...subscription.headers,
           'User-Agent': subscription.userAgent,
         },
-        activate: false,
-        updateNow: false,
+        activate: true,
+        updateNow: true,
       );
       final added = _subscriptionFromRuntime(created, subscription);
       state = state.copyWith(
@@ -182,29 +160,21 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
             if (item.id != added.id) item,
           added,
         ],
+        activeId: created.id,
+        busy: false,
         clearError: true,
       );
-      unawaited(_activateAndUpdateAddedSubscription(created.id));
+      ref
+          .read(proxyCatalogProvider.notifier)
+          .replaceGroups(created.profile.groups);
       return true;
     } on Object catch (error) {
-      state = state.copyWith(lastError: 'Failed to add subscription: $error');
+      state = state.copyWith(
+        busy: false,
+        lastError: 'Failed to add subscription: $error',
+      );
       return false;
     }
-  }
-
-  Future<void> _activateAndUpdateAddedSubscription(String id) async {
-    final gateway = _gateway;
-    if (gateway == null) return;
-    try {
-      await gateway.activateSubscription(id);
-      state = state.copyWith(activeId: id, clearError: true);
-    } on Object catch (error) {
-      state = state.copyWith(
-        lastError: 'Subscription was added but could not be activated: $error',
-      );
-      return;
-    }
-    await updateSubscription(id);
   }
 
   Future<void> removeSubscription(String id) async {
@@ -316,7 +286,7 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
       if (snapshotIsActive(id)) {
         ref
             .read(proxyCatalogProvider.notifier)
-            .replaceNodes(result.subscription.nodes);
+            .replaceGroups(result.subscription.profile.groups);
       }
     } on Object catch (error) {
       state = state.copyWith(
@@ -384,7 +354,7 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
       id: runtime.id,
       name: runtime.name,
       url: previous?.url ?? _sourceUrl(runtime.source),
-      formatHint: SubscriptionFormat.singBoxJson,
+      formatHint: previous?.formatHint ?? SubscriptionFormat.auto,
       updateStatus: status,
       autoUpdate: runtime.autoUpdate,
       updateIntervalSeconds: runtime.updateIntervalSeconds,
@@ -403,7 +373,7 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
       uploadBytes: runtime.uploadBytes,
       downloadBytes: runtime.downloadBytes,
       totalBytes: runtime.totalBytes,
-      nodeCount: runtime.nodes.length,
+      nodeCount: runtime.profile.nodes.length,
       enabled: runtime.enabled,
     );
   }

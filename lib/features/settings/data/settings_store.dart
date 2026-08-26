@@ -26,13 +26,6 @@ class SharedPreferencesSettingsStore implements AppSettingsStore {
       themeMode: ThemeModeOptionParsing.fromName(
         prefs.getString(_k('themeMode')),
       ),
-      listenAddress:
-          (prefs.getString(_k('listenAddress'))?.trim().isEmpty ?? true)
-          ? '127.0.0.1'
-          : prefs.getString(_k('listenAddress'))!.trim(),
-      mixedPort: _sanitizePort(prefs.getInt(_k('mixedPort'))),
-      proxyMode: ProxyModeParsing.fromName(prefs.getString(_k('proxyMode'))),
-      ipv6: prefs.getBool(_k('ipv6')) ?? false,
       systemProxy: prefs.getBool(_k('systemProxy')) ?? true,
       serviceBasePath: (prefs.getString(_k('serviceBasePath')) ?? '').trim(),
       serviceWorkingPath: (prefs.getString(_k('serviceWorkingPath')) ?? '')
@@ -47,10 +40,6 @@ class SharedPreferencesSettingsStore implements AppSettingsStore {
     final prefs = await SharedPreferences.getInstance();
     await Future.wait([
       prefs.setString(_k('themeMode'), settings.themeMode.name),
-      prefs.setString(_k('listenAddress'), settings.listenAddress),
-      prefs.setInt(_k('mixedPort'), settings.mixedPort),
-      prefs.setString(_k('proxyMode'), settings.proxyMode.name),
-      prefs.setBool(_k('ipv6'), settings.ipv6),
       prefs.setBool(_k('systemProxy'), settings.systemProxy),
       prefs.setString(_k('serviceBasePath'), settings.serviceBasePath),
       prefs.setString(_k('serviceWorkingPath'), settings.serviceWorkingPath),
@@ -58,8 +47,6 @@ class SharedPreferencesSettingsStore implements AppSettingsStore {
       prefs.setString(_k('serviceLocale'), settings.serviceLocale),
     ]);
   }
-
-  int _sanitizePort(int? v) => v == null || v <= 0 || v >= 65536 ? 2080 : v;
 }
 
 class MemorySettingsStore implements AppSettingsStore {

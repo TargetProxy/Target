@@ -4,10 +4,7 @@ import 'package:target/core/platform/platform_settings_policy.dart';
 import 'package:target/data/models/app_settings.dart';
 
 void main() {
-  const mixedSettings = AppSettings(
-    proxyMode: ProxyMode.mixed,
-    systemProxy: true,
-  );
+  const mixedSettings = AppSettings(systemProxy: true);
 
   for (final platform in [AppPlatform.android, AppPlatform.ios]) {
     test('$platform is normalized to VPN-only settings', () {
@@ -16,7 +13,6 @@ void main() {
         AppCapabilities(platform),
       );
 
-      expect(normalized.proxyMode, ProxyMode.tun);
       expect(normalized.systemProxy, isFalse);
     });
   }

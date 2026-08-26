@@ -70,17 +70,6 @@ class SettingsNotifier extends Notifier<SettingsState> {
     unawaited(_saveLatest());
   }
 
-  void setProxyMode(ProxyMode mode) {
-    updateSettings(
-      (settings) => settings.copyWith(
-        proxyMode: mode,
-        // TUN owns the traffic entry point. Keeping the mixed inbound enabled
-        // at the same time makes Windows expose two competing proxy paths.
-        systemProxy: mode == ProxyMode.tun ? false : settings.systemProxy,
-      ),
-    );
-  }
-
   Future<void> _saveLatest() async {
     if (_saveInFlight) {
       _saveAgain = true;

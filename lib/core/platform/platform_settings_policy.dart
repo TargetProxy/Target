@@ -8,10 +8,9 @@ final class PlatformSettingsPolicy {
     AppSettings settings,
     AppCapabilities capabilities,
   ) {
-    if (!capabilities.vpnOnly ||
-        (settings.proxyMode == ProxyMode.tun && !settings.systemProxy)) {
+    if (!capabilities.vpnOnly || !settings.systemProxy) {
       return settings;
     }
-    return settings.copyWith(proxyMode: ProxyMode.tun, systemProxy: false);
+    return settings.copyWith(systemProxy: false);
   }
 }
