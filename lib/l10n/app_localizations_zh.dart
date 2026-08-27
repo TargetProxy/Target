@@ -9,12 +9,6 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
-  String get appTitle => 'Target';
-
-  @override
-  String get workspace => '工作区';
-
-  @override
   String get dashboard => '仪表盘';
 
   @override
@@ -55,14 +49,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get logs => '日志';
-
-  @override
-  String get nodeMap => '节点地图';
-
-  @override
-  String mapSummary(int regionCount, int nodeCount) {
-    return '$regionCount 个地区 · $nodeCount 个节点';
-  }
 
   @override
   String get proxyNodeWorldMap => '代理节点世界地图';

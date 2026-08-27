@@ -15,7 +15,6 @@ void main() {
   test('Chinese map strings interpolate counts', () {
     final l10n = AppLocalizationsZh();
 
-    expect(l10n.mapSummary(12, 28), '12 个地区 · 28 个节点');
     expect(l10n.countryCount(12), '国家 · 12');
     expect(l10n.groupMembers(3, 'select'), '3 个成员 · select');
     expect(l10n.fitMapToNodes, '适配所有节点');

@@ -1,7 +1,5 @@
 {
   "@@locale": "en",
-  "appTitle": "Target",
-  "workspace": "WORKSPACE",
   "dashboard": "Dashboard",
   "profiles": "Profiles",
   "connections": "Connections",
@@ -16,14 +14,6 @@
   "running": "Running",
   "stopped": "Stopped",
   "logs": "Logs",
-  "nodeMap": "Node map",
-  "mapSummary": "{regionCount} regions · {nodeCount} nodes",
-  "@mapSummary": {
-    "placeholders": {
-      "regionCount": {"type": "int"},
-      "nodeCount": {"type": "int"}
-    }
-  },
   "proxyNodeWorldMap": "World map of proxy nodes",
   "zoomIn": "Zoom in",
   "zoomOut": "Zoom out",

@@ -1,7 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/platform/app_platform.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/runtime/core_notifier.dart';
 import '../../../maps/application/proxy_country_map.dart';
@@ -16,7 +15,6 @@ class CurrentProfileCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final capabilities = ref.watch(appCapabilitiesProvider);
     final proxies = ref.watch(proxiesProvider);
     final isTun = core.settings.proxyMode.name == 'tun';
     final selectedNode = proxies.selectedGroup?.selectedNode;
@@ -78,18 +76,6 @@ class CurrentProfileCard extends ConsumerWidget {
                 value: selectedNode.id,
               ),
             ],
-            const SizedBox(height: AppSpacing.smallGap),
-            HomeInfoRow(
-              icon: isTun
-                  ? Icons.admin_panel_settings_outlined
-                  : Icons.place_outlined,
-              label: isTun ? 'Privilege' : 'Listen',
-              value: isTun
-                  ? capabilities.vpnOnly
-                        ? 'VPN service'
-                        : 'Elevate on demand'
-                  : '${core.settings.listenAddress}:${core.settings.mixedPort}',
-            ),
             if (proxies.lastError != null) ...[
               const SizedBox(height: AppSpacing.smallGap),
               HomeInfoRow(

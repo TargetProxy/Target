@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -178,54 +177,6 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
     }
   }
 
-  Future<void> removeSubscription(String id) async {
-    final gateway = _gateway;
-    if (gateway == null) {
-      _failUnavailable();
-      return;
-    }
-    try {
-      await gateway.removeSubscription(id);
-      state = state.copyWith(
-        subscriptions: [
-          for (final item in state.subscriptions)
-            if (item.id != id) item,
-        ],
-        clearError: true,
-      );
-    } on Object catch (error) {
-      state = state.copyWith(
-        lastError: 'Failed to remove subscription: $error',
-      );
-    }
-  }
-
-  Future<void> renameSubscription(String id, String newName) async {
-    final index = state.subscriptions.indexWhere((item) => item.id == id);
-    if (index < 0) return;
-    final gateway = _gateway;
-    if (gateway == null) {
-      _failUnavailable();
-      return;
-    }
-    try {
-      final renamed = await gateway.renameSubscription(id, newName);
-      state = state.copyWith(
-        subscriptions: [
-          for (var i = 0; i < state.subscriptions.length; i++)
-            i == index
-                ? _subscriptionFromRuntime(renamed, state.subscriptions[index])
-                : state.subscriptions[i],
-        ],
-        clearError: true,
-      );
-    } on Object catch (error) {
-      state = state.copyWith(
-        lastError: 'Failed to rename subscription: $error',
-      );
-    }
-  }
-
   Future<void> setActive(String id) async {
     final gateway = _gateway;
     if (gateway == null) {
@@ -324,34 +275,6 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
       '===== END TARGETLIB GENERATED CONFIG =====',
       source: 'CONFIG',
     );
-  }
-
-  Future<bool> importFromClipboard(String text) async {
-    final value = text.trim();
-    if (value.isEmpty) return false;
-    return addSubscription(value);
-  }
-
-  String exportSubscriptions() {
-    final data = state.subscriptions.map((item) => item.toJson()).toList();
-    return const JsonEncoder.withIndent('  ').convert(data);
-  }
-
-  Future<void> importFromJson(String json) async {
-    try {
-      final list = jsonDecode(json) as List;
-      for (final item in list) {
-        final map = Map<String, dynamic>.from(item as Map);
-        final url = map['url'] as String?;
-        if (url != null) {
-          await addSubscription(url, name: map['name'] as String?);
-        }
-      }
-    } on Object catch (error) {
-      state = state.copyWith(
-        lastError: 'Failed to import subscriptions: $error',
-      );
-    }
   }
 
   bool snapshotIsActive(String id) => state.activeId == id;

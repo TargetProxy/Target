@@ -4,14 +4,9 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/router.dart';
 
 class ConnectionErrorBanner extends StatelessWidget {
-  const ConnectionErrorBanner({
-    required this.message,
-    this.onElevate,
-    super.key,
-  });
+  const ConnectionErrorBanner({required this.message, super.key});
 
   final String message;
-  final Future<void> Function()? onElevate;
 
   @override
   Widget build(BuildContext context) {
@@ -35,16 +30,10 @@ class ConnectionErrorBanner extends StatelessWidget {
           message,
           style: TextStyle(color: theme.colorScheme.onErrorContainer),
         ),
-        trailing: onElevate == null
-            ? Icon(
-                Icons.chevron_right,
-                color: theme.colorScheme.onErrorContainer,
-              )
-            : FilledButton.icon(
-                onPressed: onElevate,
-                icon: const Icon(Icons.admin_panel_settings_outlined, size: 18),
-                label: const Text('Elevate'),
-              ),
+        trailing: Icon(
+          Icons.chevron_right,
+          color: theme.colorScheme.onErrorContainer,
+        ),
         onTap: () => context.go(AppRoute.logs.path),
       ),
     );

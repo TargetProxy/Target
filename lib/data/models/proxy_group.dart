@@ -17,8 +17,6 @@ class ProxyGroup {
   /// in this group are applied to the runtime core via SelectOutbound.
   static const runtimeSelectorGroupId = 'proxy';
 
-  bool get isRuntimeSelector => id == runtimeSelectorGroupId;
-
   final String id;
   final String name;
   final String type;

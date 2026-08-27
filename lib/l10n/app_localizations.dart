@@ -98,18 +98,6 @@ abstract class AppLocalizations {
     Locale('zh'),
   ];
 
-  /// No description provided for @appTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Target'**
-  String get appTitle;
-
-  /// No description provided for @workspace.
-  ///
-  /// In en, this message translates to:
-  /// **'WORKSPACE'**
-  String get workspace;
-
   /// No description provided for @dashboard.
   ///
   /// In en, this message translates to:
@@ -193,18 +181,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Logs'**
   String get logs;
-
-  /// No description provided for @nodeMap.
-  ///
-  /// In en, this message translates to:
-  /// **'Node map'**
-  String get nodeMap;
-
-  /// No description provided for @mapSummary.
-  ///
-  /// In en, this message translates to:
-  /// **'{regionCount} regions · {nodeCount} nodes'**
-  String mapSummary(int regionCount, int nodeCount);
 
   /// No description provided for @proxyNodeWorldMap.
   ///

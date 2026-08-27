@@ -20,18 +20,6 @@ class IpInfo {
   final String org;
   final String asName;
 
-  factory IpInfo.fromJson(Map<String, dynamic> json) {
-    return IpInfo(
-      ip: json['query'] as String? ?? '',
-      country: json['country'] as String? ?? '',
-      countryCode: json['countryCode'] as String? ?? '',
-      city: json['city'] as String? ?? '',
-      isp: json['isp'] as String? ?? '',
-      org: json['org'] as String? ?? '',
-      asName: json['as'] as String? ?? '',
-    );
-  }
-
   String get flagEmoji {
     if (countryCode.length != 2) return '';
     final upper = countryCode.toUpperCase();

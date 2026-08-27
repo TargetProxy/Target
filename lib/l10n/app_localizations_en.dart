@@ -9,12 +9,6 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
-  String get appTitle => 'Target';
-
-  @override
-  String get workspace => 'WORKSPACE';
-
-  @override
   String get dashboard => 'Dashboard';
 
   @override
@@ -55,14 +49,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get logs => 'Logs';
-
-  @override
-  String get nodeMap => 'Node map';
-
-  @override
-  String mapSummary(int regionCount, int nodeCount) {
-    return '$regionCount regions · $nodeCount nodes';
-  }
 
   @override
   String get proxyNodeWorldMap => 'World map of proxy nodes';

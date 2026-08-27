@@ -55,30 +55,3 @@ class TargetPageHeader extends StatelessWidget {
     );
   }
 }
-
-class TargetSectionTitle extends StatelessWidget {
-  const TargetSectionTitle({
-    required this.icon,
-    required this.title,
-    super.key,
-  });
-
-  final IconData icon;
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 20),
-        const SizedBox(width: 8),
-        Text(
-          title,
-          style: Theme.of(
-            context,
-          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-        ),
-      ],
-    );
-  }
-}

@@ -40,11 +40,8 @@ class Subscription {
     this.updateIntervalSeconds = 43200,
     this.headers = const {},
     this.userAgent = SubscriptionRequestDefaults.userAgent,
-    this.allowInsecureHttp = false,
     this.lastUpdatedAt,
     this.expiresAt,
-    this.lastEtag,
-    this.lastModified,
     this.activeProfileId,
     this.profileTitle,
     this.webPageUrl,
@@ -67,11 +64,8 @@ class Subscription {
   final int updateIntervalSeconds;
   final Map<String, String> headers;
   final String userAgent;
-  final bool allowInsecureHttp;
   final DateTime? lastUpdatedAt;
   final DateTime? expiresAt;
-  final String? lastEtag;
-  final DateTime? lastModified;
   final String? activeProfileId;
   final String? profileTitle;
   final String? webPageUrl;
@@ -83,18 +77,6 @@ class Subscription {
   final int? totalBytes;
   final int nodeCount;
   final bool enabled;
-
-  double? get usagePercent {
-    final total = totalBytes;
-    if (total == null || total <= 0) return null;
-    return (uploadBytes + downloadBytes) / total;
-  }
-
-  bool get isExpired {
-    final exp = expiresAt;
-    if (exp == null) return false;
-    return DateTime.now().isAfter(exp);
-  }
 
   String get safeUrl {
     final uri = Uri.tryParse(url);
@@ -124,11 +106,8 @@ class Subscription {
     int? updateIntervalSeconds,
     Map<String, String>? headers,
     String? userAgent,
-    bool? allowInsecureHttp,
     DateTime? lastUpdatedAt,
     DateTime? expiresAt,
-    String? lastEtag,
-    DateTime? lastModified,
     String? activeProfileId,
     String? profileTitle,
     String? webPageUrl,
@@ -152,11 +131,8 @@ class Subscription {
           updateIntervalSeconds ?? this.updateIntervalSeconds,
       headers: headers ?? this.headers,
       userAgent: userAgent ?? this.userAgent,
-      allowInsecureHttp: allowInsecureHttp ?? this.allowInsecureHttp,
       lastUpdatedAt: lastUpdatedAt ?? this.lastUpdatedAt,
       expiresAt: expiresAt ?? this.expiresAt,
-      lastEtag: lastEtag ?? this.lastEtag,
-      lastModified: lastModified ?? this.lastModified,
       activeProfileId: activeProfileId ?? this.activeProfileId,
       profileTitle: profileTitle ?? this.profileTitle,
       webPageUrl: webPageUrl ?? this.webPageUrl,
@@ -181,11 +157,8 @@ class Subscription {
     'updateIntervalSeconds': updateIntervalSeconds,
     'headers': headers,
     'userAgent': userAgent,
-    'allowInsecureHttp': allowInsecureHttp,
     'lastUpdatedAt': lastUpdatedAt?.toIso8601String(),
     'expiresAt': expiresAt?.toIso8601String(),
-    'lastEtag': lastEtag,
-    'lastModified': lastModified?.toIso8601String(),
     'activeProfileId': activeProfileId,
     'profileTitle': profileTitle,
     'webPageUrl': webPageUrl,
@@ -215,11 +188,8 @@ class Subscription {
       headers: Map<String, String>.from(json['headers'] as Map? ?? const {}),
       userAgent:
           json['userAgent'] as String? ?? SubscriptionRequestDefaults.userAgent,
-      allowInsecureHttp: json['allowInsecureHttp'] as bool? ?? false,
       lastUpdatedAt: _parseDate(json['lastUpdatedAt'] as String?),
       expiresAt: _parseDate(json['expiresAt'] as String?),
-      lastEtag: json['lastEtag'] as String?,
-      lastModified: _parseDate(json['lastModified'] as String?),
       activeProfileId: json['activeProfileId'] as String?,
       profileTitle: json['profileTitle'] as String?,
       webPageUrl: json['webPageUrl'] as String?,

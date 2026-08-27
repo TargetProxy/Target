@@ -1,7 +1,5 @@
 import 'package:material_ui/material_ui.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../../../app/router.dart';
 import '../../../../core/theme/app_spacing.dart';
 
 class QuickActionsGrid extends StatelessWidget {
@@ -35,74 +33,50 @@ class QuickActionsGrid extends StatelessWidget {
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: AppSpacing.itemGap),
-            Row(
-              children: [
-                Expanded(
-                  child: _QuickAction(
-                    icon: Icons.speed,
-                    label: 'Test Proxies',
-                    onTap: enabled ? onTestLatency : null,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.smallGap),
-                Expanded(
-                  child: _QuickAction(
-                    icon: Icons.hub,
-                    label: 'Change Node',
-                    onTap: () => context.go(AppRoute.proxies.path),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.smallGap),
-            Row(
-              children: [
-                Expanded(
-                  child: _QuickAction(
-                    icon: Icons.rule_folder_outlined,
-                    label: 'Refresh Rules',
-                    onTap: enabled ? onRefreshRuleSets : null,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.smallGap),
-                Expanded(
-                  child: _QuickAction(
-                    icon: Icons.cancel_presentation_outlined,
-                    label: 'Close Connections',
-                    onTap: enabled ? onCloseConnections : null,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.smallGap),
-            Row(
-              children: [
-                Expanded(
-                  child: _QuickAction(
-                    icon: Icons.sync,
-                    label: 'Manage Profiles',
-                    onTap: () => context.go(AppRoute.proxies.path),
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.smallGap),
-                Expanded(
-                  child: _QuickAction(
-                    icon: Icons.receipt_long_outlined,
-                    label: 'View Logs',
-                    onTap: () => context.go(AppRoute.logs.path),
-                  ),
-                ),
-                if (onReinstallService != null) ...[
-                  const SizedBox(width: AppSpacing.smallGap),
-                  Expanded(
-                    child: _QuickAction(
-                      icon: Icons.sync_lock_outlined,
-                      label: 'Reinstall Service',
-                      onTap: onReinstallService,
+            LayoutBuilder(
+              builder: (context, constraints) {
+                const gap = AppSpacing.smallGap;
+                final itemWidth = (constraints.maxWidth - gap) / 2;
+                return Wrap(
+                  spacing: gap,
+                  runSpacing: gap,
+                  children: [
+                    SizedBox(
+                      width: itemWidth,
+                      child: _QuickAction(
+                        icon: Icons.speed,
+                        label: 'Test Proxies',
+                        onTap: enabled ? onTestLatency : null,
+                      ),
                     ),
-                  ),
-                ],
-              ],
+                    SizedBox(
+                      width: itemWidth,
+                      child: _QuickAction(
+                        icon: Icons.rule_folder_outlined,
+                        label: 'Refresh Rules',
+                        onTap: enabled ? onRefreshRuleSets : null,
+                      ),
+                    ),
+                    SizedBox(
+                      width: itemWidth,
+                      child: _QuickAction(
+                        icon: Icons.cancel_presentation_outlined,
+                        label: 'Close Connections',
+                        onTap: enabled ? onCloseConnections : null,
+                      ),
+                    ),
+                    if (onReinstallService != null)
+                      SizedBox(
+                        width: itemWidth,
+                        child: _QuickAction(
+                          icon: Icons.sync_lock_outlined,
+                          label: 'Reinstall Service',
+                          onTap: onReinstallService,
+                        ),
+                      ),
+                  ],
+                );
+              },
             ),
           ],
         ),

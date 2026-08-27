@@ -177,10 +177,6 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
     state = state.copyWith(searchQuery: query);
   }
 
-  void toggleSortOrder() {
-    state = state.copyWith(sortAsc: !state.sortAsc);
-  }
-
   Future<void> testAllLatency() async {
     if (state.testing) return;
     state = state.copyWith(testing: true, clearError: true);
@@ -233,49 +229,6 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
       state = state.copyWith(lastError: 'Latency test failed: $error');
     } finally {
       state = state.copyWith(testing: false);
-    }
-  }
-
-  Future<void> testSingleLatency(String nodeId) async {
-    state = state.copyWith(clearError: true);
-    final coreGroups = ref.read(coreProvider).proxyGroups;
-    final candidateGroups = coreGroups.any(_isUrlTestGroup)
-        ? coreGroups
-        : state.groups;
-    final testable = candidateGroups.any(
-      (group) =>
-          _isUrlTestGroup(group) &&
-          group.nodes.any(
-            (node) => node.id == nodeId && node.type.toLowerCase() != 'direct',
-          ),
-    );
-    if (!testable) {
-      state = state.copyWith(
-        lastError: 'This node is not part of a TargetLib URLTest group.',
-      );
-      return;
-    }
-    for (var gi = 0; gi < state.groups.length; gi++) {
-      final group = state.groups[gi];
-      final idx = group.nodes.indexWhere((n) => n.id == nodeId);
-      if (idx < 0) continue;
-
-      final node = group.nodes[idx];
-      final latency = await ref
-          .read(coreProvider.notifier)
-          .testLatency(node.id);
-      if (latency == null) {
-        state = state.copyWith(lastError: ref.read(coreProvider).message);
-      }
-      final updated = List<ProxyNode>.from(group.nodes);
-      updated[idx] = node.copyWith(latencyMs: latency);
-      state = state.copyWith(
-        groups: [
-          for (var i = 0; i < state.groups.length; i++)
-            i == gi ? group.copyWith(nodes: updated) : state.groups[i],
-        ],
-      );
-      return;
     }
   }
 
