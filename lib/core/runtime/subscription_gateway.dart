@@ -58,40 +58,13 @@ class RuntimeSubscription {
 }
 
 class RuntimeProfile {
-  const RuntimeProfile({
-    this.nodes = const [],
-    this.groups = const [],
-    this.customOutbounds = const [],
-    this.customInbounds = const [],
-    this.routeRuleCount = 0,
-    this.dns,
-  });
+  const RuntimeProfile({this.nodes = const [], this.groups = const []});
 
   final List<ProxyNode> nodes;
+
+  /// Client-owned runtime selector groups built from TargetLib's node-only
+  /// profile view.
   final List<ProxyGroup> groups;
-  final List<RuntimeProfileObject> customOutbounds;
-  final List<RuntimeProfileObject> customInbounds;
-  final int routeRuleCount;
-  final RuntimeProfileDns? dns;
-}
-
-class RuntimeProfileObject {
-  const RuntimeProfileObject({required this.tag, required this.type});
-
-  final String tag;
-  final String type;
-}
-
-class RuntimeProfileDns {
-  const RuntimeProfileDns({
-    required this.servers,
-    required this.ruleCount,
-    this.finalTag,
-  });
-
-  final List<RuntimeProfileObject> servers;
-  final int ruleCount;
-  final String? finalTag;
 }
 
 class RuntimeSubscriptionUpdate {
@@ -100,12 +73,16 @@ class RuntimeSubscriptionUpdate {
     required this.changed,
     required this.notModified,
     required this.duration,
+    this.originalConfig = '',
+    this.generatedConfig = '',
   });
 
   final RuntimeSubscription subscription;
   final bool changed;
   final bool notModified;
   final Duration duration;
+  final String originalConfig;
+  final String generatedConfig;
 }
 
 abstract interface class SubscriptionGateway {

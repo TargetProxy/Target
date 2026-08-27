@@ -93,7 +93,7 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
       if (!next.running) {
         _runtimeSelections.clear();
       } else if (previous?.running != true) {
-        unawaited(_syncSelectedNodeToRuntime());
+        unawaited(_syncAllSelectionsToRuntime());
       }
     });
     var result = _syncFromCatalog(
@@ -115,40 +115,62 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
     final group = state.groups[state.selectedGroupIndex];
     if (!group.nodes.any((node) => node.id == nodeId)) return;
     if (group.selectedNodeId != nodeId) {
-      ref.read(proxyCatalogProvider.notifier).selectNode(group.id, nodeId);
-      state = state.copyWith(
-        groups: [
-          for (var i = 0; i < state.groups.length; i++)
-            i == state.selectedGroupIndex
-                ? group.copyWith(
-                    selectedNodeId: nodeId,
-                    nodes: [
-                      for (final node in group.nodes)
-                        node.copyWith(isSelected: node.id == nodeId),
-                    ],
-                  )
-                : state.groups[i],
-        ],
-      );
+      if (ref.read(coreProvider).running &&
+          !await _selectRuntime(group.id, nodeId)) {
+        return;
+      }
+      _applyLocalSelection(group.id, state.selectedGroupIndex, nodeId);
+      return;
     }
     await _selectRuntime(group.id, nodeId);
   }
 
-  Future<void> _syncSelectedNodeToRuntime() async {
-    final group = state.selectedGroup;
-    final nodeId = group?.selectedNodeId;
-    if (group != null && nodeId != null) {
-      await _selectRuntime(group.id, nodeId);
+  void _applyLocalSelection(String groupId, int groupIndex, String nodeId) {
+    ref.read(proxyCatalogProvider.notifier).selectNode(groupId, nodeId);
+    state = state.copyWith(
+      groups: [
+        for (var i = 0; i < state.groups.length; i++)
+          i == groupIndex
+              ? state.groups[i].copyWith(
+                  selectedNodeId: nodeId,
+                  nodes: [
+                    for (final node in state.groups[i].nodes)
+                      node.copyWith(isSelected: node.id == nodeId),
+                  ],
+                )
+              : state.groups[i],
+      ],
+      clearError: true,
+    );
+  }
+
+  Future<void> _syncAllSelectionsToRuntime() async {
+    for (final group in state.groups) {
+      final nodeId = group.selectedNodeId;
+      if (nodeId != null) {
+        await _selectRuntime(group.id, nodeId);
+      }
     }
   }
 
-  Future<void> _selectRuntime(String groupId, String nodeId) async {
+  Future<bool> _selectRuntime(String groupId, String nodeId) async {
     if (!ref.read(coreProvider).running ||
         _runtimeSelections[groupId] == nodeId) {
-      return;
+      return true;
     }
-    _runtimeSelections[groupId] = nodeId;
-    await ref.read(coreProvider.notifier).selectOutbound(groupId, nodeId);
+    try {
+      await ref.read(coreProvider.notifier).selectOutbound(groupId, nodeId);
+      _runtimeSelections[groupId] = nodeId;
+      state = state.copyWith(clearError: true);
+      return true;
+    } on Object {
+      // Allow a later retry instead of memoizing the failed selection.
+      _runtimeSelections.remove(groupId);
+      state = state.copyWith(
+        lastError: 'Failed to switch outbound to $nodeId.',
+      );
+      return false;
+    }
   }
 
   void setSearchQuery(String query) {

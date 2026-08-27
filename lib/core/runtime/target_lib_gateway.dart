@@ -1,6 +1,7 @@
 // ignore_for_file: prefer_initializing_formals
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:fixnum/fixnum.dart';
@@ -280,6 +281,14 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
           changed: result.changed,
           notModified: result.notModified,
           duration: Duration(milliseconds: result.durationMilliseconds.toInt()),
+          originalConfig: utf8.decode(
+            result.originalConfig,
+            allowMalformed: true,
+          ),
+          generatedConfig: utf8.decode(
+            result.generatedConfig,
+            allowMalformed: true,
+          ),
         );
       });
 
@@ -350,58 +359,42 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
           id: node.tag,
           name: node.name.isEmpty ? node.tag : node.name,
           type: node.type,
+          countryCode: node.countryCode.isEmpty ? null : node.countryCode,
+          // Only nodes that explicitly failed normalization are excluded;
+          // discovered/normalized phases stay selectable so exits can be
+          // chosen before the core reports READY.
           isAvailable:
-              node.phase ==
-              targetlib_pb.ProfileNodePhase.PROFILE_NODE_PHASE_READY,
+              node.phase !=
+              targetlib_pb.ProfileNodePhase.PROFILE_NODE_PHASE_FAILED,
           metadata: {
             'server': node.server,
             'port': node.port,
-            'groups': node.groupTags.toList(),
             if (node.errorMessage.isNotEmpty) 'error': node.errorMessage,
           },
         ),
     ];
-    final candidates = <String, ProxyNode>{
-      for (final node in nodes) node.id: node,
-      for (final outbound in source.customOutbounds)
-        if (outbound.tag.isNotEmpty)
-          outbound.tag: ProxyNode(
-            id: outbound.tag,
-            name: outbound.tag,
-            type: outbound.type,
-            metadata: const {'source': 'profile'},
-          ),
-    };
-    final groups = <ProxyGroup>[
-      for (final group in source.groups)
-        ProxyGroup(
-          id: group.tag,
-          name: group.tag,
-          type: group.type,
-          selectedNodeId: candidates.containsKey(group.defaultTag)
-              ? group.defaultTag
-              : null,
-          nodes: [for (final tag in group.memberTags) ?candidates[tag]],
-        ),
+    final exitNodes = [
+      for (final node in nodes)
+        if (_isSelectableExit(node) && node.isAvailable) node,
     ];
-    RuntimeProfileObject object(targetlib_pb.ProfileObject source) =>
-        RuntimeProfileObject(tag: source.tag, type: source.type);
     return RuntimeProfile(
       nodes: nodes,
-      groups: groups,
-      customOutbounds: source.customOutbounds.map(object).toList(),
-      customInbounds: source.customInbounds.map(object).toList(),
-      routeRuleCount: source.routeRuleCount,
-      dns: source.hasDns()
-          ? RuntimeProfileDns(
-              servers: source.dns.servers.map(object).toList(),
-              ruleCount: source.dns.ruleCount,
-              finalTag: source.dns.finalServer.isEmpty
-                  ? null
-                  : source.dns.finalServer,
-            )
-          : null,
+      groups: exitNodes.isEmpty
+          ? const []
+          : [
+              ProxyGroup(
+                id: ProxyGroup.runtimeSelectorGroupId,
+                name: ProxyGroup.runtimeSelectorGroupId,
+                type: 'selector',
+                nodes: exitNodes,
+              ),
+            ],
     );
+  }
+
+  static bool _isSelectableExit(ProxyNode node) {
+    final type = node.type.toLowerCase();
+    return type != 'direct' && type != 'block' && type != 'dns';
   }
 
   DateTime? _dateFromUnixMilliseconds(int value) => value <= 0

@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/platform/app_platform.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/runtime/core_notifier.dart';
+import '../../../maps/application/proxy_country_map.dart';
+import '../../../proxies/application/proxies_notifier.dart';
 import 'home_info_row.dart';
 
 class CurrentProfileCard extends ConsumerWidget {
@@ -15,7 +17,15 @@ class CurrentProfileCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final capabilities = ref.watch(appCapabilitiesProvider);
+    final proxies = ref.watch(proxiesProvider);
     final isTun = core.settings.proxyMode.name == 'tun';
+    final selectedNode = proxies.selectedGroup?.selectedNode;
+    final selectedCountry = selectedNode == null
+        ? null
+        : proxyNodeCountryCode(selectedNode);
+    final selectedNodeMeta = selectedNode == null
+        ? 'No node selected'
+        : [?selectedCountry, selectedNode.typeLabel].join(' / ');
 
     return Card(
       child: Padding(
@@ -50,6 +60,26 @@ class CurrentProfileCard extends ConsumerWidget {
             ),
             const SizedBox(height: AppSpacing.smallGap),
             HomeInfoRow(
+              icon: Icons.route_outlined,
+              label: 'Node',
+              value: selectedNode?.displayName ?? 'No node selected',
+            ),
+            if (selectedNode != null) ...[
+              const SizedBox(height: AppSpacing.smallGap),
+              HomeInfoRow(
+                icon: Icons.flag_outlined,
+                label: 'Region',
+                value: selectedNodeMeta,
+              ),
+              const SizedBox(height: AppSpacing.smallGap),
+              HomeInfoRow(
+                icon: Icons.tag_outlined,
+                label: 'Node ID',
+                value: selectedNode.id,
+              ),
+            ],
+            const SizedBox(height: AppSpacing.smallGap),
+            HomeInfoRow(
               icon: isTun
                   ? Icons.admin_panel_settings_outlined
                   : Icons.place_outlined,
@@ -60,6 +90,14 @@ class CurrentProfileCard extends ConsumerWidget {
                         : 'Elevate on demand'
                   : '${core.settings.listenAddress}:${core.settings.mixedPort}',
             ),
+            if (proxies.lastError != null) ...[
+              const SizedBox(height: AppSpacing.smallGap),
+              HomeInfoRow(
+                icon: Icons.error_outline,
+                label: 'Proxy error',
+                value: proxies.lastError!,
+              ),
+            ],
           ],
         ),
       ),

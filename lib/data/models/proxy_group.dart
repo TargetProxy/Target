@@ -12,6 +12,13 @@ class ProxyGroup {
     this.nodes = const [],
   });
 
+  /// Tag of the selector group that TargetLib generates for every profile
+  /// (config.Build always emits a single selector named `proxy`). Selections
+  /// in this group are applied to the runtime core via SelectOutbound.
+  static const runtimeSelectorGroupId = 'proxy';
+
+  bool get isRuntimeSelector => id == runtimeSelectorGroupId;
+
   final String id;
   final String name;
   final String type;

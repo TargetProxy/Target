@@ -10,7 +10,7 @@ commands, and logs.
 - Settings persistence: available
 - TargetLib subscription persistence, parsing, scheduling, and proxy catalog: available
 - TargetLib runtime lifecycle: available through FFI and gRPC
-- Runtime state, subscription events, and profile outbound groups: available
+- Runtime state, subscription events, and node-only subscription profiles: available
 - Live traffic and connection snapshots: awaiting backend protocol support
 - Active URLTest triggering and refreshed latency results: available
 - TargetLib logs: streamed through the authenticated gRPC command server
@@ -42,6 +42,10 @@ first use, Target copies it to the `path_provider` application support
 directory and runs that managed copy. The TargetLib build script also refreshes
 all existing Windows runner copies, so `Reinstall Service` installs the latest
 local daemon build without a manual file copy.
+
+Subscription profiles are consumed as node-only data. TargetLib owns the runtime
+`urltest` and `proxy` selector construction, and Target builds UI groupings such
+as countries from node metadata instead of trusting provider-defined groups.
 
 ## Run
 

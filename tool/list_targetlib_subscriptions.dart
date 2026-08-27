@@ -8,7 +8,8 @@ const _socketName = 'targetlib.sock';
 const _host = '127.0.0.1';
 const _port = 19090;
 
-Future<void> main() async {
+Future<void> main(List<String> args) async {
+  final nodeFilter = args.isEmpty ? null : args.first.toLowerCase();
   final appData = Platform.environment['APPDATA'];
   if (appData == null || appData.isEmpty) {
     stderr.writeln('APPDATA is not set.');
@@ -30,10 +31,7 @@ Future<void> main() async {
       Empty(),
       options: connection.$3,
     );
-    final state = await connection.$2.getState(
-      Empty(),
-      options: connection.$3,
-    );
+    final state = await connection.$2.getState(Empty(), options: connection.$3);
     final list = await connection.$2.listSubscriptions(
       Empty(),
       options: connection.$3,
@@ -53,15 +51,22 @@ Future<void> main() async {
           'name=${item.name}',
           'status=${item.status.name}',
           'nodes=${item.profile.nodes.length}',
-          'groups=${item.profile.groups.length}',
           'error=${item.errorMessage}',
           'updated=${item.updatedAtUnixMs}',
         ].join(' '),
       );
-      for (final node in item.profile.nodes.take(5)) {
+      final nodes = nodeFilter == null
+          ? item.profile.nodes.take(5)
+          : item.profile.nodes.where(
+              (node) =>
+                  node.tag.toLowerCase().contains(nodeFilter) ||
+                  node.name.toLowerCase().contains(nodeFilter),
+            );
+      for (final node in nodes) {
         stdout.writeln(
           '  node tag=${node.tag} name=${node.name} type=${node.type} '
-          'phase=${node.phase.name} server=${node.server}:${node.port}',
+          'country=${node.countryCode} phase=${node.phase.name} '
+          'server=${node.server}:${node.port}',
         );
       }
     }
@@ -80,11 +85,15 @@ Future<(ClientChannel, TargetLibClient, CallOptions, String)> _connect(
       ClientChannel(
         InternetAddress(socketPath, type: InternetAddressType.unix),
         port: 0,
-        options: const ChannelOptions(credentials: ChannelCredentials.insecure()),
+        options: const ChannelOptions(
+          credentials: ChannelCredentials.insecure(),
+        ),
       ),
       'unix',
     ));
-  } on Object {}
+  } on Object {
+    // Unix sockets are not available on every host; fall back to TCP below.
+  }
   candidates.add((
     ClientChannel(
       _host,

@@ -52,7 +52,7 @@ class _ProfilesWorkspacePageState extends ConsumerState<ProfilesWorkspacePage> {
               selectedId: selected?.id,
               busy: subscriptions.busy,
               onSelected: (id) {
-                setState(() => _selectedId = id);
+                _selectProfile(id);
                 Navigator.pop(context);
               },
               onAdd: _showAddSubscription,
@@ -71,7 +71,7 @@ class _ProfilesWorkspacePageState extends ConsumerState<ProfilesWorkspacePage> {
             profiles: profiles,
             selectedId: selected?.id,
             busy: subscriptions.busy,
-            onSelected: (id) => setState(() => _selectedId = id),
+            onSelected: _selectProfile,
             onAdd: _showAddSubscription,
             onRefresh: _refreshSelected,
           ),
@@ -102,6 +102,14 @@ class _ProfilesWorkspacePageState extends ConsumerState<ProfilesWorkspacePage> {
       (profile) => profile.enabled,
       orElse: () => profiles.first,
     );
+  }
+
+  void _selectProfile(String id) {
+    setState(() => _selectedId = id);
+    final current = ref.read(subscriptionsProvider);
+    if (current.activeId != id) {
+      ref.read(subscriptionsProvider.notifier).setActive(id);
+    }
   }
 
   Future<void> _showAddSubscription() async {
@@ -462,7 +470,10 @@ class _NodeSnapshot extends ConsumerWidget {
               ('System proxy', 'Enabled'),
           ],
         ),
-        const _SectionTitle(icon: Icons.account_tree_outlined, title: 'Node snapshot'),
+        const _SectionTitle(
+          icon: Icons.account_tree_outlined,
+          title: 'Node snapshot',
+        ),
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),

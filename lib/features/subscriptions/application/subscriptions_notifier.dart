@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/runtime/core_notifier.dart';
 import '../../../core/runtime/subscription_gateway.dart';
+import '../../../core/logging/app_logger.dart';
 import '../../../data/models/subscription.dart';
 import '../../proxies/application/proxy_catalog.dart';
 
@@ -263,6 +264,7 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
     );
     try {
       final result = await gateway.updateSubscription(id);
+      _logConfigComparison(result);
       Subscription? current;
       for (final item in state.subscriptions) {
         if (item.id == id) {
@@ -304,6 +306,24 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
         lastError: 'Failed to update subscription: $error',
       );
     }
+  }
+
+  void _logConfigComparison(RuntimeSubscriptionUpdate result) {
+    if (result.originalConfig.isEmpty && result.generatedConfig.isEmpty) {
+      return;
+    }
+    AppLogger.info(
+      '===== ORIGINAL SUBSCRIPTION CONFIG =====\n'
+      '${result.originalConfig}\n'
+      '===== END ORIGINAL SUBSCRIPTION CONFIG =====',
+      source: 'CONFIG',
+    );
+    AppLogger.info(
+      '===== TARGETLIB GENERATED CONFIG =====\n'
+      '${result.generatedConfig}\n'
+      '===== END TARGETLIB GENERATED CONFIG =====',
+      source: 'CONFIG',
+    );
   }
 
   Future<bool> importFromClipboard(String text) async {

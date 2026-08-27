@@ -81,6 +81,42 @@ void main() {
     expect(container.read(coreProvider).settings.routeMode, RouteMode.direct);
     expect(gateway.configurations.last.routeMode, RouteMode.direct);
   });
+
+  test(
+    'keeps the previous node selected when runtime selection fails',
+    () async {
+      final gateway = _RecordingCoreGateway();
+      final container = ProviderContainer(
+        overrides: [coreGatewayProvider.overrideWithValue(gateway)],
+      );
+      addTearDown(container.dispose);
+
+      container.read(coreProvider);
+      container.read(proxyCatalogProvider.notifier).replaceGroups(const [
+        ProxyGroup(
+          id: 'proxy',
+          name: 'proxy',
+          type: 'selector',
+          selectedNodeId: 'node-1',
+          nodes: [
+            ProxyNode(id: 'node-1', name: 'Singapore', type: 'vmess'),
+            ProxyNode(id: 'node-2', name: 'Tokyo', type: 'vmess'),
+          ],
+        ),
+      ]);
+      container.read(proxiesProvider);
+      gateway.emit(const CoreSnapshot(lifecycle: CoreLifecycle.running));
+      await Future<void>.delayed(Duration.zero);
+      expect(gateway.selections, [('proxy', 'node-1')]);
+
+      gateway.throwOnSelect = true;
+      await container.read(proxiesProvider.notifier).selectNode('node-2');
+
+      final proxies = container.read(proxiesProvider);
+      expect(proxies.selectedGroup?.selectedNodeId, 'node-1');
+      expect(proxies.lastError, contains('Failed to switch outbound'));
+    },
+  );
 }
 
 class _RecordingCoreGateway extends UnavailableCoreGateway {
@@ -88,6 +124,8 @@ class _RecordingCoreGateway extends UnavailableCoreGateway {
   final List<(String, String)> selections = [];
   final List<RuntimeSettings> configurations = [];
   RuntimeSettings runtimeSettings = const RuntimeSettings();
+  CoreSnapshot currentSnapshot = const CoreSnapshot();
+  bool throwOnSelect = false;
 
   @override
   bool get isAvailable => true;
@@ -96,9 +134,12 @@ class _RecordingCoreGateway extends UnavailableCoreGateway {
   Stream<CoreSnapshot> get snapshots => _snapshots.stream;
 
   @override
-  Future<CoreSnapshot> current() async => const CoreSnapshot();
+  Future<CoreSnapshot> current() async => currentSnapshot;
 
-  void emit(CoreSnapshot snapshot) => _snapshots.add(snapshot);
+  void emit(CoreSnapshot snapshot) {
+    currentSnapshot = snapshot;
+    _snapshots.add(snapshot);
+  }
 
   @override
   Future<void> configureHost(AppSettings settings) async {}
@@ -115,6 +156,9 @@ class _RecordingCoreGateway extends UnavailableCoreGateway {
 
   @override
   Future<void> selectOutbound(String groupId, String outboundId) async {
+    if (throwOnSelect) {
+      throw StateError('select failed');
+    }
     selections.add((groupId, outboundId));
   }
 
