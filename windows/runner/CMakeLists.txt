@@ -38,17 +38,3 @@ target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
 # Run the Flutter tool portions of the build. This must not be removed.
 add_dependencies(${BINARY_NAME} flutter_assemble)
-
-# Bundle TargetLib beside the Flutter executable. Dart copies it into the
-# application support directory before launching or installing the service.
-set(TARGETLIB_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/../../../TargetLib/build/TargetLib.exe")
-if(EXISTS "${TARGETLIB_SOURCE}")
-  add_custom_target(bundle_targetlib ALL
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${TARGETLIB_SOURCE}"
-      "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/TargetLib.exe"
-    DEPENDS "${TARGETLIB_SOURCE}"
-    COMMENT "Bundling TargetLib.exe"
-    VERBATIM)
-  add_dependencies(${BINARY_NAME} bundle_targetlib)
-endif()

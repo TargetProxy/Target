@@ -1,4 +1,3 @@
-import '../../data/models/app_settings.dart';
 import '../../data/models/ip_info.dart';
 import '../../data/models/runtime_settings.dart';
 import 'core_models.dart';
@@ -14,8 +13,6 @@ abstract class CoreGateway {
   Stream<CoreSnapshot> get snapshots;
 
   Future<CoreSnapshot> current();
-
-  Future<void> configureHost(AppSettings settings);
 
   Future<RuntimeSettings> getRuntimeConfig();
 
@@ -38,8 +35,6 @@ abstract class CoreGateway {
   Future<int> refreshRuleSets();
 
   Future<void> clearLogs();
-
-  Future<void> reinstallService();
 
   /// Queries the egress IP geolocation through the backend.
   Future<IpInfo> fetchIpInfo();
@@ -78,9 +73,6 @@ class UnavailableCoreGateway implements CoreGateway {
   );
 
   @override
-  Future<void> configureHost(AppSettings settings) => _unavailable();
-
-  @override
   Future<RuntimeSettings> getRuntimeConfig() => _unavailable();
 
   @override
@@ -116,9 +108,6 @@ class UnavailableCoreGateway implements CoreGateway {
 
   @override
   Future<void> clearLogs() async {}
-
-  @override
-  Future<void> reinstallService() => _unavailable();
 
   @override
   Future<IpInfo> fetchIpInfo() => _unavailable();

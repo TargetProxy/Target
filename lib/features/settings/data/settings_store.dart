@@ -27,11 +27,6 @@ class SharedPreferencesSettingsStore implements AppSettingsStore {
         prefs.getString(_k('themeMode')),
       ),
       systemProxy: prefs.getBool(_k('systemProxy')) ?? true,
-      serviceBasePath: (prefs.getString(_k('serviceBasePath')) ?? '').trim(),
-      serviceWorkingPath: (prefs.getString(_k('serviceWorkingPath')) ?? '')
-          .trim(),
-      serviceTempPath: (prefs.getString(_k('serviceTempPath')) ?? '').trim(),
-      serviceLocale: (prefs.getString(_k('serviceLocale')) ?? '').trim(),
     );
   }
 
@@ -41,10 +36,6 @@ class SharedPreferencesSettingsStore implements AppSettingsStore {
     await Future.wait([
       prefs.setString(_k('themeMode'), settings.themeMode.name),
       prefs.setBool(_k('systemProxy'), settings.systemProxy),
-      prefs.setString(_k('serviceBasePath'), settings.serviceBasePath),
-      prefs.setString(_k('serviceWorkingPath'), settings.serviceWorkingPath),
-      prefs.setString(_k('serviceTempPath'), settings.serviceTempPath),
-      prefs.setString(_k('serviceLocale'), settings.serviceLocale),
     ]);
   }
 }

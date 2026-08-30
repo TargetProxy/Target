@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/models/runtime_settings.dart';
 import '../../data/models/proxy_group.dart';
-import '../../features/settings/application/settings_notifier.dart';
 import '../logging/app_logger.dart';
 import '../platform/app_platform.dart';
 import 'core_gateway.dart';
@@ -83,6 +82,7 @@ class CoreNotifier extends Notifier<CoreState> {
   Future<void> Function()? _startupBarrier;
   RuntimeSettings? _pendingConfiguration;
   Future<void>? _configurationTask;
+  int _configurationRevision = 0;
 
   @override
   CoreState build() {
@@ -102,6 +102,7 @@ class CoreNotifier extends Notifier<CoreState> {
   }
 
   Future<void> updateRuntimeConfig(RuntimeSettings settings) async {
+    _configurationRevision++;
     state = state.copyWith(settings: settings);
     if (!state.available) {
       return;
@@ -169,7 +170,6 @@ class CoreNotifier extends Notifier<CoreState> {
     AppLogger.info('Connect requested using ${state.backendName}');
     await _run(() async {
       await _startupBarrier?.call();
-      await _gateway!.configureHost(ref.read(settingsProvider).settings);
       await _gateway!.start();
     }, operationName: 'connect');
   }
@@ -261,11 +261,6 @@ class CoreNotifier extends Notifier<CoreState> {
     );
   }
 
-  Future<void> reinstallService() async {
-    if (!state.available) return;
-    await _run(_gateway!.reinstallService, operationName: 'reinstall service');
-  }
-
   Future<void> _refresh() async {
     // build() schedules this method before Riverpod publishes the initial
     // notifier state. Yield once before reading state.
@@ -274,7 +269,7 @@ class CoreNotifier extends Notifier<CoreState> {
       _applySnapshot(await _gateway!.current());
       return;
     }
-    await _gateway!.configureHost(ref.read(settingsProvider).settings);
+    final configurationRevision = _configurationRevision;
     final settings = await _gateway!.getRuntimeConfig();
     final snapshot = await _gateway!.current();
     _applySnapshot(
@@ -284,7 +279,9 @@ class CoreNotifier extends Notifier<CoreState> {
         traffic: snapshot.traffic,
         connections: snapshot.connections,
         proxyGroups: snapshot.proxyGroups,
-        runtimeSettings: settings,
+        runtimeSettings: configurationRevision == _configurationRevision
+            ? settings
+            : null,
       ),
     );
   }

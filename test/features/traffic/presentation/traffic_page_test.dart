@@ -4,7 +4,6 @@ import 'package:material_ui/material_ui.dart';
 import 'package:target/core/runtime/core_gateway.dart';
 import 'package:target/core/runtime/core_models.dart';
 import 'package:target/core/runtime/core_notifier.dart';
-import 'package:target/data/models/app_settings.dart';
 import 'package:target/data/models/runtime_settings.dart';
 import 'package:target/features/traffic/presentation/traffic_page.dart';
 import 'package:target/l10n/app_localizations.dart';
@@ -68,9 +67,6 @@ class _SnapshotGateway extends UnavailableCoreGateway {
 
   @override
   bool get isAvailable => true;
-
-  @override
-  Future<void> configureHost(AppSettings settings) async {}
 
   @override
   Future<RuntimeSettings> getRuntimeConfig() async => const RuntimeSettings();

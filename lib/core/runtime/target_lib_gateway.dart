@@ -8,7 +8,6 @@ import 'package:fixnum/fixnum.dart';
 import 'package:grpc/grpc.dart';
 import 'package:protobuf/well_known_types/google/protobuf/empty.pb.dart';
 
-import '../../data/models/app_settings.dart';
 import '../../data/models/ip_info.dart';
 import '../../data/models/proxy_group.dart';
 import '../../data/models/proxy_node.dart';
@@ -43,7 +42,6 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
   final List<StreamSubscription<Object?>> _runtimeSubscriptions = [];
   Future<void> _runtimeStreamTail = Future<void>.value();
 
-  AppSettings _settings = const AppSettings();
   TargetLibClient? _manager;
   final TargetLibRuntime _runtime = TargetLibRuntime();
   CallOptions? _callOptions;
@@ -94,11 +92,6 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
     );
     return _current;
   }
-
-  @override
-  Future<void> configureHost(AppSettings settings) => _serialize(() async {
-    _settings = settings;
-  });
 
   @override
   Future<RuntimeSettings> getRuntimeConfig() => _serialize(() async {
@@ -536,49 +529,6 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
   }
 
   @override
-  Future<void> reinstallService() => _serialize(() async {
-    final basePath = (await _resolveBaseDirectory()).path;
-    final workingPath = await _resolveWorkingPath();
-    final tempPath = await _resolveTempPath();
-
-    // Release the in-process daemon before replacing its registered binary.
-    await _shutdownTransport();
-    try {
-      await _runtime.serviceManager.run(
-        'stop',
-        basePath: basePath,
-        workingPath: workingPath,
-        tempPath: tempPath,
-        locale: _settings.serviceLocale,
-        refreshExecutable: false,
-      );
-    } on Object catch (error) {
-      // The service may not be installed or may already be stopped.
-      AppLogger.info('Service stop skipped: $error', source: 'TargetLib');
-    }
-    try {
-      await _runtime.serviceManager.run(
-        'uninstall',
-        basePath: basePath,
-        workingPath: workingPath,
-        tempPath: tempPath,
-        locale: _settings.serviceLocale,
-        refreshExecutable: false,
-      );
-    } on Object catch (error) {
-      // Uninstall is intentionally best effort: a missing service should not
-      // prevent the subsequent install from repairing the installation.
-      AppLogger.info('Service uninstall skipped: $error', source: 'TargetLib');
-    }
-    await _runtime.serviceManager.installAndStart(
-      basePath: basePath,
-      workingPath: workingPath,
-      tempPath: tempPath,
-      locale: _settings.serviceLocale,
-    );
-  });
-
-  @override
   Future<void> dispose() => _serialize(() async {
     if (_disposed) return;
     await _stopLocked();
@@ -590,37 +540,14 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
 
   Future<Directory> _resolveBaseDirectory() async {
     final path = await _runtime.resolveBasePath(
-      override: _settings.serviceBasePath,
       rootOverride: _workingDirectory?.path,
     );
     return Directory(path);
   }
 
-  Future<String> _resolveWorkingPath() async {
-    final override = _settings.serviceWorkingPath.trim();
-    if (override.isNotEmpty) return override;
-    // When no override is set, let TargetLib default to basePath.
-    // Return empty so the TargetLib runtime uses its default working path.
-    return '';
-  }
-
-  Future<String> _resolveTempPath() async {
-    final override = _settings.serviceTempPath.trim();
-    if (override.isNotEmpty) return override;
-    // Resolve the TargetLib scratch directory through the plugin runtime.
-    return _runtime.resolveTempPath(override);
-  }
-
   Future<void> _ensureCore() async {
     final baseDir = await _resolveBaseDirectory();
-    final workingPath = await _resolveWorkingPath();
-    final tempPath = await _resolveTempPath();
-    await _runtime.ensureConnected(
-      basePath: baseDir.path,
-      workingPath: workingPath,
-      tempPath: tempPath,
-      locale: _settings.serviceLocale,
-    );
+    await _runtime.ensureConnected(basePath: baseDir.path);
   }
 
   Future<void> _ensureConnected() async {

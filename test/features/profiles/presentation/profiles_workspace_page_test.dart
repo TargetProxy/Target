@@ -7,7 +7,6 @@ import 'package:target/core/runtime/core_gateway.dart';
 import 'package:target/core/runtime/core_models.dart';
 import 'package:target/core/runtime/core_notifier.dart';
 import 'package:target/core/runtime/subscription_gateway.dart';
-import 'package:target/data/models/app_settings.dart';
 import 'package:target/data/models/proxy_group.dart';
 import 'package:target/data/models/proxy_node.dart';
 import 'package:target/data/models/runtime_settings.dart';
@@ -68,9 +67,6 @@ class _ProfilesGateway extends UnavailableCoreGateway
 
   @override
   Stream<void> get subscriptionChanges => _subscriptionChanges.stream;
-
-  @override
-  Future<void> configureHost(AppSettings settings) async {}
 
   @override
   Future<RuntimeSettings> getRuntimeConfig() async => const RuntimeSettings();

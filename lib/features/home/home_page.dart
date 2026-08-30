@@ -30,11 +30,10 @@ class _HomePageState extends ConsumerState<HomePage> {
   bool _ipLoading = false;
   String? _ipError;
   bool _serviceChecking = true;
-  bool _serviceNeedsInstall = false;
   bool _serviceCheckFailed = false;
-  bool _serviceInstalling = false;
+  bool _serviceStarting = false;
   TargetLibServiceStatus? _serviceStatus;
-  String? _serviceInstallError;
+  String? _serviceError;
   final _serviceController = TargetLibServiceController();
 
   @override
@@ -50,28 +49,22 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   Future<void> _checkTargetLibService() async {
     try {
-      final settings = ref.read(settingsProvider).settings;
-      final result = await _serviceController.status(
-        basePath: settings.serviceBasePath,
-      );
+      final result = await _serviceController.status();
       if (mounted) {
         setState(() {
           _serviceChecking = false;
-          _serviceNeedsInstall =
-              result.status == TargetLibServiceStatus.notInstalled;
           _serviceCheckFailed = false;
           _serviceStatus = result.status;
-          _serviceInstallError = null;
+          _serviceError = null;
         });
       }
     } on Object catch (error) {
       if (mounted) {
         setState(() {
           _serviceChecking = false;
-          _serviceNeedsInstall = false;
           _serviceCheckFailed = true;
           _serviceStatus = null;
-          _serviceInstallError = error.toString();
+          _serviceError = error.toString();
         });
       }
     }
@@ -81,59 +74,24 @@ class _HomePageState extends ConsumerState<HomePage> {
     await _checkTargetLibService();
   }
 
-  Future<void> _installTargetLibService() async {
-    setState(() {
-      _serviceInstalling = true;
-      _serviceInstallError = null;
-    });
-    try {
-      final settings = ref.read(settingsProvider).settings;
-      await _serviceController.installAndStart(
-        basePath: settings.serviceBasePath,
-        workingPath: settings.serviceWorkingPath,
-        tempPath: settings.serviceTempPath,
-        locale: settings.serviceLocale,
-      );
-      if (mounted) {
-        setState(() {
-          _serviceChecking = false;
-          _serviceNeedsInstall = false;
-          _serviceCheckFailed = false;
-          _serviceStatus = TargetLibServiceStatus.running;
-          _serviceInstallError = null;
-        });
-      }
-    } on Object catch (error) {
-      if (mounted) setState(() => _serviceInstallError = error.toString());
-    } finally {
-      if (mounted) setState(() => _serviceInstalling = false);
-    }
-  }
-
   Future<void> _startTargetLibService() async {
     setState(() {
-      _serviceInstalling = true;
-      _serviceInstallError = null;
+      _serviceStarting = true;
+      _serviceError = null;
     });
     try {
-      final settings = ref.read(settingsProvider).settings;
-      await _serviceController.start(
-        basePath: settings.serviceBasePath,
-        workingPath: settings.serviceWorkingPath,
-        tempPath: settings.serviceTempPath,
-        locale: settings.serviceLocale,
-      );
+      await _serviceController.start();
       if (mounted) {
         setState(() {
           _serviceStatus = TargetLibServiceStatus.running;
           _serviceCheckFailed = false;
-          _serviceInstallError = null;
+          _serviceError = null;
         });
       }
     } on Object catch (error) {
-      if (mounted) setState(() => _serviceInstallError = error.toString());
+      if (mounted) setState(() => _serviceError = error.toString());
     } finally {
-      if (mounted) setState(() => _serviceInstalling = false);
+      if (mounted) setState(() => _serviceStarting = false);
     }
   }
 
@@ -177,21 +135,19 @@ class _HomePageState extends ConsumerState<HomePage> {
                     const SizedBox(height: 20),
                     if (capabilities.supportsManagedService &&
                         !_serviceChecking &&
-                        (_serviceNeedsInstall ||
-                            _serviceCheckFailed ||
-                            _serviceStatus ==
-                                TargetLibServiceStatus.stopped)) ...[
-                      _ServiceInstallCard(
-                        installing: _serviceInstalling,
-                        installed:
-                            _serviceStatus == TargetLibServiceStatus.stopped,
+                        (_serviceCheckFailed ||
+                            _serviceStatus !=
+                                TargetLibServiceStatus.running)) ...[
+                      _ServiceStatusCard(
+                        starting: _serviceStarting,
+                        status: _serviceStatus,
                         checkFailed: _serviceCheckFailed,
-                        error: _serviceInstallError,
-                        onAction: _serviceCheckFailed
-                            ? _refreshTargetLibService
-                            : _serviceStatus == TargetLibServiceStatus.stopped
+                        error: _serviceError,
+                        onAction:
+                            !_serviceCheckFailed &&
+                                _serviceStatus == TargetLibServiceStatus.stopped
                             ? _startTargetLibService
-                            : _installTargetLibService,
+                            : _refreshTargetLibService,
                       ),
                       const SizedBox(height: 16),
                     ],
@@ -368,9 +324,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                       onTestLatency: _testProxies,
                       onRefreshRuleSets: _refreshRuleSets,
                       onCloseConnections: _closeConnections,
-                      onReinstallService: capabilities.supportsManagedService
-                          ? _reinstallService
-                          : null,
                     ),
                   ],
                 ),
@@ -406,48 +359,6 @@ class _HomePageState extends ConsumerState<HomePage> {
           ),
         ),
       );
-  }
-
-  Future<void> _reinstallService() async {
-    if (!ref.read(appCapabilitiesProvider).supportsManagedService) {
-      return;
-    }
-    if (ref.read(coreProvider).busy) {
-      return;
-    }
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Force reinstall service?'),
-        content: const Text(
-          'TargetLib will stop, uninstall, and install again with '
-          'administrator permission.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Reinstall'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-    await ref.read(coreProvider.notifier).reinstallService();
-    if (!mounted) return;
-    final core = ref.read(coreProvider);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          core.lifecycle == CoreLifecycle.failed
-              ? core.message
-              : 'TargetLib service reinstalled.',
-        ),
-      ),
-    );
   }
 
   Future<void> _changeProxyMode(runtime_models.ProxyMode mode) async {
@@ -553,17 +464,17 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 }
 
-class _ServiceInstallCard extends StatelessWidget {
-  const _ServiceInstallCard({
-    required this.installing,
-    required this.installed,
+class _ServiceStatusCard extends StatelessWidget {
+  const _ServiceStatusCard({
+    required this.starting,
+    required this.status,
     required this.checkFailed,
     required this.error,
     required this.onAction,
   });
 
-  final bool installing;
-  final bool installed;
+  final bool starting;
+  final TargetLibServiceStatus? status;
   final bool checkFailed;
   final String? error;
   final VoidCallback onAction;
@@ -589,9 +500,11 @@ class _ServiceInstallCard extends StatelessWidget {
                   child: Text(
                     checkFailed
                         ? 'Unable to check TargetLib service'
-                        : installed
+                        : status == TargetLibServiceStatus.stopped
                         ? 'TargetLib service is stopped'
-                        : 'Install the TargetLib service',
+                        : status == TargetLibServiceStatus.notInstalled
+                        ? 'TargetLib service is not installed'
+                        : 'TargetLib service status is unknown',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
@@ -600,35 +513,33 @@ class _ServiceInstallCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               (checkFailed ? error : null) ??
-                  (installed
+                  (status == TargetLibServiceStatus.stopped
                       ? 'Start the registered service to make TargetLib available.'
-                      : 'Administrator permission is required to register TargetLib with the operating system.'),
+                      : 'Install or repair TargetLib using the platform installer, then check again.'),
               style: TextStyle(color: scheme.onSecondaryContainer),
             ),
             const SizedBox(height: 12),
             Align(
               alignment: Alignment.centerRight,
               child: FilledButton.icon(
-                onPressed: installing ? null : onAction,
-                icon: installing
+                onPressed: starting ? null : onAction,
+                icon: starting
                     ? const SizedBox(
                         width: 16,
                         height: 16,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : Icon(
-                        checkFailed
-                            ? Icons.refresh
-                            : installed
+                        !checkFailed && status == TargetLibServiceStatus.stopped
                             ? Icons.play_arrow
-                            : Icons.download,
+                            : Icons.refresh,
                       ),
                 label: Text(
-                  installing
-                      ? (installed ? 'Starting…' : 'Installing…')
-                      : checkFailed
-                      ? 'Retry'
-                      : (installed ? 'Start service' : 'Install'),
+                  starting
+                      ? 'Starting…'
+                      : !checkFailed && status == TargetLibServiceStatus.stopped
+                      ? 'Start service'
+                      : 'Check again',
                 ),
               ),
             ),
