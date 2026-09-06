@@ -35,7 +35,7 @@
 *   **流量与连接看板**：UI 页面已就绪，但 `TargetLibGateway` 尚未正式订阅实时数据流，当前无法展示真实的实时网络快照。
 *   **规则集刷新**：`refreshRuleSets()` 当前为空实现（固定返回 `0`）。
 *   **构建与打包**：
-    *   **Windows**：安装包暂无签名；NSIS 负责应用文件、TargetLib 服务注册、启动与卸载。
+    *   **Windows**：安装包暂无签名；Inno Setup 负责应用文件、TargetLib 服务注册、启动与卸载。
     *   **Android / iOS**：Android 仅使用 debug 签名；iOS CI 依赖 `--no-codesign`，无法直接作为正式 Release。
 *   **CI 工作流**：`.github/workflows/build.yml` 中定义的多平台构建，由于 TargetLib 仓库移除了 `scripts/build.ps1` 而存在断链。在修复前，CI 无法作为五端构建的可靠验证。
 
@@ -45,7 +45,7 @@
 
 | 平台 | 运行模式 | 当前进度与现状 |
 | :--- | :--- | :--- |
-| **Windows** | 桌面服务 | ✅ 已接入服务安装、检测/启动、托盘、单实例及 NSIS 脚本。**支持最完善**。 |
+| **Windows** | 桌面服务 | ✅ 已接入服务安装、检测/启动、托盘、单实例及 Inno Setup 脚本。**支持最完善**。 |
 | **Linux** | 桌面服务 | 🚧 Flutter runner、托盘与服务能力已就绪。发布需补充 TargetLib 产物。 |
 | **macOS** | 桌面服务 | 🚧 基础能力已配置（可生成项目）。正式分发亟需解决苹果签名与公证。 |
 | **Android** | 移动 VPN | 🚧 启动时主动请求 VPN 权限并以 VPN 模式运行。Release 签名待配置。 |
@@ -68,7 +68,7 @@ Target/
 ├── assets/              # 静态资源：应用图标和世界地图拓扑数据
 ├── test/                # 质量保证：单元测试与组件级测试
 ├── tool/                # 开发者工具：TargetLib 调试脚本
-├── stage/windows/       # 打包分发：Windows NSIS 配置和脚本
+├── stage/windows/       # 打包分发：Windows Inno Setup 配置和脚本
 └── .github/workflows/   # 持续集成：多平台自动构建工作流
 
 ```
@@ -98,6 +98,7 @@ Flutter UI
 * **Go**: 用于本地构建 TargetLib 核心服务
 * **TargetLib 源码**: 需与本仓库处于**同级目录**（`pubspec.yaml` 强依赖 `../TargetLib/flutter` 路径）
 * 对应目标平台的原生构建工具链 (Visual Studio / Xcode / Android Studio 等)
+* **Inno Setup 6+**: 用于生成 Windows 安装包
 
 **推荐的本地工作区目录结构：**
 

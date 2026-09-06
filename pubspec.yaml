@@ -30,6 +30,8 @@ dependencies:
   syncfusion_flutter_maps: ^34.2.4
   shared_preferences: ^2.5.5
   path_provider: ^2.1.6
+  proxy_manager:
+    path: third_party/proxy_manager
   country_flags: ^4.1.2
 dev_dependencies:
   flutter_launcher_icons: ^0.14.4

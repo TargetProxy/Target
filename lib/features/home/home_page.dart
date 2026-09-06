@@ -8,7 +8,6 @@ import '../../core/runtime/core_models.dart';
 import '../../core/platform/app_platform.dart';
 import 'package:targetlib/targetlib.dart';
 import '../../data/models/runtime_settings.dart' as runtime_models;
-import '../settings/application/settings_notifier.dart';
 import '../../data/models/ip_info.dart';
 import '../../core/widgets/target_page_layout.dart';
 import '../proxies/application/proxies_notifier.dart';
@@ -364,11 +363,6 @@ class _HomePageState extends ConsumerState<HomePage> {
   Future<void> _changeProxyMode(runtime_models.ProxyMode mode) async {
     final current = ref.read(coreProvider).settings;
     if (current.proxyMode == mode) return;
-    if (mode == runtime_models.ProxyMode.tun) {
-      ref
-          .read(settingsProvider.notifier)
-          .updateSettings((settings) => settings.copyWith(systemProxy: false));
-    }
     await ref
         .read(coreProvider.notifier)
         .updateRuntimeConfig(current.copyWith(proxyMode: mode));

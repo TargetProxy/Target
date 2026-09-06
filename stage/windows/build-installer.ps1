@@ -4,7 +4,7 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 $outputDir = Join-Path $repoRoot "build\windows\installer"
 $pngPath = Join-Path $repoRoot "assets\TargetAppIcon.png"
 $icoPath = Join-Path $outputDir "TargetAppIcon.ico"
-$nsiPath = Join-Path $PSScriptRoot "installer.nsi"
+$issPath = Join-Path $PSScriptRoot "installer.iss"
 $releasePath = Join-Path $repoRoot "build\windows\x64\runner\Release\target.exe"
 $targetLibPath = Join-Path (Split-Path -Parent $repoRoot) "TargetLib\build\TargetLib.exe"
 
@@ -35,19 +35,29 @@ if ($LASTEXITCODE -ne 0) {
   throw "Failed to convert the application icon. Ensure Python and Pillow are installed."
 }
 
-$makeNsis = Get-Command makensis -ErrorAction SilentlyContinue
-if ($makeNsis) {
-  $makeNsisPath = $makeNsis.Source
+$versionLine = Select-String -LiteralPath (Join-Path $repoRoot "pubspec.yaml") -Pattern '^version:\s*([^+\s]+)' | Select-Object -First 1
+if (-not $versionLine) {
+  throw "Unable to read the application version from pubspec.yaml."
+}
+$appVersion = $versionLine.Matches[0].Groups[1].Value
+
+$iscc = Get-Command ISCC.exe -ErrorAction SilentlyContinue
+if ($iscc) {
+  $isccPath = $iscc.Source
 } else {
-  $defaultNsisPath = "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
-  if (Test-Path -LiteralPath $defaultNsisPath) {
-    $makeNsisPath = $defaultNsisPath
-  } else {
-    throw "makensis was not found. Install NSIS or add it to PATH."
+  $candidatePaths = @(
+    (Join-Path $env:ProgramFiles "Inno Setup 7\ISCC.exe"),
+    (Join-Path ${env:ProgramFiles(x86)} "Inno Setup 7\ISCC.exe"),
+    (Join-Path $env:ProgramFiles "Inno Setup 6\ISCC.exe"),
+    (Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe")
+  )
+  $isccPath = $candidatePaths | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+  if (-not $isccPath) {
+    throw "ISCC.exe was not found. Install Inno Setup 6 or later, or add it to PATH."
   }
 }
 
-& $makeNsisPath "/WX" "/DTARGETLIB_SOURCE=$targetLibPath" $nsiPath
+& $isccPath "/DAppVersion=$appVersion" "/DTargetLibSource=$targetLibPath" $issPath
 if ($LASTEXITCODE -ne 0) {
-  throw "NSIS compilation failed."
+  throw "Inno Setup compilation failed."
 }

@@ -32,7 +32,7 @@ class _ProfilesWorkspacePageState extends ConsumerState<ProfilesWorkspacePage> {
   Widget build(BuildContext context) {
     final subscriptions = ref.watch(subscriptionsProvider);
     final profiles = subscriptions.subscriptions;
-    final selected = _selectedProfile(profiles);
+    final selected = _selectedProfile(profiles, subscriptions.activeId);
     final wide = MediaQuery.sizeOf(context).width >= 820;
 
     if (!wide) {
@@ -90,12 +90,20 @@ class _ProfilesWorkspacePageState extends ConsumerState<ProfilesWorkspacePage> {
     );
   }
 
-  Subscription? _selectedProfile(List<Subscription> profiles) {
+  Subscription? _selectedProfile(List<Subscription> profiles, String? activeId) {
     if (profiles.isEmpty) return null;
     final requested = _selectedId;
     if (requested != null) {
       for (final profile in profiles) {
         if (profile.id == requested) return profile;
+      }
+    }
+    // The runtime active id is authoritative when this page is recreated.
+    // `enabled` can briefly reflect stale data while an activation is being
+    // persisted, which would otherwise select the first profile.
+    if (activeId != null) {
+      for (final profile in profiles) {
+        if (profile.id == activeId) return profile;
       }
     }
     return profiles.firstWhere(
@@ -137,7 +145,10 @@ class _ProfilesWorkspacePageState extends ConsumerState<ProfilesWorkspacePage> {
 
   Future<void> _refreshSelected() async {
     final profiles = ref.read(subscriptionsProvider).subscriptions;
-    final selected = _selectedProfile(profiles);
+    final selected = _selectedProfile(
+      profiles,
+      ref.read(subscriptionsProvider).activeId,
+    );
     if (selected != null) {
       await ref
           .read(subscriptionsProvider.notifier)

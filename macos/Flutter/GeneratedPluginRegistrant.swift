@@ -6,6 +6,7 @@ import FlutterMacOS
 import Foundation
 
 import flutter_alone
+import proxy_manager
 import screen_retriever_macos
 import shared_preferences_foundation
 import targetlib
@@ -14,6 +15,7 @@ import window_manager
 
 func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
   FlutterAlonePlugin.register(with: registry.registrar(forPlugin: "FlutterAlonePlugin"))
+  ProxyManagerPlugin.register(with: registry.registrar(forPlugin: "ProxyManagerPlugin"))
   ScreenRetrieverMacosPlugin.register(with: registry.registrar(forPlugin: "ScreenRetrieverMacosPlugin"))
   SharedPreferencesPlugin.register(with: registry.registrar(forPlugin: "SharedPreferencesPlugin"))
   TargetlibPlugin.register(with: registry.registrar(forPlugin: "TargetlibPlugin"))

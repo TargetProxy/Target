@@ -4,6 +4,7 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   flutter_alone
+  proxy_manager
   screen_retriever_linux
   targetlib
   tray_manager

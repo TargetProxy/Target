@@ -3,11 +3,14 @@ import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/logging/app_logger.dart';
 import '../core/theme/app_theme.dart';
 import '../core/platform/app_platform.dart';
+import '../core/platform/desktop_system_proxy.dart';
 import '../core/runtime/core_gateway.dart';
 import '../core/runtime/core_notifier.dart';
 import '../data/models/app_settings.dart';
+import '../data/models/runtime_settings.dart';
 import '../features/settings/application/settings_notifier.dart';
 import '../features/settings/data/settings_store.dart';
 import '../features/subscriptions/application/subscriptions_notifier.dart';
@@ -24,12 +27,14 @@ class TargetApp extends StatelessWidget {
     this.coreGateway,
     this.initialSettings,
     this.settingsStore,
+    this.systemProxy,
   });
 
   final CoreGateway? coreGateway;
   final AppCapabilities? capabilities;
   final AppSettings? initialSettings;
   final AppSettingsStore? settingsStore;
+  final DesktopSystemProxy? systemProxy;
 
   @override
   Widget build(BuildContext context) {
@@ -44,13 +49,15 @@ class TargetApp extends StatelessWidget {
         if (settingsStore != null)
           settingsStoreProvider.overrideWithValue(settingsStore!),
       ],
-      child: const _TargetAppView(),
+      child: _TargetAppView(systemProxy: systemProxy),
     );
   }
 }
 
 class _TargetAppView extends ConsumerStatefulWidget {
-  const _TargetAppView();
+  const _TargetAppView({this.systemProxy});
+
+  final DesktopSystemProxy? systemProxy;
 
   @override
   ConsumerState<_TargetAppView> createState() => _TargetAppViewState();
@@ -58,6 +65,8 @@ class _TargetAppView extends ConsumerStatefulWidget {
 
 class _TargetAppViewState extends ConsumerState<_TargetAppView> {
   late final AppRouter _appRouter = AppRouter();
+  late final DesktopSystemProxy _systemProxy =
+      widget.systemProxy ?? DesktopSystemProxy();
   DesktopTrayController? _trayController;
 
   @override
@@ -77,6 +86,7 @@ class _TargetAppViewState extends ConsumerState<_TargetAppView> {
   @override
   void dispose() {
     _trayController?.dispose();
+    unawaited(_systemProxy.dispose());
     super.dispose();
   }
 
@@ -88,6 +98,15 @@ class _TargetAppViewState extends ConsumerState<_TargetAppView> {
       if (controller != null) {
         unawaited(controller.updateCoreState(next));
       }
+      unawaited(_synchronizeSystemProxy(core: next));
+    });
+    ref.listen<SettingsState>(settingsProvider, (_, next) {
+      unawaited(
+        _synchronizeSystemProxy(
+          core: ref.read(coreProvider),
+          settings: next.settings,
+        ),
+      );
     });
 
     return MaterialApp.router(
@@ -139,8 +158,38 @@ class _TargetAppViewState extends ConsumerState<_TargetAppView> {
   Future<void> _prepareExit() async {
     try {
       await _stopCore();
+      await _systemProxy.synchronize(enabled: false, host: '', port: 0);
     } finally {
       await DesktopSingleInstance.release();
+    }
+  }
+
+  Future<void> _synchronizeSystemProxy({
+    required CoreState core,
+    AppSettings? settings,
+  }) async {
+    final capabilities = ref.read(appCapabilitiesProvider);
+    final appSettings = settings ?? ref.read(settingsProvider).settings;
+    final enabled =
+        capabilities.supportsMixedProxy &&
+        core.running &&
+        core.settings.proxyMode == ProxyMode.mixed &&
+        appSettings.systemProxy;
+    try {
+      await _systemProxy.synchronize(
+        enabled: enabled,
+        host: core.settings.listenAddress,
+        port: core.settings.mixedPort,
+      );
+    } on Object catch (error, stackTrace) {
+      AppLogger.error(
+        enabled
+            ? 'Failed to enable the system proxy'
+            : 'Failed to disable the system proxy',
+        source: 'system-proxy',
+        error: error,
+        stackTrace: stackTrace,
+      );
     }
   }
 }
