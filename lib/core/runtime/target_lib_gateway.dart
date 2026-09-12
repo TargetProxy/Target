@@ -200,7 +200,6 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
       );
       return RuntimeSubscriptionSnapshot(
         subscriptions: result.subscriptions.map(_runtimeSubscription).toList(),
-        activeId: result.activeId.isEmpty ? null : result.activeId,
       );
     },
   );
@@ -214,7 +213,6 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
     required bool autoUpdate,
     required int updateIntervalSeconds,
     required Map<String, String> headers,
-    bool activate = false,
     bool updateNow = false,
   }) => _serialize(() async {
     await _ensureConnected();
@@ -227,7 +225,6 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
         autoUpdate: autoUpdate,
         updateIntervalSeconds: Int64(updateIntervalSeconds),
         headers: headers.entries,
-        activate: activate,
         updateNow: updateNow,
       ),
       options: updateNow
@@ -260,6 +257,17 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
       });
 
   @override
+  Future<RuntimeSubscription> setSubscriptionEnabled(String id, bool enabled) =>
+      _serialize(() async {
+        await _ensureConnected();
+        final view = await _manager!.setSubscriptionEnabled(
+          targetlib_pb.SetSubscriptionEnabledRequest(id: id, enabled: enabled),
+          options: _callOptions,
+        );
+        return _runtimeSubscription(view);
+      });
+
+  @override
   Future<RuntimeSubscriptionUpdate> updateSubscription(String id) =>
       _serialize(() async {
         await _ensureConnected();
@@ -285,16 +293,6 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
         );
       });
 
-  @override
-  Future<void> activateSubscription(String? id) => _serialize(() async {
-    await _ensureConnected();
-    final normalized = id?.trim().isEmpty == true ? null : id?.trim();
-    await _manager!.setActiveSubscription(
-      targetlib_pb.SetActiveSubscriptionRequest(id: normalized ?? ''),
-      options: _callOptions,
-    );
-  });
-
   /// Queries the egress IP geolocation through the TargetLib backend.
   @override
   Future<IpInfo> fetchIpInfo() => _serialize(() async {
@@ -310,6 +308,18 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
       asName: response.asName,
     );
   });
+
+  @override
+  Future<targetlib_pb.NodePool> getNodePool() => _runtime.getNodePool();
+
+  @override
+  Future<targetlib_pb.ServiceBindingList> listServiceBindings() =>
+      _runtime.listServiceBindings();
+
+  @override
+  Future<targetlib_pb.SmartConnectDiagnostics> getSmartConnectDiagnostics({
+    String? serviceId,
+  }) => _runtime.getSmartConnectDiagnostics(serviceId: serviceId);
 
   RuntimeSubscription _runtimeSubscription(targetlib_pb.SubscriptionView view) {
     return RuntimeSubscription(

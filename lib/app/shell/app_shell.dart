@@ -27,6 +27,7 @@ class AppShell extends StatelessWidget {
   static const _navigationRoutes = [
     AppRoute.home,
     AppRoute.proxies,
+    AppRoute.nodes,
     AppRoute.connections,
     AppRoute.traffic,
     AppRoute.logs,
@@ -67,6 +68,10 @@ class AdaptiveScaffold extends StatelessWidget {
         icon: Icon(Icons.hub_outlined),
         selectedIcon: Icon(Icons.hub),
         label: l10n.profiles,
+      ),
+      NavigationDestination(
+        icon: const Icon(Icons.public),
+        label: l10n.nodeSelection,
       ),
       NavigationDestination(
         icon: Icon(Icons.cable_outlined),
@@ -163,9 +168,10 @@ class _DesktopSidebar extends StatelessWidget {
               ),
               item(0, l10n.dashboard, Icons.dashboard_outlined),
               item(1, l10n.profiles, Icons.hub_outlined),
-              item(2, l10n.connections, Icons.cable_outlined),
-              item(3, l10n.traffic, Icons.show_chart),
-              item(4, l10n.logs, Icons.receipt_long_outlined),
+              item(2, l10n.nodeSelection, Icons.public),
+              item(3, l10n.connections, Icons.cable_outlined),
+              item(4, l10n.traffic, Icons.show_chart),
+              item(5, l10n.logs, Icons.receipt_long_outlined),
             ],
           ),
         ),

@@ -2,13 +2,9 @@ import '../../data/models/proxy_group.dart';
 import '../../data/models/proxy_node.dart';
 
 class RuntimeSubscriptionSnapshot {
-  const RuntimeSubscriptionSnapshot({
-    required this.subscriptions,
-    required this.activeId,
-  });
+  const RuntimeSubscriptionSnapshot({required this.subscriptions});
 
   final List<RuntimeSubscription> subscriptions;
-  final String? activeId;
 }
 
 enum RuntimeSubscriptionStatus { idle, updating, ready, failed }
@@ -98,7 +94,6 @@ abstract interface class SubscriptionGateway {
     required bool autoUpdate,
     required int updateIntervalSeconds,
     required Map<String, String> headers,
-    bool activate = false,
     bool updateNow = false,
   });
 
@@ -106,8 +101,7 @@ abstract interface class SubscriptionGateway {
 
   Future<RuntimeSubscription> renameSubscription(String id, String name);
 
-  Future<RuntimeSubscriptionUpdate> updateSubscription(String id);
+  Future<RuntimeSubscription> setSubscriptionEnabled(String id, bool enabled);
 
-  /// Selects the subscription used by TargetLib runtime configuration.
-  Future<void> activateSubscription(String? id);
+  Future<RuntimeSubscriptionUpdate> updateSubscription(String id);
 }

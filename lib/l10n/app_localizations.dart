@@ -107,8 +107,164 @@ abstract class AppLocalizations {
   /// No description provided for @profiles.
   ///
   /// In en, this message translates to:
-  /// **'Profiles'**
+  /// **'Subscriptions'**
   String get profiles;
+
+  /// No description provided for @nodeSelection.
+  ///
+  /// In en, this message translates to:
+  /// **'Node selection'**
+  String get nodeSelection;
+
+  /// No description provided for @subscriptionsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select the subscriptions to include in your Smart Connect node pool.'**
+  String get subscriptionsHint;
+
+  /// No description provided for @addSubscription.
+  ///
+  /// In en, this message translates to:
+  /// **'Add subscription'**
+  String get addSubscription;
+
+  /// No description provided for @updateSubscription.
+  ///
+  /// In en, this message translates to:
+  /// **'Update subscription'**
+  String get updateSubscription;
+
+  /// No description provided for @refreshPool.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh node pool'**
+  String get refreshPool;
+
+  /// No description provided for @includedInPool.
+  ///
+  /// In en, this message translates to:
+  /// **'Included in node pool'**
+  String get includedInPool;
+
+  /// No description provided for @excludedFromPool.
+  ///
+  /// In en, this message translates to:
+  /// **'Not included'**
+  String get excludedFromPool;
+
+  /// No description provided for @noSubscriptionsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a subscription, then select one or more sources for your node pool.'**
+  String get noSubscriptionsHint;
+
+  /// No description provided for @poolSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{subscriptions} subscriptions enabled · {nodes} nodes'**
+  String poolSummary(int subscriptions, int nodes);
+
+  /// No description provided for @poolNodeCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} nodes'**
+  String poolNodeCount(int count);
+
+  /// No description provided for @subscriptionDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscription details'**
+  String get subscriptionDetails;
+
+  /// No description provided for @lastUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Last updated'**
+  String get lastUpdated;
+
+  /// No description provided for @neverUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Not updated yet'**
+  String get neverUpdated;
+
+  /// No description provided for @trafficUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Traffic used'**
+  String get trafficUsed;
+
+  /// No description provided for @subscriptionAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Address'**
+  String get subscriptionAddress;
+
+  /// No description provided for @nodePoolHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Explore regions on the map, then select a node from your enabled subscriptions.'**
+  String get nodePoolHint;
+
+  /// No description provided for @allSubscriptions.
+  ///
+  /// In en, this message translates to:
+  /// **'All subscriptions'**
+  String get allSubscriptions;
+
+  /// No description provided for @allRegions.
+  ///
+  /// In en, this message translates to:
+  /// **'All regions'**
+  String get allRegions;
+
+  /// No description provided for @searchNodes.
+  ///
+  /// In en, this message translates to:
+  /// **'Search nodes, protocols or subscriptions'**
+  String get searchNodes;
+
+  /// No description provided for @noMatchingNodes.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching nodes'**
+  String get noMatchingNodes;
+
+  /// No description provided for @emptyPool.
+  ///
+  /// In en, this message translates to:
+  /// **'Your node pool is empty'**
+  String get emptyPool;
+
+  /// No description provided for @manageSubscriptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage subscriptions'**
+  String get manageSubscriptions;
+
+  /// No description provided for @noNodeSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a node'**
+  String get noNodeSelected;
+
+  /// No description provided for @nodeUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Unavailable'**
+  String get nodeUnavailable;
+
+  /// No description provided for @unknownSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown source'**
+  String get unknownSource;
+
+  /// No description provided for @clearFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear filters'**
+  String get clearFilters;
 
   /// No description provided for @connections.
   ///

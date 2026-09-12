@@ -6,6 +6,7 @@ import '../features/home/home_page.dart';
 import '../features/logs/presentation/logs_page.dart';
 import '../features/profiles/presentation/profiles_workspace_page.dart';
 import '../features/traffic/presentation/traffic_page.dart';
+import '../features/proxies/presentation/node_pool_page.dart';
 import 'shell/app_shell.dart';
 
 class AppRouter {
@@ -25,6 +26,10 @@ class AppRouter {
           GoRoute(
             path: AppRoute.proxies.path,
             pageBuilder: _fadePageBuilder(const ProfilesWorkspacePage()),
+          ),
+          GoRoute(
+            path: AppRoute.nodes.path,
+            pageBuilder: _fadePageBuilder(const NodePoolPage()),
           ),
           GoRoute(
             path: AppRoute.connections.path,
@@ -54,6 +59,7 @@ class AppRouter {
 enum AppRoute {
   home('/'),
   proxies('/proxies'),
+  nodes('/nodes'),
   connections('/connections'),
   traffic('/traffic'),
   logs('/logs');

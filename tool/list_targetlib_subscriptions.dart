@@ -42,7 +42,7 @@ Future<void> main(List<String> args) async {
       'targetlib=${version.targetlibVersion} '
       'sing-box=${version.singBoxVersion} protocol=${version.protocolVersion}',
     );
-    stdout.writeln('state=${state.state.name} active=${list.activeId}');
+    stdout.writeln('state=${state.state.name} subscriptions=${list.subscriptions.length}');
     stdout.writeln('subscriptions=${list.subscriptions.length}');
     for (final item in list.subscriptions) {
       stdout.writeln(

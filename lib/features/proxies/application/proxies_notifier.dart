@@ -182,14 +182,17 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
     state = state.copyWith(testing: true, clearError: true);
 
     try {
-      final coreGroups = ref.read(coreProvider).proxyGroups;
-      final candidateGroups = coreGroups.any((group) => _isUrlTest(group.type))
-          ? coreGroups
-          : state.groups;
+      // The Flutter snapshot exposes the user-facing `proxy` selector. The
+      // daemon's URLTest group is intentionally internal to TargetLib and is
+      // not mirrored into CoreState.proxyGroups. TargetLib maps these node
+      // tags back to its URLTest group when TestOutbounds is called, so
+      // filtering for a Flutter-side URLTest group makes every real pool look
+      // untestable.
+      final candidateGroups = state.groups;
       final nodeIds = {
-        for (final group in candidateGroups.where(_isUrlTestGroup))
+        for (final group in candidateGroups)
           for (final node in group.nodes)
-            if (node.type.toLowerCase() != 'direct') node.id,
+            if (_isTestableNode(node)) node.id,
       };
       if (nodeIds.isEmpty) {
         final protocols = state.groups
@@ -200,9 +203,8 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
             .join(', ');
         state = state.copyWith(
           lastError: protocols.isEmpty
-              ? 'TargetLib has no testable URLTest nodes. Add a subscription first.'
-              : 'TargetLib has no testable URLTest nodes. '
-                    'Supported nodes found: $protocols.',
+              ? 'TargetLib has no testable nodes. Add a subscription first.'
+              : 'TargetLib has no testable nodes. Supported nodes found: $protocols.',
         );
         return;
       }
@@ -232,10 +234,14 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
     }
   }
 
-  bool _isUrlTest(String type) =>
-      type.toLowerCase().replaceAll(RegExp(r'[-_]'), '') == 'urltest';
-
-  bool _isUrlTestGroup(ProxyGroup group) => _isUrlTest(group.type);
+  bool _isTestableNode(ProxyNode node) {
+    final type = node.type.toLowerCase();
+    return node.id.isNotEmpty &&
+        node.isAvailable &&
+        type != 'direct' &&
+        type != 'block' &&
+        type != 'dns';
+  }
 
   void _mergeLatency(String nodeId, int latency) {
     // Merge into the latest snapshot because group updates can arrive while
@@ -270,8 +276,11 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
     if (core.proxyGroups.isEmpty) {
       return current;
     }
-    final catalogGroups = ref.read(proxyCatalogProvider).groups;
-    if (catalogGroups.isNotEmpty) {
+    final catalog = ref.read(proxyCatalogProvider);
+    final catalogGroups = catalog.groups;
+    // An empty loaded pool is authoritative (for example, all sources disabled).
+    // Older runtime snapshots must not put those nodes back into the UI.
+    if (catalog.initialized) {
       final runtimeNodes = <String, ProxyNode>{
         for (final group in core.proxyGroups)
           for (final node in group.nodes) node.id: node,

@@ -1,841 +1,183 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/utils/format_bytes.dart';
-import '../../../l10n/app_localizations.dart';
+import '../../../core/widgets/target_page_layout.dart';
 import '../../../data/models/subscription.dart';
-import '../../../data/models/runtime_settings.dart';
-import '../../../core/runtime/core_notifier.dart';
-import '../../../core/platform/app_platform.dart';
-import '../../proxies/application/proxies_notifier.dart';
-import '../../settings/application/settings_notifier.dart';
+import '../../../l10n/app_localizations.dart';
+import '../../proxies/application/proxy_catalog.dart';
 import '../../subscriptions/application/subscriptions_notifier.dart';
 import '../../subscriptions/presentation/widgets/add_subscription_sheet.dart';
-import '../../maps/application/proxy_country_map.dart';
-import '../../maps/presentation/widgets/abstract_world_map.dart';
 
-enum _ProfileSection { overview, proxies, nodes }
-
-class ProfilesWorkspacePage extends ConsumerStatefulWidget {
+class ProfilesWorkspacePage extends ConsumerWidget {
   const ProfilesWorkspacePage({super.key});
 
   @override
-  ConsumerState<ProfilesWorkspacePage> createState() =>
-      _ProfilesWorkspacePageState();
-}
-
-class _ProfilesWorkspacePageState extends ConsumerState<ProfilesWorkspacePage> {
-  String? _selectedId;
-  _ProfileSection _section = _ProfileSection.overview;
-
-  @override
-  Widget build(BuildContext context) {
-    final subscriptions = ref.watch(subscriptionsProvider);
-    final profiles = subscriptions.subscriptions;
-    final selected = _selectedProfile(profiles, subscriptions.activeId);
-    final wide = MediaQuery.sizeOf(context).width >= 820;
-
-    if (!wide) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Profiles')),
-        body: selected == null
-            ? _EmptyWorkspace(onAdd: _showAddSubscription)
-            : _ProfileDetail(
-                profile: selected,
-                section: _section,
-                onSectionChanged: (value) => setState(() => _section = value),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(subscriptionsProvider);
+    final notifier = ref.read(subscriptionsProvider.notifier);
+    final l10n = AppLocalizations.of(context);
+    final busy = state.busy || state.changingIds.isNotEmpty;
+    final nodeCount = ref
+        .watch(proxyCatalogProvider)
+        .groups
+        .expand((group) => group.nodes)
+        .map((node) => node.id)
+        .toSet()
+        .length;
+    return Align(
+      alignment: Alignment.topCenter,
+      child: SafeArea(
+        child: TargetPageLayout(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TargetPageHeader(
+                title: l10n.profiles,
+                subtitle: l10n.subscriptionsHint,
               ),
-        drawer: Drawer(
-          child: SafeArea(
-            child: _ProfileList(
-              profiles: profiles,
-              selectedId: selected?.id,
-              busy: subscriptions.busy,
-              onSelected: (id) {
-                _selectProfile(id);
-                Navigator.pop(context);
-              },
-              onAdd: _showAddSubscription,
-              onRefresh: _refreshSelected,
-            ),
-          ),
-        ),
-      );
-    }
-
-    return Row(
-      children: [
-        SizedBox(
-          width: 190,
-          child: _ProfileList(
-            profiles: profiles,
-            selectedId: selected?.id,
-            busy: subscriptions.busy,
-            onSelected: _selectProfile,
-            onAdd: _showAddSubscription,
-            onRefresh: _refreshSelected,
-          ),
-        ),
-        const VerticalDivider(width: 1),
-        Expanded(
-          child: selected == null
-              ? _EmptyWorkspace(onAdd: _showAddSubscription)
-              : _ProfileDetail(
-                  profile: selected,
-                  section: _section,
-                  onSectionChanged: (value) => setState(() => _section = value),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 12,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  FilledButton.icon(
+                    onPressed: busy
+                        ? null
+                        : () => _addSubscription(context, ref),
+                    icon: const Icon(Icons.add),
+                    label: Text(l10n.addSubscription),
+                  ),
+                  IconButton(
+                    onPressed: busy ? null : notifier.load,
+                    tooltip: l10n.refreshPool,
+                    icon: const Icon(Icons.refresh),
+                  ),
+                  Text(
+                    l10n.poolSummary(
+                      state.subscriptions.where((sub) => sub.enabled).length,
+                      nodeCount,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              if (state.lastError != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Text(
+                    state.lastError!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
                 ),
+              if (state.subscriptions.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 32),
+                  child: Text(
+                    l10n.noSubscriptionsHint,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              for (final subscription in state.subscriptions) ...[
+                Card(
+                  key: ValueKey('subscription-${subscription.id}'),
+                  child: Column(
+                    children: [
+                      CheckboxListTile(
+                        key: ValueKey('enable-${subscription.id}'),
+                        value: subscription.enabled,
+                        onChanged: busy
+                            ? null
+                            : (value) {
+                                if (value != null) {
+                                  notifier.setEnabled(subscription.id, value);
+                                }
+                              },
+                        controlAffinity: ListTileControlAffinity.leading,
+                        title: Text(subscription.name),
+                        subtitle: Text(
+                          '${l10n.poolNodeCount(subscription.nodeCount)} · ${subscription.enabled ? l10n.includedInPool : l10n.excludedFromPool}',
+                        ),
+                        secondary:
+                            state.changingIds.contains(subscription.id) ||
+                                subscription.updateStatus ==
+                                    SubscriptionUpdateStatus.updating
+                            ? const SizedBox.square(
+                                dimension: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : IconButton(
+                                onPressed: busy
+                                    ? null
+                                    : () => notifier.updateSubscription(
+                                        subscription.id,
+                                      ),
+                                tooltip: l10n.updateSubscription,
+                                icon: const Icon(Icons.refresh),
+                              ),
+                      ),
+                      ExpansionTile(
+                        key: PageStorageKey('details-${subscription.id}'),
+                        title: Text(
+                          l10n.subscriptionDetails,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        childrenPadding: const EdgeInsets.fromLTRB(
+                          16,
+                          0,
+                          16,
+                          16,
+                        ),
+                        expandedCrossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SelectableText(
+                            '${l10n.subscriptionAddress}: ${subscription.safeUrl}',
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '${l10n.lastUpdated}: ${subscription.lastUpdatedAt == null ? l10n.neverUpdated : DateFormat.yMMMd(l10n.localeName).add_Hm().format(subscription.lastUpdatedAt!.toLocal())}',
+                          ),
+                          Text(
+                            '${l10n.trafficUsed}: ${formatBytes(subscription.uploadBytes + subscription.downloadBytes)}',
+                          ),
+                          if (subscription.lastError?.isNotEmpty == true)
+                            Text(
+                              subscription.lastError!,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.error,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+            ],
+          ),
         ),
-      ],
+      ),
     );
   }
 
-  Subscription? _selectedProfile(List<Subscription> profiles, String? activeId) {
-    if (profiles.isEmpty) return null;
-    final requested = _selectedId;
-    if (requested != null) {
-      for (final profile in profiles) {
-        if (profile.id == requested) return profile;
-      }
-    }
-    // The runtime active id is authoritative when this page is recreated.
-    // `enabled` can briefly reflect stale data while an activation is being
-    // persisted, which would otherwise select the first profile.
-    if (activeId != null) {
-      for (final profile in profiles) {
-        if (profile.id == activeId) return profile;
-      }
-    }
-    return profiles.firstWhere(
-      (profile) => profile.enabled,
-      orElse: () => profiles.first,
-    );
-  }
-
-  void _selectProfile(String id) {
-    setState(() => _selectedId = id);
-    final current = ref.read(subscriptionsProvider);
-    if (current.activeId != id) {
-      ref.read(subscriptionsProvider.notifier).setActive(id);
-    }
-  }
-
-  Future<void> _showAddSubscription() async {
+  Future<void> _addSubscription(BuildContext context, WidgetRef ref) async {
     final result = await showModalBottomSheet<Map<String, String>>(
       context: context,
       isScrollControlled: true,
       builder: (_) => const AddSubscriptionSheet(),
     );
-    if (result == null || !mounted) return;
+    if (result == null || !context.mounted) return;
     final url = result['url']?.trim();
     if (url == null || url.isEmpty) return;
-
-    final notifier = ref.read(subscriptionsProvider.notifier);
-    final added = await notifier.addSubscription(url, name: result['name']);
-    if (!mounted || added) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          ref.read(subscriptionsProvider).lastError ??
-              'Subscription was not added.',
-        ),
-      ),
-    );
+    await ref
+        .read(subscriptionsProvider.notifier)
+        .addSubscription(url, name: result['name']);
   }
-
-  Future<void> _refreshSelected() async {
-    final profiles = ref.read(subscriptionsProvider).subscriptions;
-    final selected = _selectedProfile(
-      profiles,
-      ref.read(subscriptionsProvider).activeId,
-    );
-    if (selected != null) {
-      await ref
-          .read(subscriptionsProvider.notifier)
-          .updateSubscription(selected.id);
-    }
-  }
-}
-
-class _ProfileList extends StatelessWidget {
-  const _ProfileList({
-    required this.profiles,
-    required this.selectedId,
-    required this.busy,
-    required this.onSelected,
-    required this.onAdd,
-    required this.onRefresh,
-  });
-
-  final List<Subscription> profiles;
-  final String? selectedId;
-  final bool busy;
-  final ValueChanged<String> onSelected;
-  final VoidCallback onAdd;
-  final VoidCallback onRefresh;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Material(
-      color: theme.colorScheme.surfaceContainerLowest,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 18, 12, 12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Profiles',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  onPressed: busy ? null : onRefresh,
-                  icon: busy
-                      ? const SizedBox.square(
-                          dimension: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.refresh),
-                  tooltip: 'Update profile',
-                ),
-                IconButton(
-                  onPressed: onAdd,
-                  icon: const Icon(Icons.add),
-                  tooltip: 'Add profile',
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 4, 18, 8),
-            child: Text(
-              'PROFILE LIST',
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                letterSpacing: 1.1,
-              ),
-            ),
-          ),
-          Expanded(
-            child: profiles.isEmpty
-                ? Center(
-                    child: Text(
-                      'No profiles',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    itemCount: profiles.length,
-                    itemBuilder: (context, index) {
-                      final profile = profiles[index];
-                      return ListTile(
-                        selected: profile.id == selectedId,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        leading: Icon(
-                          profile.enabled
-                              ? Icons.description
-                              : Icons.description_outlined,
-                          size: 20,
-                        ),
-                        title: Text(
-                          profile.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        subtitle: Text(
-                          '${profile.nodeCount} nodes',
-                          maxLines: 1,
-                        ),
-                        trailing: profile.enabled
-                            ? Icon(
-                                Icons.check_circle,
-                                size: 16,
-                                color: theme.colorScheme.primary,
-                              )
-                            : null,
-                        onTap: () => onSelected(profile.id),
-                      );
-                    },
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ProfileDetail extends ConsumerWidget {
-  const _ProfileDetail({
-    required this.profile,
-    required this.section,
-    required this.onSectionChanged,
-  });
-
-  final Subscription profile;
-  final _ProfileSection section;
-  final ValueChanged<_ProfileSection> onSectionChanged;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final busy = ref.watch(subscriptionsProvider).busy;
-    final notifier = ref.read(subscriptionsProvider.notifier);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 18, 18, 12),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      profile.name,
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      profile.enabled ? 'Active profile' : 'Inactive profile',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: profile.enabled
-                            ? Colors.green
-                            : theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (!profile.enabled)
-                OutlinedButton.icon(
-                  onPressed: () => notifier.setActive(profile.id),
-                  icon: const Icon(Icons.check),
-                  label: const Text('Use profile'),
-                ),
-              const SizedBox(width: 8),
-              IconButton(
-                onPressed: busy
-                    ? null
-                    : () => notifier.updateSubscription(profile.id),
-                icon: const Icon(Icons.refresh),
-                tooltip: 'Update',
-              ),
-            ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 14),
-          child: SegmentedButton<_ProfileSection>(
-            segments: const [
-              ButtonSegment(
-                value: _ProfileSection.overview,
-                icon: Icon(Icons.dashboard_outlined),
-                label: Text('Overview'),
-              ),
-              ButtonSegment(
-                value: _ProfileSection.proxies,
-                icon: Icon(Icons.account_tree_outlined),
-                label: Text('Proxies'),
-              ),
-              ButtonSegment(
-                value: _ProfileSection.nodes,
-                icon: Icon(Icons.account_tree_outlined),
-                label: Text('Nodes'),
-              ),
-            ],
-            selected: {section},
-            onSelectionChanged: (value) => onSectionChanged(value.first),
-          ),
-        ),
-        const Divider(height: 1),
-        Expanded(
-          child: switch (section) {
-            _ProfileSection.overview => _Overview(profile: profile),
-            _ProfileSection.proxies => const _Policy(),
-            _ProfileSection.nodes => _NodeSnapshot(profile: profile),
-          },
-        ),
-      ],
-    );
-  }
-}
-
-class _Overview extends ConsumerWidget {
-  const _Overview({required this.profile});
-
-  final Subscription profile;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final used = profile.uploadBytes + profile.downloadBytes;
-    final proxies = ref.watch(proxiesProvider);
-    return _SectionScroll(
-      children: [
-        const _SectionTitle(
-          icon: Icons.info_outline,
-          title: 'Profile overview',
-        ),
-        _InfoCard(
-          rows: [
-            ('Status', profile.enabled ? 'Active' : 'Inactive'),
-            ('Nodes', '${profile.nodeCount}'),
-            (
-              'Last updated',
-              profile.lastUpdatedAt?.toLocal().toString() ?? 'Never',
-            ),
-          ],
-        ),
-        const _SectionTitle(
-          icon: Icons.cloud_download_outlined,
-          title: 'Subscription',
-        ),
-        _InfoCard(
-          rows: [
-            ('Address', profile.safeUrl),
-            ('Automatic updates', profile.autoUpdate ? 'Enabled' : 'Disabled'),
-            (
-              'Update interval',
-              '${profile.updateIntervalSeconds ~/ 3600} hours',
-            ),
-            ('Traffic used', formatBytes(used)),
-          ],
-        ),
-        const _SectionTitle(icon: Icons.account_tree_outlined, title: 'Policy'),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: proxies.groups.isEmpty
-                ? const Text('No proxy groups are available.')
-                : Row(
-                    children: [
-                      _PolicyMetric(
-                        label: 'Groups',
-                        value: '${proxies.groups.length}',
-                      ),
-                      _PolicyMetric(
-                        label: 'Nodes',
-                        value:
-                            '${proxies.groups.fold<int>(0, (sum, group) => sum + group.nodes.length)}',
-                      ),
-                      _PolicyMetric(
-                        label: 'Selected',
-                        value:
-                            '${proxies.groups.where((group) => group.selectedNode != null).length}',
-                      ),
-                    ],
-                  ),
-          ),
-        ),
-        if (profile.lastError != null)
-          Card(
-            color: Theme.of(context).colorScheme.errorContainer,
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Text(profile.lastError!),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _NodeSnapshot extends ConsumerWidget {
-  const _NodeSnapshot({required this.profile});
-
-  final Subscription profile;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final settings = ref.watch(settingsProvider).settings;
-    final runtime = ref.watch(coreProvider).settings;
-    final capabilities = ref.watch(appCapabilitiesProvider);
-    return _SectionScroll(
-      children: [
-        const _SectionTitle(icon: Icons.tune, title: 'Runtime settings'),
-        _InfoCard(
-          rows: [
-            ('Proxy mode', runtime.proxyMode.label),
-            ('Routing', runtime.routeMode.label),
-            if (capabilities.supportsMixedProxy)
-              ('Listen address', runtime.listenAddress),
-            if (capabilities.supportsMixedProxy)
-              ('Mixed port', '${runtime.mixedPort}'),
-            ('IPv6', runtime.ipv6 ? 'Enabled' : 'Disabled'),
-            if (capabilities.supportsMixedProxy &&
-                runtime.proxyMode == ProxyMode.mixed &&
-                settings.systemProxy)
-              ('System proxy', 'Enabled'),
-          ],
-        ),
-        const _SectionTitle(
-          icon: Icons.account_tree_outlined,
-          title: 'Node snapshot',
-        ),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${profile.nodeCount} nodes available from the active subscription.',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  profile.profileTitle == null
-                      ? 'Backend now exposes node information directly, so the app can work from selection and latency data without a raw config file.'
-                      : 'Backend now exposes node information directly for ${profile.profileTitle}.',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _PolicyMetric extends StatelessWidget {
-  const _PolicyMetric({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            value,
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Policy extends ConsumerWidget {
-  const _Policy();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final proxies = ref.watch(proxiesProvider);
-    final l10n = AppLocalizations.of(context);
-    final notifier = ref.read(proxiesProvider.notifier);
-    final proxyNodes = proxies.selectedGroup?.nodes ?? const [];
-    final countries = proxyCountryMapEntries(proxyNodes);
-    final selectedNode = proxies.selectedGroup?.selectedNode;
-    final selectedCountry = selectedNode == null
-        ? null
-        : proxyNodeCountryCode(selectedNode);
-    final countryGroups = [
-      for (var index = 0; index < proxies.groups.length; index++)
-        (
-          index: index,
-          group: proxies.groups[index],
-          nodes: selectedCountry == null
-              ? proxies.groups[index].nodes
-              : proxyNodesInCountry(
-                  proxies.groups[index].nodes,
-                  selectedCountry,
-                ),
-        ),
-    ].where((entry) => entry.nodes.isNotEmpty).toList();
-    return _SectionScroll(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: _SectionTitle(
-                icon: Icons.account_tree_outlined,
-                title: l10n.outboundPolicy,
-              ),
-            ),
-            FilledButton.icon(
-              onPressed: proxies.testing ? null : notifier.testAllLatency,
-              icon: const Icon(Icons.speed),
-              label: Text(l10n.testLatency),
-            ),
-          ],
-        ),
-        _CountryMapHeader(message: l10n.selectionSavedForNextCoreStart),
-        AbstractWorldMap(
-          height: 320,
-          nodes: countries,
-          selectedId: selectedCountry,
-          onSelect: (countryCode) {
-            final node = firstProxyNodeInCountry(proxyNodes, countryCode);
-            if (node != null) notifier.selectNode(node.id);
-          },
-        ),
-        _CountrySectionTitle(
-          icon: Icons.public,
-          title: l10n.selectCountry,
-          subtitle: l10n.countryCount(countries.length),
-        ),
-        if (countryGroups.isEmpty)
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(28),
-              child: Center(child: Text(l10n.noOutboundGroupsAvailable)),
-            ),
-          )
-        else
-          for (final entry in countryGroups)
-            Card(
-              child: ExpansionTile(
-                initiallyExpanded: entry.index == proxies.selectedGroupIndex,
-                leading: const Icon(Icons.route),
-                title: Text(entry.group.name),
-                subtitle: Text(
-                  l10n.groupMembers(entry.nodes.length, entry.group.type),
-                ),
-                children: [
-                  for (final node in entry.nodes)
-                    ListTile(
-                      dense: true,
-                      leading: Icon(
-                        node.isSelected
-                            ? Icons.radio_button_checked
-                            : Icons.radio_button_off,
-                        color: node.isSelected
-                            ? Theme.of(context).colorScheme.primary
-                            : null,
-                      ),
-                      title: Text(node.name),
-                      subtitle: Text(node.typeLabel),
-                      trailing: Text(
-                        node.latencyMs == null ? '—' : '${node.latencyMs} ms',
-                      ),
-                      onTap: () {
-                        notifier.selectGroup(entry.index);
-                        notifier.selectNode(node.id);
-                      },
-                    ),
-                ],
-              ),
-            ),
-      ],
-    );
-  }
-}
-
-class _CountryMapHeader extends StatelessWidget {
-  const _CountryMapHeader({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(
-              Icons.language,
-              size: 14,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              message,
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _CountrySectionTitle extends StatelessWidget {
-  const _CountrySectionTitle({
-    required this.icon,
-    required this.title,
-    this.subtitle,
-  });
-
-  final IconData icon;
-  final String title;
-  final String? subtitle;
-
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Row(
-        children: [
-          Icon(icon, size: 20),
-          const SizedBox(width: 8),
-          Text(
-            title,
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-          ),
-        ],
-      ),
-      if (subtitle != null) ...[
-        const SizedBox(height: 2),
-        Text(
-          subtitle!,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ],
-    ],
-  );
-}
-
-class _EmptyWorkspace extends StatelessWidget {
-  const _EmptyWorkspace({required this.onAdd});
-
-  final VoidCallback onAdd;
-
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          Icons.description_outlined,
-          size: 52,
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-        ),
-        const SizedBox(height: 14),
-        Text(
-          'No profile selected',
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-        const SizedBox(height: 6),
-        const Text('Add a subscription to create your first profile.'),
-        const SizedBox(height: 18),
-        FilledButton.icon(
-          onPressed: onAdd,
-          icon: const Icon(Icons.add),
-          label: const Text('Add profile'),
-        ),
-      ],
-    ),
-  );
-}
-
-class _SectionScroll extends StatelessWidget {
-  const _SectionScroll({required this.children});
-
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) => SingleChildScrollView(
-    padding: const EdgeInsets.all(24),
-    child: Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 900),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (var i = 0; i < children.length; i++) ...[
-              children[i],
-              if (i != children.length - 1) const SizedBox(height: 18),
-            ],
-          ],
-        ),
-      ),
-    ),
-  );
-}
-
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle({required this.icon, required this.title});
-
-  final IconData icon;
-  final String title;
-
-  @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      Icon(icon, size: 20),
-      const SizedBox(width: 8),
-      Text(
-        title,
-        style: Theme.of(
-          context,
-        ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-      ),
-    ],
-  );
-}
-
-class _InfoCard extends StatelessWidget {
-  const _InfoCard({required this.rows});
-
-  final List<(String, String)> rows;
-
-  @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          for (var i = 0; i < rows.length; i++) ...[
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Text(
-                    rows[i].$1,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 24),
-                Expanded(child: Text(rows[i].$2, textAlign: TextAlign.left)),
-              ],
-            ),
-            if (i != rows.length - 1)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 10),
-                child: Divider(height: 1),
-              ),
-          ],
-        ],
-      ),
-    ),
-  );
 }

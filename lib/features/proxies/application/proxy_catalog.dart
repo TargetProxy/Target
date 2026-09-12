@@ -7,12 +7,16 @@ import '../../../data/models/proxy_node.dart';
 /// Immutable snapshot of the parsed proxy catalog.
 @immutable
 class ProxyCatalogState {
-  const ProxyCatalogState({this.groups = const []});
+  const ProxyCatalogState({this.groups = const [], this.initialized = false});
 
   final List<ProxyGroup> groups;
+  final bool initialized;
 
   ProxyCatalogState copyWith({List<ProxyGroup>? groups}) {
-    return ProxyCatalogState(groups: groups ?? this.groups);
+    return ProxyCatalogState(
+      groups: groups ?? this.groups,
+      initialized: initialized,
+    );
   }
 }
 
@@ -21,8 +25,8 @@ class ProxyCatalogNotifier extends Notifier<ProxyCatalogState> {
   ProxyCatalogState build() => const ProxyCatalogState();
 
   void clear() {
-    if (state.groups.isEmpty) return;
-    state = const ProxyCatalogState();
+    if (state.initialized && state.groups.isEmpty) return;
+    state = const ProxyCatalogState(initialized: true);
   }
 
   void replaceGroups(List<ProxyGroup> sourceGroups) {
@@ -30,6 +34,7 @@ class ProxyCatalogNotifier extends Notifier<ProxyCatalogState> {
       for (final group in state.groups) group.id: group.selectedNodeId,
     };
     state = ProxyCatalogState(
+      initialized: true,
       groups: [
         for (final group in sourceGroups)
           _mergeGroup(group, previousSelections[group.id]),
@@ -43,7 +48,10 @@ class ProxyCatalogNotifier extends Notifier<ProxyCatalogState> {
       previousSelection ?? source.selectedNodeId,
       nodes,
     );
-    return source.copyWith(
+    return ProxyGroup(
+      id: source.id,
+      name: source.name,
+      type: source.type,
       selectedNodeId: selected,
       nodes: _markSelected(nodes, selected),
     );
@@ -81,7 +89,8 @@ class ProxyCatalogNotifier extends Notifier<ProxyCatalogState> {
     if (previous != null && nodes.any((node) => node.id == previous)) {
       return previous;
     }
-    return nodes.isEmpty ? null : nodes.first.id;
+    // Removing a source must not silently choose a different connection.
+    return null;
   }
 
   List<ProxyNode> _markSelected(List<ProxyNode> nodes, String? selectedNodeId) {

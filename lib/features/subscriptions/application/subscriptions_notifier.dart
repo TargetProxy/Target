@@ -2,46 +2,42 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:targetlib/targetlib.dart' as targetlib;
 
 import '../../../core/runtime/core_notifier.dart';
 import '../../../core/runtime/subscription_gateway.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../data/models/subscription.dart';
+import '../../../data/models/proxy_group.dart';
+import '../../../data/models/proxy_node.dart';
 import '../../proxies/application/proxy_catalog.dart';
 
 @immutable
 class SubscriptionsState {
   const SubscriptionsState({
     this.subscriptions = const [],
-    this.activeId,
     this.busy = false,
     this.lastError,
+    this.changingIds = const {},
   });
 
   final List<Subscription> subscriptions;
-  final String? activeId;
   final bool busy;
   final String? lastError;
-
-  Subscription? get activeSubscription {
-    for (final subscription in subscriptions) {
-      if (subscription.id == activeId) return subscription;
-    }
-    return null;
-  }
+  final Set<String> changingIds;
 
   SubscriptionsState copyWith({
     List<Subscription>? subscriptions,
-    String? activeId,
     bool? busy,
     String? lastError,
     bool clearError = false,
+    Set<String>? changingIds,
   }) {
     return SubscriptionsState(
       subscriptions: subscriptions ?? this.subscriptions,
-      activeId: activeId ?? this.activeId,
       busy: busy ?? this.busy,
       lastError: clearError ? null : lastError ?? this.lastError,
+      changingIds: changingIds ?? this.changingIds,
     );
   }
 }
@@ -80,7 +76,6 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
       try {
         final snapshot = await gateway.listSubscriptions();
         final remote = snapshot.subscriptions;
-        final activeId = snapshot.activeId;
         final previous = {
           for (final item in state.subscriptions) item.id: item,
         };
@@ -90,24 +85,44 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
         ];
         state = state.copyWith(
           subscriptions: subscriptions,
-          activeId: activeId,
           busy: subscriptions.any(
             (item) => item.updateStatus == SubscriptionUpdateStatus.updating,
           ),
           clearError: true,
         );
-        RuntimeSubscription? active;
-        for (final item in remote) {
-          if (item.id == activeId) {
-            active = item;
-            break;
-          }
-        }
         final catalog = ref.read(proxyCatalogProvider.notifier);
-        if (active == null) {
+        // NodePool is assembled by TargetLib from all enabled subscriptions.
+        // Use it as the single source of truth for the unified node list.
+        final pool = await ref.read(coreGatewayProvider).getNodePool();
+        final nodes = [
+          for (final node in pool.nodes)
+            ProxyNode(
+              id: node.tag,
+              name: node.name.isEmpty ? node.tag : node.name,
+              type: node.type,
+              countryCode: node.countryCode.isEmpty ? null : node.countryCode,
+              isAvailable:
+                  node.phase !=
+                  targetlib.ProfileNodePhase.PROFILE_NODE_PHASE_FAILED,
+              metadata: {
+                'server': node.server,
+                'port': node.port,
+                'subscriptionId': node.subscriptionId,
+                if (node.errorMessage.isNotEmpty) 'error': node.errorMessage,
+              },
+            ),
+        ];
+        if (nodes.isEmpty) {
           catalog.clear();
         } else {
-          catalog.replaceGroups(active.profile.groups);
+          catalog.replaceGroups([
+            ProxyGroup(
+              id: ProxyGroup.runtimeSelectorGroupId,
+              name: ProxyGroup.runtimeSelectorGroupId,
+              type: 'selector',
+              nodes: nodes,
+            ),
+          ]);
         }
       } on Object catch (error) {
         state = state.copyWith(
@@ -150,7 +165,6 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
           ...subscription.headers,
           'User-Agent': subscription.userAgent,
         },
-        activate: true,
         updateNow: true,
       );
       final added = _subscriptionFromRuntime(created, subscription);
@@ -160,13 +174,10 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
             if (item.id != added.id) item,
           added,
         ],
-        activeId: created.id,
         busy: false,
         clearError: true,
       );
-      ref
-          .read(proxyCatalogProvider.notifier)
-          .replaceGroups(created.profile.groups);
+      await _loadSubscriptions();
       return true;
     } on Object catch (error) {
       state = state.copyWith(
@@ -177,19 +188,28 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
     }
   }
 
-  Future<void> setActive(String id) async {
+  Future<void> setEnabled(String id, bool enabled) async {
     final gateway = _gateway;
     if (gateway == null) {
       _failUnavailable();
       return;
     }
+    if (state.changingIds.contains(id)) return;
+    final existing = state.subscriptions.where((item) => item.id == id);
+    if (existing.isEmpty || existing.first.enabled == enabled) return;
+    state = state.copyWith(
+      changingIds: {...state.changingIds, id},
+      clearError: true,
+    );
     try {
-      await gateway.activateSubscription(id);
+      await gateway.setSubscriptionEnabled(id, enabled);
       await _loadSubscriptions();
     } on Object catch (error) {
       state = state.copyWith(
-        lastError: 'Failed to activate subscription: $error',
+        lastError: 'Failed to change subscription: $error',
       );
+    } finally {
+      state = state.copyWith(changingIds: {...state.changingIds}..remove(id));
     }
   }
 
@@ -236,11 +256,7 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
         busy: false,
         clearError: true,
       );
-      if (snapshotIsActive(id)) {
-        ref
-            .read(proxyCatalogProvider.notifier)
-            .replaceGroups(result.subscription.profile.groups);
-      }
+      await _loadSubscriptions();
     } on Object catch (error) {
       state = state.copyWith(
         subscriptions: [
@@ -276,8 +292,6 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
       source: 'CONFIG',
     );
   }
-
-  bool snapshotIsActive(String id) => state.activeId == id;
 
   Subscription _subscriptionFromRuntime(
     RuntimeSubscription runtime,

@@ -1,6 +1,7 @@
 import '../../data/models/ip_info.dart';
 import '../../data/models/runtime_settings.dart';
 import 'core_models.dart';
+import 'package:targetlib/targetlib.dart' as targetlib;
 
 /// Stable app-facing boundary for the native proxy core.
 ///
@@ -38,6 +39,12 @@ abstract class CoreGateway {
 
   /// Queries the egress IP geolocation through the backend.
   Future<IpInfo> fetchIpInfo();
+
+  Future<targetlib.NodePool> getNodePool();
+  Future<targetlib.ServiceBindingList> listServiceBindings();
+  Future<targetlib.SmartConnectDiagnostics> getSmartConnectDiagnostics({
+    String? serviceId,
+  });
 
   Future<void> dispose();
 }
@@ -111,6 +118,14 @@ class UnavailableCoreGateway implements CoreGateway {
 
   @override
   Future<IpInfo> fetchIpInfo() => _unavailable();
+  @override
+  Future<targetlib.NodePool> getNodePool() => _unavailable();
+  @override
+  Future<targetlib.ServiceBindingList> listServiceBindings() => _unavailable();
+  @override
+  Future<targetlib.SmartConnectDiagnostics> getSmartConnectDiagnostics({
+    String? serviceId,
+  }) => _unavailable();
 
   @override
   Future<void> dispose() async {}

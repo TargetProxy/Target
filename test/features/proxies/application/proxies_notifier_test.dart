@@ -25,6 +25,7 @@ void main() {
         id: 'regional-auto',
         name: 'regional-auto',
         type: 'selector',
+        selectedNodeId: 'node-1',
         nodes: [ProxyNode(id: 'node-1', name: 'Singapore', type: 'vmess')],
       ),
     ]);
