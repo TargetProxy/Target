@@ -136,21 +136,77 @@ class ProfilesWorkspacePage extends ConsumerWidget {
                         ),
                         expandedCrossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          SelectableText(
-                            '${l10n.subscriptionAddress}: ${subscription.safeUrl}',
+                          _DetailRow(
+                            label: l10n.subscriptionAddress,
+                            value: subscription.safeUrl,
+                            selectable: true,
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            '${l10n.lastUpdated}: ${subscription.lastUpdatedAt == null ? l10n.neverUpdated : DateFormat.yMMMd(l10n.localeName).add_Hm().format(subscription.lastUpdatedAt!.toLocal())}',
+                          _DetailRow(
+                            label: l10n.lastUpdated,
+                            value: subscription.lastUpdatedAt == null
+                                ? l10n.neverUpdated
+                                : DateFormat.yMMMd(
+                                    l10n.localeName,
+                                  ).add_Hm().format(
+                                    subscription.lastUpdatedAt!.toLocal(),
+                                  ),
                           ),
-                          Text(
-                            '${l10n.trafficUsed}: ${formatBytes(subscription.uploadBytes + subscription.downloadBytes)}',
+                          _DetailRow(
+                            label: l10n.subscriptionNodes,
+                            value: '${subscription.nodeCount}',
                           ),
+                          _DetailRow(
+                            label: l10n.automaticUpdates,
+                            value: subscription.autoUpdate
+                                ? l10n.enabled
+                                : l10n.disabled,
+                          ),
+                          _DetailRow(
+                            label: l10n.updateInterval,
+                            value: _formatInterval(
+                              subscription.updateIntervalSeconds,
+                              disabledLabel: l10n.disabled,
+                            ),
+                          ),
+                          _DetailRow(
+                            label: l10n.trafficUsed,
+                            value: formatBytes(
+                              subscription.uploadBytes +
+                                  subscription.downloadBytes,
+                            ),
+                          ),
+                          if (subscription.expiresAt != null)
+                            _DetailRow(
+                              label: l10n.expires,
+                              value: DateFormat.yMMMd(l10n.localeName)
+                                  .add_Hm()
+                                  .format(subscription.expiresAt!.toLocal()),
+                            ),
+                          if (subscription.profileTitle?.isNotEmpty == true)
+                            _DetailRow(
+                              label: l10n.profile,
+                              value: subscription.profileTitle!,
+                            ),
+                          if (subscription.webPageUrl?.isNotEmpty == true)
+                            _DetailRow(
+                              label: l10n.webPage,
+                              value: subscription.webPageUrl!,
+                              selectable: true,
+                            ),
+                          if (subscription.supportUrl?.isNotEmpty == true)
+                            _DetailRow(
+                              label: l10n.support,
+                              value: subscription.supportUrl!,
+                              selectable: true,
+                            ),
                           if (subscription.lastError?.isNotEmpty == true)
-                            Text(
-                              subscription.lastError!,
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.error,
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                subscription.lastError!,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.error,
+                                ),
                               ),
                             ),
                         ],
@@ -179,5 +235,53 @@ class ProfilesWorkspacePage extends ConsumerWidget {
     await ref
         .read(subscriptionsProvider.notifier)
         .addSubscription(url, name: result['name']);
+  }
+
+  static String _formatInterval(int seconds, {required String disabledLabel}) {
+    if (seconds <= 0) return disabledLabel;
+    final hours = seconds ~/ 3600;
+    if (hours > 0 && seconds % 3600 == 0) {
+      return '$hours h';
+    }
+    final minutes = seconds ~/ 60;
+    if (minutes > 0 && seconds % 60 == 0) {
+      return '$minutes min';
+    }
+    return '$seconds s';
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  const _DetailRow({
+    required this.label,
+    required this.value,
+    this.selectable = false,
+  });
+
+  final String label;
+  final String value;
+  final bool selectable;
+
+  @override
+  Widget build(BuildContext context) {
+    final labelStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+    );
+    final valueWidget = selectable
+        ? SelectionArea(
+            child: Text(value, maxLines: 2, overflow: TextOverflow.ellipsis),
+          )
+        : Text(value, softWrap: true);
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(width: 132, child: Text(label, style: labelStyle)),
+          const SizedBox(width: 12),
+          Expanded(child: valueWidget),
+        ],
+      ),
+    );
   }
 }

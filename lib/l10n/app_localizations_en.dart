@@ -66,6 +66,33 @@ class AppLocalizationsEn extends AppLocalizations {
   String get subscriptionAddress => 'Address';
 
   @override
+  String get subscriptionNodes => 'Nodes';
+
+  @override
+  String get automaticUpdates => 'Automatic updates';
+
+  @override
+  String get enabled => 'Enabled';
+
+  @override
+  String get disabled => 'Disabled';
+
+  @override
+  String get updateInterval => 'Update interval';
+
+  @override
+  String get expires => 'Expires';
+
+  @override
+  String get profile => 'Profile';
+
+  @override
+  String get webPage => 'Web page';
+
+  @override
+  String get support => 'Support';
+
+  @override
   String get nodePoolHint =>
       'Explore regions on the map, then select a node from your enabled subscriptions.';
 

@@ -200,6 +200,60 @@ abstract class AppLocalizations {
   /// **'Address'**
   String get subscriptionAddress;
 
+  /// No description provided for @subscriptionNodes.
+  ///
+  /// In en, this message translates to:
+  /// **'Nodes'**
+  String get subscriptionNodes;
+
+  /// No description provided for @automaticUpdates.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic updates'**
+  String get automaticUpdates;
+
+  /// No description provided for @enabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled'**
+  String get enabled;
+
+  /// No description provided for @disabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled'**
+  String get disabled;
+
+  /// No description provided for @updateInterval.
+  ///
+  /// In en, this message translates to:
+  /// **'Update interval'**
+  String get updateInterval;
+
+  /// No description provided for @expires.
+  ///
+  /// In en, this message translates to:
+  /// **'Expires'**
+  String get expires;
+
+  /// No description provided for @profile.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile'**
+  String get profile;
+
+  /// No description provided for @webPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Web page'**
+  String get webPage;
+
+  /// No description provided for @support.
+  ///
+  /// In en, this message translates to:
+  /// **'Support'**
+  String get support;
+
   /// No description provided for @nodePoolHint.
   ///
   /// In en, this message translates to:

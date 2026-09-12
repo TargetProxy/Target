@@ -165,7 +165,8 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
     );
     try {
       if (_capabilities.platform == AppPlatform.android) {
-        final granted = await Targetlib().requestVpnPermission();
+        final granted = await const AndroidTargetLibHostBridge()
+            .requestPermission();
         if (!granted) {
           throw const CoreUnavailableException(
             'Android VPN permission was not granted.',

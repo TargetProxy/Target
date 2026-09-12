@@ -64,6 +64,33 @@ class AppLocalizationsZh extends AppLocalizations {
   String get subscriptionAddress => '订阅地址';
 
   @override
+  String get subscriptionNodes => '节点数';
+
+  @override
+  String get automaticUpdates => '自动更新';
+
+  @override
+  String get enabled => '已启用';
+
+  @override
+  String get disabled => '已停用';
+
+  @override
+  String get updateInterval => '更新周期';
+
+  @override
+  String get expires => '过期时间';
+
+  @override
+  String get profile => '配置';
+
+  @override
+  String get webPage => '网页';
+
+  @override
+  String get support => '支持';
+
+  @override
   String get nodePoolHint => '在地图上浏览地区，从已启用订阅的节点中选择连接。';
 
   @override
