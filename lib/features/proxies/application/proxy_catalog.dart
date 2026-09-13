@@ -80,9 +80,17 @@ class ProxyCatalogNotifier extends Notifier<ProxyCatalogState> {
       }
     }
     return [
-      for (final node in nodes)
-        node.copyWith(latencyMs: previous[node.id]?.latencyMs),
+      for (final node in nodes) _withPreviousLatency(node, previous[node.id]),
     ];
+  }
+
+  ProxyNode _withPreviousLatency(ProxyNode node, ProxyNode? previous) {
+    if (previous == null) return node;
+    if (previous.latencyMs == null && !previous.latencyTimedOut) return node;
+    return node.copyWith(
+      latencyMs: previous.latencyMs,
+      latencyTimedOut: previous.latencyTimedOut,
+    );
   }
 
   String? _restoreSelection(String? previous, List<ProxyNode> nodes) {

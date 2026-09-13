@@ -216,8 +216,11 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
         if (result.succeeded && latency != null) {
           successCount++;
           _mergeLatency(result.outboundId, latency);
-        } else if (result.errorMessage.isNotEmpty) {
+        } else {
+          _markLatencyTimeout(result.outboundId);
+          if (result.errorMessage.isNotEmpty) {
           errors.add('${result.outboundId}: ${result.errorMessage}');
+          }
         }
       }
       if (successCount == 0) {
@@ -252,16 +255,67 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
           group.copyWith(
             nodes: [
               for (final node in group.nodes)
-                node.id == nodeId ? node.copyWith(latencyMs: latency) : node,
+                node.id == nodeId ? node.copyWith(latencyMs: latency, latencyTimedOut: false) : node,
             ],
           ),
       ],
     );
   }
 
+  void _markLatencyTimeout(String nodeId) {
+    state = state.copyWith(groups: [for (final group in state.groups) group.copyWith(nodes: [for (final node in group.nodes) node.id == nodeId ? node.copyWith(latencyTimedOut: true) : node])]);
+  }
+
+  Map<String, ProxyNode> _latencySnapshot(ProxiesState current) {
+    final result = <String, ProxyNode>{};
+    for (final group in current.groups) {
+      for (final node in group.nodes) {
+        if (node.latencyMs != null || node.latencyTimedOut) {
+          result[node.id] = node;
+        }
+      }
+    }
+    return result;
+  }
+
+  ProxyNode _withPreservedLatency(ProxyNode node, ProxyNode? cached) {
+    if (cached == null) return node;
+    // Fresh latency data wins over previously cached results.
+    if (node.latencyMs != null || node.latencyTimedOut) return node;
+    if (cached.latencyMs == null && !cached.latencyTimedOut) return node;
+    return node.copyWith(
+      latencyMs: cached.latencyMs,
+      latencyTimedOut: cached.latencyTimedOut,
+    );
+  }
+
+  ProxyNode _mergeRuntimeLatency(
+    ProxyNode node,
+    ProxyNode? runtime,
+    ProxyNode? cached,
+  ) {
+    final withRuntime =
+        (runtime?.latencyMs != null || (runtime?.latencyTimedOut ?? false))
+        ? node.copyWith(
+            latencyMs: runtime!.latencyMs,
+            latencyTimedOut: runtime.latencyTimedOut,
+          )
+        : node;
+    return _withPreservedLatency(withRuntime, cached);
+  }
+
   ProxiesState _syncFromCatalog(ProxiesState current, ProxyCatalogState next) {
     final selectedGroupId = current.selectedGroup?.id;
-    final groups = List<ProxyGroup>.of(next.groups);
+    final latencies = _latencySnapshot(current);
+    final groups = [
+      for (final group in next.groups)
+        group.copyWith(
+          nodes: [
+            for (final node in group.nodes)
+              _withPreservedLatency(node, latencies[node.id]),
+          ],
+        ),
+    ];
     final index = groups.indexWhere((group) => group.id == selectedGroupId);
     final selectedGroupIndex = index >= 0 ? index : 0;
     return current.copyWith(
@@ -285,12 +339,17 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
         for (final group in core.proxyGroups)
           for (final node in group.nodes) node.id: node,
       };
+      final latencies = _latencySnapshot(current);
       final groups = [
         for (final group in catalogGroups)
           group.copyWith(
             nodes: [
               for (final node in group.nodes)
-                node.copyWith(latencyMs: runtimeNodes[node.id]?.latencyMs),
+                _mergeRuntimeLatency(
+                  node,
+                  runtimeNodes[node.id],
+                  latencies[node.id],
+                ),
             ],
           ),
       ];
@@ -302,7 +361,16 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
       );
     }
     final selectedGroupId = current.selectedGroup?.id;
-    final groups = List<ProxyGroup>.of(core.proxyGroups);
+    final latencies = _latencySnapshot(current);
+    final groups = [
+      for (final group in core.proxyGroups)
+        group.copyWith(
+          nodes: [
+            for (final node in group.nodes)
+              _withPreservedLatency(node, latencies[node.id]),
+          ],
+        ),
+    ];
     final index = groups.indexWhere((group) => group.id == selectedGroupId);
     final selectedGroupIndex = index >= 0 ? index : 0;
     return current.copyWith(

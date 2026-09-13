@@ -8,6 +8,7 @@ class ProxyNode {
     required this.type,
     this.countryCode,
     this.latencyMs,
+    this.latencyTimedOut = false,
     this.isSelected = false,
     this.isAvailable = true,
     this.metadata = const {},
@@ -18,6 +19,7 @@ class ProxyNode {
   final String type;
   final String? countryCode;
   final int? latencyMs;
+  final bool latencyTimedOut;
   final bool isSelected;
   final bool isAvailable;
   final Map<String, dynamic> metadata;
@@ -32,6 +34,7 @@ class ProxyNode {
     String? type,
     String? countryCode,
     int? latencyMs,
+    bool? latencyTimedOut,
     bool? isSelected,
     bool? isAvailable,
     Map<String, dynamic>? metadata,
@@ -42,6 +45,7 @@ class ProxyNode {
       type: type ?? this.type,
       countryCode: countryCode ?? this.countryCode,
       latencyMs: latencyMs ?? this.latencyMs,
+      latencyTimedOut: latencyTimedOut ?? this.latencyTimedOut,
       isSelected: isSelected ?? this.isSelected,
       isAvailable: isAvailable ?? this.isAvailable,
       metadata: metadata ?? this.metadata,

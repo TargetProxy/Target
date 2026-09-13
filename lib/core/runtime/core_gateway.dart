@@ -45,6 +45,7 @@ abstract class CoreGateway {
   Future<targetlib.SmartConnectDiagnostics> getSmartConnectDiagnostics({
     String? serviceId,
   });
+  Future<targetlib.RuntimeState> getSmartConnectRuntimeState();
 
   Future<void> dispose();
 }
@@ -126,6 +127,8 @@ class UnavailableCoreGateway implements CoreGateway {
   Future<targetlib.SmartConnectDiagnostics> getSmartConnectDiagnostics({
     String? serviceId,
   }) => _unavailable();
+  @override
+  Future<targetlib.RuntimeState> getSmartConnectRuntimeState() => _unavailable();
 
   @override
   Future<void> dispose() async {}

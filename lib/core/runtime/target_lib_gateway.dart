@@ -16,13 +16,15 @@ import '../logging/ansi_escape.dart';
 import '../logging/app_logger.dart';
 import '../platform/app_platform.dart';
 import 'core_gateway.dart';
+import 'smart_runtime_gateway.dart';
 import 'core_models.dart';
 import 'package:targetlib/targetlib.dart' as targetlib_pb;
 import 'package:targetlib/targetlib.dart'
     hide ProxyMode, RouteMode, RuntimeSettings, LogLevel;
 import 'subscription_gateway.dart';
 
-class TargetLibGateway implements CoreGateway, SubscriptionGateway {
+class TargetLibGateway
+    implements CoreGateway, SubscriptionGateway, SmartRuntimeGateway {
   TargetLibGateway({Directory? workingDirectory, AppCapabilities? capabilities})
     : _workingDirectory = workingDirectory,
       _capabilities = capabilities ?? AppCapabilities.current() {
@@ -311,17 +313,79 @@ class TargetLibGateway implements CoreGateway, SubscriptionGateway {
   });
 
   @override
-  Future<targetlib_pb.NodePool> getNodePool() => _runtime.getNodePool();
+  Future<targetlib_pb.NodePool> getNodePool() =>
+      _smartCall(() => _runtime.getNodePool());
 
   @override
   Future<targetlib_pb.ServiceBindingList> listServiceBindings() =>
-      _runtime.listServiceBindings();
+      _smartCall(() => _runtime.listServiceBindings());
 
   @override
   Future<targetlib_pb.SmartConnectDiagnostics> getSmartConnectDiagnostics({
     String? serviceId,
-  }) => _runtime.getSmartConnectDiagnostics(serviceId: serviceId);
+  }) => _smartCall(
+    () => _runtime.getSmartConnectDiagnostics(serviceId: serviceId),
+  );
 
+  @override
+  Future<targetlib_pb.RuntimeState> getSmartConnectRuntimeState() =>
+      _smartCall(() => _runtime.getRuntimeState());
+
+  Future<T> _smartCall<T>(Future<T> Function() operation) async {
+    await _ensureConnected();
+    return operation();
+  }
+
+  @override
+  Future<targetlib_pb.CapabilitiesResponse> smartCapabilities() =>
+      _smartCall(_runtime.capabilities);
+
+  @override
+  Future<targetlib_pb.RuntimeConfig> smartConfig() =>
+      _smartCall(_runtime.getRuntimeConfig);
+
+  @override
+  Future<targetlib_pb.RuntimeConfig> updateSmartModel(
+    targetlib_pb.RuntimeModel model,
+    String expectedRevision,
+  ) => _smartCall(() async {
+    // Re-read settings so a service operation never restores stale proxy/TUN settings.
+    final config = await _runtime.getRuntimeConfig();
+    if (config.revision != expectedRevision) {
+      throw StateError(
+        'Runtime changed; refresh before applying Smart Connect',
+      );
+    }
+    return _runtime.updateRuntimeConfig(
+      config.settings,
+      model: model,
+      expectedRevision: expectedRevision,
+    );
+  });
+
+  @override
+  Future<targetlib_pb.ServiceProbe> putSmartProbe(
+    targetlib_pb.ServiceProbe probe,
+  ) => _smartCall(() => _runtime.putServiceProbe(probe));
+
+  @override
+  Stream<targetlib_pb.ProbeResult> probeSmartService(
+    targetlib_pb.ProbeServiceRequest request,
+  ) async* {
+    await _ensureConnected();
+    yield* _runtime.probeService(request);
+  }
+
+  @override
+  Stream<targetlib_pb.RuntimeEvent> smartEvents() async* {
+    await _ensureConnected();
+    yield* _runtime.subscribeRuntimeEvents();
+  }
+
+  @override
+  Future<targetlib_pb.QualityHistory> smartHistory(
+    targetlib_pb.QualityHistoryRequest request,
+  ) => _smartCall(() => _runtime.getQualityHistory(request));
   RuntimeSubscription _runtimeSubscription(targetlib_pb.SubscriptionView view) {
     return RuntimeSubscription(
       id: view.id,

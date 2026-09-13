@@ -1,3 +1,4 @@
+import '../features/smart_connect/application/smart_connect_notifier.dart';
 import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
@@ -73,6 +74,16 @@ class _TargetAppViewState extends ConsumerState<_TargetAppView> {
   void initState() {
     super.initState();
     ref.read(subscriptionsProvider.notifier).load();
+    ref
+        .read(coreProvider.notifier)
+        .setStartupBarrier(
+          () => ref.read(smartConnectProvider.notifier).prepareForStart(),
+        );
+    Future.microtask(() {
+      if (mounted) {
+        unawaited(ref.read(smartConnectProvider.notifier).initialize());
+      }
+    });
     if (ref.read(appCapabilitiesProvider).supportsTray) {
       final controller = DesktopTrayController(
         onToggleConnection: _toggleConnection,

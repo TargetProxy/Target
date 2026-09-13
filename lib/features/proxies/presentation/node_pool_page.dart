@@ -40,6 +40,17 @@ class _NodePoolPageState extends ConsumerState<NodePoolPage> {
     }
   }
 
+  Color _latencyColor(BuildContext context, ProxyNode node) {
+    final scheme = Theme.of(context).colorScheme;
+    if (node.latencyTimedOut) return scheme.error;
+    final latency = node.latencyMs;
+    if (latency == null) return scheme.onSurfaceVariant;
+    if (latency <= 200) return Colors.green;
+    if (latency <= 500) return Colors.orange.shade700;
+    if (latency <= 1000) return Colors.deepOrange;
+    return Colors.red;
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -264,7 +275,17 @@ class _NodePoolPageState extends ConsumerState<NodePoolPage> {
                         '${sourceName(node)} · ${node.typeLabel}${node.isAvailable ? '' : ' · ${l10n.nodeUnavailable}'}',
                       ),
                       trailing: Text(
-                        node.latencyMs == null ? '—' : '${node.latencyMs} ms',
+                        node.latencyTimedOut
+                            ? 'timeout'
+                            : (node.latencyMs == null
+                                  ? '—'
+                                  : '${node.latencyMs} ms'),
+                        style: TextStyle(
+                          color: _latencyColor(context, node),
+                          fontWeight: node.latencyTimedOut
+                              ? FontWeight.bold
+                              : FontWeight.w600,
+                        ),
                       ),
                       enabled: node.isAvailable,
                       onTap: busy || !node.isAvailable
