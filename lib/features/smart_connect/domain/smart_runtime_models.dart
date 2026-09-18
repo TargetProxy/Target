@@ -43,10 +43,12 @@ class SmartAssessment {
     required this.runtimeRevision,
     required this.poolRevision,
     required this.evaluatedAt,
+    this.proposalId,
   });
   final SmartPolicy policy;
   final List<SmartNode> nodes;
   final SmartSelection selection;
   final String runtimeRevision, poolRevision;
   final DateTime evaluatedAt;
+  final String? proposalId;
 }

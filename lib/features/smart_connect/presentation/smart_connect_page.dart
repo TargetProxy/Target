@@ -6,6 +6,7 @@ import '../../settings/application/settings_notifier.dart';
 import '../../subscriptions/application/subscriptions_notifier.dart';
 import '../application/smart_connect_notifier.dart';
 import '../application/smart_policy_notifier.dart';
+import '../data/smart_intent_repository.dart';
 import '../domain/smart_connect_models.dart';
 import 'smart_policy_editor.dart';
 
@@ -32,7 +33,13 @@ class _SmartConnectPageState extends ConsumerState<SmartConnectPage> {
     );
     if (result != null && mounted) {
       try {
+        final repository = ref.read(smartRepositoryProvider);
+        if (ref.read(settingsProvider).settings.smartConnectEnabled &&
+            repository is IntentSmartConnectRepository) {
+          await repository.syncPolicy(result);
+        }
         await ref.read(smartPoliciesProvider.notifier).savePolicy(result);
+        await ref.read(smartConnectProvider.notifier).refresh();
       } on Object catch (error) {
         if (mounted) _message(error.toString());
       }
@@ -259,24 +266,31 @@ class _SmartConnectPageState extends ConsumerState<SmartConnectPage> {
     );
     if (saved == true && mounted) {
       try {
-        final store = ref.read(smartPolicyStoreProvider);
-        await store.saveNodePreference(
-          node.id,
-          SmartNodePreference(
-            enabled: enabled,
-            excluded: excluded,
-            favorite: favorite,
-            tags: tags.text
-                .split(',')
-                .map((s) => s.trim())
-                .where((s) => s.isNotEmpty)
-                .toSet(),
-          ),
+        final preference = SmartNodePreference(
+          enabled: enabled,
+          excluded: excluded,
+          favorite: favorite,
+          tags: tags.text
+              .split(',')
+              .map((s) => s.trim())
+              .where((s) => s.isNotEmpty)
+              .toSet(),
         );
-        await store.saveSubscriptionPriority(
-          node.subscriptionId,
-          int.parse(priority.text),
-        );
+        final repository = ref.read(smartRepositoryProvider);
+        if (repository is IntentSmartConnectRepository) {
+          await repository.setPreference(
+            node,
+            preference,
+            int.parse(priority.text),
+          );
+        } else {
+          final store = ref.read(smartPolicyStoreProvider);
+          await store.saveNodePreference(node.id, preference);
+          await store.saveSubscriptionPriority(
+            node.subscriptionId,
+            int.parse(priority.text),
+          );
+        }
         await ref.read(smartConnectProvider.notifier).refresh();
       } on Object catch (e) {
         if (mounted) _message(e.toString());

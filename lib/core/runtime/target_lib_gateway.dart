@@ -24,7 +24,11 @@ import 'package:targetlib/targetlib.dart'
 import 'subscription_gateway.dart';
 
 class TargetLibGateway
-    implements CoreGateway, SubscriptionGateway, SmartRuntimeGateway {
+    implements
+        CoreGateway,
+        SubscriptionGateway,
+        SmartRuntimeGateway,
+        SmartIntentGateway {
   TargetLibGateway({Directory? workingDirectory, AppCapabilities? capabilities})
     : _workingDirectory = workingDirectory,
       _capabilities = capabilities ?? AppCapabilities.current() {
@@ -386,6 +390,52 @@ class TargetLibGateway
   Future<targetlib_pb.QualityHistory> smartHistory(
     targetlib_pb.QualityHistoryRequest request,
   ) => _smartCall(() => _runtime.getQualityHistory(request));
+
+  @override
+  Future<targetlib_pb.SmartConnectSnapshot> smartSnapshot() =>
+      _smartCall(() => _runtime.connection!.getSmartConnectSnapshot());
+
+  @override
+  Future<targetlib_pb.Operation> setSmartEnabled(
+    targetlib_pb.SetSmartConnectEnabledRequest request,
+  ) => _smartCall(() => _runtime.connection!.setSmartConnectEnabled(request));
+  @override
+  Future<targetlib_pb.Operation> upsertSmartPolicy(
+    targetlib_pb.UpsertServicePolicyRequest request,
+  ) => _smartCall(() => _runtime.connection!.upsertServicePolicy(request));
+  @override
+  Future<targetlib_pb.Operation> deleteSmartPolicy(
+    targetlib_pb.DeleteServicePolicyRequest request,
+  ) => _smartCall(() => _runtime.connection!.deleteServicePolicy(request));
+  @override
+  Future<targetlib_pb.Operation> setSmartPreference(
+    targetlib_pb.SetNodePreferenceRequest request,
+  ) => _smartCall(() => _runtime.connection!.setNodePreference(request));
+  @override
+  Future<targetlib_pb.Operation> requestSmartEvaluation(
+    targetlib_pb.RequestServiceEvaluationRequest request,
+  ) => _smartCall(() => _runtime.connection!.requestServiceEvaluation(request));
+  @override
+  Future<targetlib_pb.Operation> approveSmartProposal(
+    targetlib_pb.ProposalCommandRequest request,
+  ) => _smartCall(() => _runtime.connection!.approveSwitchProposal(request));
+  @override
+  Future<targetlib_pb.Operation> rejectSmartProposal(
+    targetlib_pb.ProposalCommandRequest request,
+  ) => _smartCall(() => _runtime.connection!.rejectSwitchProposal(request));
+  @override
+  Future<targetlib_pb.Operation> forceSmartBinding(
+    targetlib_pb.ForceServiceBindingRequest request,
+  ) => _smartCall(() => _runtime.connection!.forceServiceBinding(request));
+  @override
+  Future<targetlib_pb.Operation> smartOperation(String id) =>
+      _smartCall(() => _runtime.connection!.getOperation(id));
+  @override
+  Stream<targetlib_pb.SmartConnectEvent> smartIntentEvents() async* {
+    await _ensureConnected();
+    yield* _runtime.connection!.subscribeSmartConnectEvents();
+  }
+
   RuntimeSubscription _runtimeSubscription(targetlib_pb.SubscriptionView view) {
     return RuntimeSubscription(
       id: view.id,

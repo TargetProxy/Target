@@ -1,5 +1,11 @@
 # Smart Connect 实验框架交付说明
 
+## 2026-09-19：TargetLib intent API 接入
+
+实际依赖的 `../TargetLib` 支持 `smart_connect_intent_api` 时，Target 现在通过核心持久化服务策略和节点偏好，请求评估并审批 proposal（或显式 Force Direct/节点），等待持久化 operation 的最终状态，再读取核心的实际绑定。该路径不再由 Dart 拼装运行模型或决定最终评分；旧 repository 仅保留给不实现 intent gateway 的测试/兼容实现。核心评估会在质量缺失/过期时进行指定节点探测，多个目标必须全部通过；Direct 不依赖探测。首选地区是评分偏好，硬性地区/订阅及节点排除在核心检查。
+
+部署时必须用这份 `../TargetLib` 源码重新构建并安装服务；仅重建 Flutter UI 不会替换系统服务。当前 intent 契约没有取消正在运行的评估的 RPC，UI 取消只放弃本次结果并在提案出现后拒绝它。核心也没有“必需节点标签”策略字段：配置此限制时应用明确拒绝同步，不会绕过。离线编辑的本地策略会在下次评估时同步到核心；策略导入仍是本地操作，需逐项评估或编辑后同步。真实机场和目标服务的地区解锁尚未做端到端验收。
+
 日期：2026-09-13。
 
 本说明对应 Target 当前工作树，以及实际路径依赖 `../TargetLib/flutter` 和 `../TargetLib` Go 核心。`smart-connect-capability-audit.md` 是早期能力核对，不能替代本次实现状态。
