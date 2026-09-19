@@ -36,10 +36,14 @@ abstract class SmartConnectRepository {
 /// The only feature layer aware of protobuf. No service operation selects the
 /// ordinary proxy group, and evaluation never writes the runtime model.
 class TargetSmartConnectRepository implements SmartConnectRepository {
-  TargetSmartConnectRepository(this.core, {SmartPolicyStore? store})
-    : store = store ?? SmartPolicyStore();
+  TargetSmartConnectRepository(
+    this.core, {
+    SmartPolicyStore? store,
+    this.existingPoolLoader,
+  }) : store = store ?? SmartPolicyStore();
   final SmartPolicyStore store;
   final CoreGateway core;
+  final Future<List<SmartNode>?> Function()? existingPoolLoader;
   static const prefix = 'target.smart.';
   String _probeId(String policyId, int index) =>
       index == 0 ? '$prefix$policyId' : '$prefix$policyId.probe.$index';
@@ -65,6 +69,7 @@ class TargetSmartConnectRepository implements SmartConnectRepository {
     final pool = await core.getNodePool();
     final preferences = await store.nodePreferences();
     final priorities = await store.subscriptionPriorities();
+    final existingNodes = await existingPoolLoader?.call();
     final config = await api.smartConfig();
     final runtime = await core.getSmartConnectRuntimeState();
     final policies = {for (final p in await store.load()) p.id: p};
@@ -77,8 +82,11 @@ class TargetSmartConnectRepository implements SmartConnectRepository {
     }
     return SmartRuntimeSnapshot(
       nodes: [
-        for (final n in pool.nodes)
-          _node(n, preferences[n.tag], priorities[n.subscriptionId] ?? 0),
+        ...(existingNodes ??
+            [
+              for (final n in pool.nodes)
+                _node(n, preferences[n.tag], priorities[n.subscriptionId] ?? 0),
+            ]),
       ],
       revision: config.revision,
       poolRevision: pool.revision,
@@ -478,4 +486,3 @@ class TargetSmartConnectRepository implements SmartConnectRepository {
     return rows;
   }
 }
-

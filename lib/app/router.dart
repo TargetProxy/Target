@@ -7,6 +7,7 @@ import '../features/logs/presentation/logs_page.dart';
 import '../features/profiles/presentation/profiles_workspace_page.dart';
 import '../features/traffic/presentation/traffic_page.dart';
 import '../features/proxies/presentation/node_pool_page.dart';
+import '../features/smart_connect/presentation/smart_connect_page.dart';
 import 'shell/app_shell.dart';
 
 class AppRouter {
@@ -30,6 +31,10 @@ class AppRouter {
           GoRoute(
             path: AppRoute.nodes.path,
             pageBuilder: _fadePageBuilder(const NodePoolPage()),
+          ),
+          GoRoute(
+            path: AppRoute.smartConnect.path,
+            pageBuilder: _fadePageBuilder(const SmartConnectPage()),
           ),
           GoRoute(
             path: AppRoute.connections.path,
@@ -60,6 +65,7 @@ enum AppRoute {
   home('/'),
   proxies('/proxies'),
   nodes('/nodes'),
+  smartConnect('/smart-connect'),
   connections('/connections'),
   traffic('/traffic'),
   logs('/logs');

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../domain/smart_connect_models.dart';
 
 class SmartPolicyEditor extends StatefulWidget {
@@ -61,10 +61,7 @@ class _SmartPolicyEditorState extends State<SmartPolicyEditor> {
       minLines: lines,
       maxLines: lines == 1 ? 1 : 6,
       readOnly: key == 'id' && widget.policy != null,
-      decoration: InputDecoration(
-        labelText: label,
-        border: const OutlineInputBorder(),
-      ),
+      decoration: InputDecoration(labelText: label),
     ),
   );
   void save() {

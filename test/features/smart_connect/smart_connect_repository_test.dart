@@ -143,6 +143,19 @@ void main() {
     repository = TargetSmartConnectRepository(gateway);
   });
   test(
+    'loads nodes from the existing proxy pool when it is available',
+    () async {
+      repository = TargetSmartConnectRepository(
+        gateway,
+        existingPoolLoader: () async => [
+          const SmartNode(id: 'proxy-pool-node', region: 'JP'),
+        ],
+      );
+      final snapshot = await repository.load();
+      expect(snapshot.nodes.map((node) => node.id), ['proxy-pool-node']);
+    },
+  );
+  test(
     'evaluation probes all targets without touching any runtime binding',
     () async {
       final assessment = await repository.evaluate(policy, SmartCancellation());
@@ -272,4 +285,3 @@ void main() {
     },
   );
 }
-

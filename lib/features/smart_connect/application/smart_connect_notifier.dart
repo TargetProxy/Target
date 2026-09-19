@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/runtime/core_notifier.dart';
-import '../../../core/runtime/smart_runtime_gateway.dart';
+import '../../proxies/application/proxy_catalog.dart';
 import '../../settings/application/settings_notifier.dart';
 import '../data/smart_connect_repository.dart';
-import '../data/smart_intent_repository.dart';
+import '../data/smart_policy_store.dart';
 import '../domain/smart_connect_models.dart';
 import '../domain/smart_runtime_models.dart';
 import 'smart_policy_notifier.dart';
@@ -13,10 +13,40 @@ export '../domain/smart_runtime_models.dart' show SmartBinding;
 final smartRepositoryProvider = Provider<SmartConnectRepository>((ref) {
   final core = ref.read(coreGatewayProvider);
   final store = ref.read(smartPolicyStoreProvider);
-  return core is SmartIntentGateway
-      ? IntentSmartConnectRepository(core, core as SmartIntentGateway, store)
-      : TargetSmartConnectRepository(core, store: store);
+  return TargetSmartConnectRepository(
+    core,
+    store: store,
+    existingPoolLoader: () => _loadExistingPool(ref, store),
+  );
 });
+
+Future<List<SmartNode>?> _loadExistingPool(
+  Ref ref,
+  SmartPolicyStore store,
+) async {
+  final catalog = ref.read(proxyCatalogProvider);
+  if (!catalog.initialized) return null;
+  final preferences = await store.nodePreferences();
+  final priorities = await store.subscriptionPriorities();
+  return [
+    for (final group in catalog.groups)
+      for (final node in group.nodes)
+        SmartNode(
+          id: node.id,
+          name: node.name,
+          subscriptionId: node.metadata['subscriptionId'] as String? ?? '',
+          protocol: node.type,
+          region: node.countryCode ?? '',
+          latencyMs: node.latencyMs,
+          enabled: node.isAvailable && (preferences[node.id]?.enabled ?? true),
+          excluded: preferences[node.id]?.excluded ?? false,
+          favorite: preferences[node.id]?.favorite ?? false,
+          tags: preferences[node.id]?.tags ?? const {},
+          subscriptionPriority:
+              priorities[node.metadata['subscriptionId'] as String? ?? ''] ?? 0,
+        ),
+  ];
+}
 
 class SmartConnectState {
   const SmartConnectState({
@@ -82,6 +112,9 @@ class SmartConnectNotifier extends Notifier<SmartConnectState> {
         },
       );
     });
+    ref.listen(proxyCatalogProvider, (_, _) {
+      if (enabled) unawaited(refresh());
+    });
     return const SmartConnectState();
   }
 
@@ -91,9 +124,7 @@ class SmartConnectNotifier extends Notifier<SmartConnectState> {
   /// Also used before core start: a failed flag save cannot revive owned routes
   /// while the persisted user setting says the feature is disabled.
   Future<void> prepareForStart() async {
-    if (!enabled && repository is IntentSmartConnectRepository) {
-      await (repository as IntentSmartConnectRepository).reconcileDisabled();
-    } else if (!enabled &&
+    if (!enabled &&
         await ref.read(smartPolicyStoreProvider).hasManagedRuntime()) {
       await repository.disable();
     }
@@ -121,9 +152,6 @@ class SmartConnectNotifier extends Notifier<SmartConnectState> {
         await _events?.cancel();
         _events = null;
       } else {
-        if (repository is IntentSmartConnectRepository) {
-          await (repository as IntentSmartConnectRepository).enable();
-        }
         final snapshot = await repository.load();
         state = state.copyWith(snapshot: snapshot);
       }
@@ -301,8 +329,7 @@ class SmartConnectNotifier extends Notifier<SmartConnectState> {
     if (state.busy || state.evaluating) return;
     state = state.copyWith(busy: true, clearError: true);
     try {
-      if (state.bindings.containsKey(policyId) ||
-          repository is IntentSmartConnectRepository) {
+      if (state.bindings.containsKey(policyId)) {
         await repository.remove(policyId);
       }
       await ref.read(smartPoliciesProvider.notifier).removePolicy(policyId);

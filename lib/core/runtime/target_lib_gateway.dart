@@ -393,47 +393,71 @@ class TargetLibGateway
 
   @override
   Future<targetlib_pb.SmartConnectSnapshot> smartSnapshot() =>
-      _smartCall(() => _runtime.connection!.getSmartConnectSnapshot());
+      _smartCall(() => _requireRuntimeConnection().getSmartConnectSnapshot());
 
   @override
   Future<targetlib_pb.Operation> setSmartEnabled(
     targetlib_pb.SetSmartConnectEnabledRequest request,
-  ) => _smartCall(() => _runtime.connection!.setSmartConnectEnabled(request));
+  ) => _smartCall(
+    () => _requireRuntimeConnection().setSmartConnectEnabled(request),
+  );
   @override
   Future<targetlib_pb.Operation> upsertSmartPolicy(
     targetlib_pb.UpsertServicePolicyRequest request,
-  ) => _smartCall(() => _runtime.connection!.upsertServicePolicy(request));
+  ) => _smartCall(
+    () => _requireRuntimeConnection().upsertServicePolicy(request),
+  );
   @override
   Future<targetlib_pb.Operation> deleteSmartPolicy(
     targetlib_pb.DeleteServicePolicyRequest request,
-  ) => _smartCall(() => _runtime.connection!.deleteServicePolicy(request));
+  ) => _smartCall(
+    () => _requireRuntimeConnection().deleteServicePolicy(request),
+  );
   @override
   Future<targetlib_pb.Operation> setSmartPreference(
     targetlib_pb.SetNodePreferenceRequest request,
-  ) => _smartCall(() => _runtime.connection!.setNodePreference(request));
+  ) => _smartCall(() => _requireRuntimeConnection().setNodePreference(request));
   @override
   Future<targetlib_pb.Operation> requestSmartEvaluation(
     targetlib_pb.RequestServiceEvaluationRequest request,
-  ) => _smartCall(() => _runtime.connection!.requestServiceEvaluation(request));
+  ) => _smartCall(
+    () => _requireRuntimeConnection().requestServiceEvaluation(request),
+  );
   @override
   Future<targetlib_pb.Operation> approveSmartProposal(
     targetlib_pb.ProposalCommandRequest request,
-  ) => _smartCall(() => _runtime.connection!.approveSwitchProposal(request));
+  ) => _smartCall(
+    () => _requireRuntimeConnection().approveSwitchProposal(request),
+  );
   @override
   Future<targetlib_pb.Operation> rejectSmartProposal(
     targetlib_pb.ProposalCommandRequest request,
-  ) => _smartCall(() => _runtime.connection!.rejectSwitchProposal(request));
+  ) => _smartCall(
+    () => _requireRuntimeConnection().rejectSwitchProposal(request),
+  );
   @override
   Future<targetlib_pb.Operation> forceSmartBinding(
     targetlib_pb.ForceServiceBindingRequest request,
-  ) => _smartCall(() => _runtime.connection!.forceServiceBinding(request));
+  ) => _smartCall(
+    () => _requireRuntimeConnection().forceServiceBinding(request),
+  );
   @override
   Future<targetlib_pb.Operation> smartOperation(String id) =>
-      _smartCall(() => _runtime.connection!.getOperation(id));
+      _smartCall(() => _requireRuntimeConnection().getOperation(id));
   @override
   Stream<targetlib_pb.SmartConnectEvent> smartIntentEvents() async* {
     await _ensureConnected();
-    yield* _runtime.connection!.subscribeSmartConnectEvents();
+    yield* _requireRuntimeConnection().subscribeSmartConnectEvents();
+  }
+
+  targetlib_pb.TargetLibConnection _requireRuntimeConnection() {
+    final connection = _runtime.connection;
+    if (connection == null) {
+      throw const CoreUnavailableException(
+        'TargetLib command connection is not available.',
+      );
+    }
+    return connection;
   }
 
   RuntimeSubscription _runtimeSubscription(targetlib_pb.SubscriptionView view) {

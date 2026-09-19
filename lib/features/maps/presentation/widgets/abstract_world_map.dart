@@ -35,6 +35,7 @@ class _AbstractWorldMapState extends State<AbstractWorldMap> {
   late MapLatLngBounds? _autoBounds;
   late String _nodeSignature;
   late String _markerSignature;
+  var _updateGeneration = 0;
 
   @override
   void initState() {
@@ -63,6 +64,7 @@ class _AbstractWorldMapState extends State<AbstractWorldMap> {
     );
     final geographyChanged = nextSignature != _nodeSignature;
     final markersChanged = nextMarkerSignature != _markerSignature;
+    final generation = ++_updateGeneration;
     _markerSignature = nextMarkerSignature;
     if (!geographyChanged) {
       if (markersChanged) {
@@ -81,12 +83,23 @@ class _AbstractWorldMapState extends State<AbstractWorldMap> {
     _nodeSignature = nextSignature;
     _autoBounds = _boundsFor(widget.nodes);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _nodeSignature == nextSignature) _fitNodes();
+      if (!mounted || generation != _updateGeneration) return;
+      // The keyed map layer is replaced during the first frame. Wait one
+      // more frame before changing its zoom behavior so Syncfusion has
+      // finished disposing the previous layer's animation controller.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted &&
+            generation == _updateGeneration &&
+            _nodeSignature == nextSignature) {
+          _fitNodes();
+        }
+      });
     });
   }
 
   @override
   void dispose() {
+    _updateGeneration++;
     _mapController.dispose();
     super.dispose();
   }

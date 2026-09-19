@@ -8,6 +8,10 @@ import '../../../data/models/proxy_node.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../maps/application/proxy_country_map.dart';
 import '../../maps/presentation/widgets/abstract_world_map.dart';
+import '../../settings/application/settings_notifier.dart';
+import '../../smart_connect/application/smart_connect_notifier.dart';
+import '../../smart_connect/application/smart_policy_notifier.dart';
+import '../../smart_connect/domain/smart_connect_models.dart';
 import '../../subscriptions/application/subscriptions_notifier.dart';
 import '../application/proxies_notifier.dart';
 
@@ -40,6 +44,113 @@ class _NodePoolPageState extends ConsumerState<NodePoolPage> {
     }
   }
 
+  Future<void> _editSmartPreference(ProxyNode node) async {
+    final store = ref.read(smartPolicyStoreProvider);
+    final current =
+        (await store.nodePreferences())[node.id] ?? const SmartNodePreference();
+    var enabled = current.enabled;
+    var excluded = current.excluded;
+    var favorite = current.favorite;
+    final tags = TextEditingController(text: current.tags.join(', '));
+    final subscriptionId = node.metadata['subscriptionId'] as String? ?? '';
+    final priority = TextEditingController(
+      text: '${(await store.subscriptionPriorities())[subscriptionId] ?? 0}',
+    );
+    if (!mounted) {
+      tags.dispose();
+      priority.dispose();
+      return;
+    }
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Text(node.name.isEmpty ? node.id : node.name),
+          content: SizedBox(
+            width: 450,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SwitchListTile(
+                  title: const Text('Enabled for Smart Connect'),
+                  value: enabled,
+                  onChanged: (value) => setState(() => enabled = value),
+                ),
+                SwitchListTile(
+                  title: const Text('Exclude from Smart Connect'),
+                  value: excluded,
+                  onChanged: (value) => setState(() => excluded = value),
+                ),
+                SwitchListTile(
+                  title: const Text('Favorite'),
+                  value: favorite,
+                  onChanged: (value) => setState(() => favorite = value),
+                ),
+                TextField(
+                  controller: tags,
+                  decoration: const InputDecoration(
+                    labelText: 'Tags, comma separated',
+                  ),
+                ),
+                TextField(
+                  controller: priority,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Subscription priority (higher wins ties)',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (int.tryParse(priority.text) != null) {
+                  Navigator.pop(context, true);
+                }
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (saved == true && mounted) {
+      try {
+        await store.saveNodePreference(
+          node.id,
+          SmartNodePreference(
+            enabled: enabled,
+            excluded: excluded,
+            favorite: favorite,
+            tags: tags.text
+                .split(',')
+                .map((value) => value.trim())
+                .where((value) => value.isNotEmpty)
+                .toSet(),
+          ),
+        );
+        await store.saveSubscriptionPriority(
+          subscriptionId,
+          int.parse(priority.text),
+        );
+        await ref.read(smartConnectProvider.notifier).refresh();
+      } on Object catch (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(error.toString())));
+        }
+      }
+    }
+    tags.dispose();
+    priority.dispose();
+  }
+
   Color _latencyColor(BuildContext context, ProxyNode node) {
     final scheme = Theme.of(context).colorScheme;
     if (node.latencyTimedOut) return scheme.error;
@@ -57,6 +168,10 @@ class _NodePoolPageState extends ConsumerState<NodePoolPage> {
     final theme = Theme.of(context);
     final proxies = ref.watch(proxiesProvider);
     final subscriptions = ref.watch(subscriptionsProvider);
+    final smartEnabled = ref
+        .watch(settingsProvider)
+        .settings
+        .smartConnectEnabled;
     final notifier = ref.read(proxiesProvider.notifier);
     final enabled = subscriptions.subscriptions.where((sub) => sub.enabled);
     final names = {
@@ -261,11 +376,6 @@ class _NodePoolPageState extends ConsumerState<NodePoolPage> {
                       key: ValueKey('node-${node.id}'),
                       dense: true,
                       selected: node.isSelected,
-                      leading: Icon(
-                        node.isSelected
-                            ? Icons.radio_button_checked
-                            : Icons.radio_button_off,
-                      ),
                       title: Text(
                         node.name,
                         maxLines: 2,
@@ -286,6 +396,24 @@ class _NodePoolPageState extends ConsumerState<NodePoolPage> {
                               ? FontWeight.bold
                               : FontWeight.w600,
                         ),
+                      ),
+                      leading: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            node.isSelected
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_off,
+                          ),
+                          if (smartEnabled)
+                            IconButton(
+                              icon: const Icon(Icons.tune),
+                              tooltip: 'Smart Connect node preferences',
+                              onPressed: busy
+                                  ? null
+                                  : () => _editSmartPreference(node),
+                            ),
+                        ],
                       ),
                       enabled: node.isAvailable,
                       onTap: busy || !node.isAvailable

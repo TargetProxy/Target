@@ -1,13 +1,16 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../../core/theme/app_spacing.dart';
+import '../../../core/widgets/target_page_layout.dart';
 import '../../settings/application/settings_notifier.dart';
 import '../../subscriptions/application/subscriptions_notifier.dart';
 import '../application/smart_connect_notifier.dart';
 import '../application/smart_policy_notifier.dart';
-import '../data/smart_intent_repository.dart';
 import '../domain/smart_connect_models.dart';
+import '../domain/smart_runtime_models.dart';
 import 'smart_policy_editor.dart';
 
 class SmartConnectPage extends ConsumerStatefulWidget {
@@ -33,11 +36,6 @@ class _SmartConnectPageState extends ConsumerState<SmartConnectPage> {
     );
     if (result != null && mounted) {
       try {
-        final repository = ref.read(smartRepositoryProvider);
-        if (ref.read(settingsProvider).settings.smartConnectEnabled &&
-            repository is IntentSmartConnectRepository) {
-          await repository.syncPolicy(result);
-        }
         await ref.read(smartPoliciesProvider.notifier).savePolicy(result);
         await ref.read(smartConnectProvider.notifier).refresh();
       } on Object catch (error) {
@@ -199,107 +197,6 @@ class _SmartConnectPageState extends ConsumerState<SmartConnectPage> {
     await _edit(presets[service]);
   }
 
-  Future<void> _nodePreference(SmartNode node) async {
-    var enabled = node.enabled,
-        excluded = node.excluded,
-        favorite = node.favorite;
-    final tags = TextEditingController(text: node.tags.join(', '));
-    final priority = TextEditingController(
-      text: '${node.subscriptionPriority}',
-    );
-    final saved = await showDialog<bool>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: Text(node.name.isEmpty ? node.id : node.name),
-          content: SizedBox(
-            width: 450,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SwitchListTile(
-                  title: const Text('Enabled for Smart Connect'),
-                  value: enabled,
-                  onChanged: (v) => setState(() => enabled = v),
-                ),
-                SwitchListTile(
-                  title: const Text('Exclude from Smart Connect'),
-                  value: excluded,
-                  onChanged: (v) => setState(() => excluded = v),
-                ),
-                SwitchListTile(
-                  title: const Text('Favorite'),
-                  value: favorite,
-                  onChanged: (v) => setState(() => favorite = v),
-                ),
-                TextField(
-                  controller: tags,
-                  decoration: const InputDecoration(
-                    labelText: 'Tags, comma separated',
-                  ),
-                ),
-                TextField(
-                  controller: priority,
-                  decoration: const InputDecoration(
-                    labelText: 'Subscription priority (higher wins ties)',
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (int.tryParse(priority.text) != null) {
-                  Navigator.pop(context, true);
-                }
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (saved == true && mounted) {
-      try {
-        final preference = SmartNodePreference(
-          enabled: enabled,
-          excluded: excluded,
-          favorite: favorite,
-          tags: tags.text
-              .split(',')
-              .map((s) => s.trim())
-              .where((s) => s.isNotEmpty)
-              .toSet(),
-        );
-        final repository = ref.read(smartRepositoryProvider);
-        if (repository is IntentSmartConnectRepository) {
-          await repository.setPreference(
-            node,
-            preference,
-            int.parse(priority.text),
-          );
-        } else {
-          final store = ref.read(smartPolicyStoreProvider);
-          await store.saveNodePreference(node.id, preference);
-          await store.saveSubscriptionPriority(
-            node.subscriptionId,
-            int.parse(priority.text),
-          );
-        }
-        await ref.read(smartConnectProvider.notifier).refresh();
-      } on Object catch (e) {
-        if (mounted) _message(e.toString());
-      }
-    }
-    tags.dispose();
-    priority.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(smartConnectProvider);
@@ -309,286 +206,353 @@ class _SmartConnectPageState extends ConsumerState<SmartConnectPage> {
     final subscriptions = ref.watch(subscriptionsProvider).subscriptions;
     final names = {for (final s in subscriptions) s.id: s.name};
     final busy = state.busy || state.evaluating;
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Smart Connect · Experimental'),
-        actions: [
-          IconButton(
-            onPressed: enabled && !busy ? notifier.refresh : null,
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Refresh actual runtime',
-          ),
-          IconButton(
-            onPressed: () => _showText(
-              'Selection audit',
-              const JsonEncoder.withIndent('  ').convert(state.logs),
-            ),
-            icon: const Icon(Icons.receipt_long),
-            tooltip: 'Selection audit',
-          ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          SwitchListTile.adaptive(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Enable Smart Connect'),
-            subtitle: const Text(
-              'Optional service routing. Evaluate first, then explicitly apply a binding.',
-            ),
-            value: enabled,
-            onChanged: state.busy ? null : notifier.setEnabled,
-          ),
-          if (!enabled)
-            const Card(
-              child: Padding(
-                padding: EdgeInsets.all(16),
-                child: Text(
-                  'Smart Connect is off. Configure policies here; ordinary proxy selection remains available.',
-                ),
-              ),
-            ),
-          if (state.error != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: SelectableText(
-                state.error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              ),
-            ),
-          if (state.message.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(state.message),
-            ),
-          if (busy) const LinearProgressIndicator(),
-          if (state.evaluating)
-            TextButton.icon(
-              onPressed: notifier.cancel,
-              icon: const Icon(Icons.cancel_outlined),
-              label: Text('Cancel evaluation · ${state.activeService}'),
-            ),
-          Wrap(
-            spacing: 12,
-            runSpacing: 8,
+    return Align(
+      alignment: Alignment.topCenter,
+      child: SafeArea(
+        child: TargetPageLayout(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              FilledButton.icon(
-                onPressed: busy ? null : () => _edit(),
-                icon: const Icon(Icons.add),
-                label: const Text('Add service'),
+              const TargetPageHeader(
+                title: 'Smart Connect',
+                subtitle:
+                    'Route each service through the best available node in the shared pool.',
               ),
-              PopupMenuButton<String>(
-                onSelected: _template,
-                enabled: !busy,
-                itemBuilder: (_) => [
-                  for (final value in [
-                    'chatgpt',
-                    'disney',
-                    'youtube',
-                    'direct',
-                  ])
-                    PopupMenuItem(value: value, child: Text(value)),
+              const SizedBox(height: AppSpacing.sectionGap),
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Enable Smart Connect'),
+                subtitle: const Text(
+                  'Optional service routing. Evaluate first, then explicitly apply a binding.',
+                ),
+                value: enabled,
+                onChanged: state.busy ? null : notifier.setEnabled,
+              ),
+              if (!enabled)
+                const Card(
+                  child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text(
+                      'Smart Connect is off. Configure policies here; ordinary proxy selection remains available.',
+                    ),
+                  ),
+                ),
+              if (state.error != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: SelectableText(
+                    state.error!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ),
+              if (state.message.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(state.message),
+                ),
+              if (busy) const LinearProgressIndicator(),
+              _RuntimeSummary(snapshot: state.snapshot, enabled: enabled),
+              if (state.evaluating)
+                TextButton.icon(
+                  onPressed: notifier.cancel,
+                  icon: const Icon(Icons.cancel_outlined),
+                  label: Text('Cancel evaluation · ${state.activeService}'),
+                ),
+              Wrap(
+                spacing: 12,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  FilledButton.icon(
+                    onPressed: busy ? null : () => _edit(),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add service'),
+                  ),
+                  PopupMenuButton<String>(
+                    onSelected: _template,
+                    enabled: !busy,
+                    itemBuilder: (_) => [
+                      for (final value in [
+                        'chatgpt',
+                        'disney',
+                        'youtube',
+                        'direct',
+                      ])
+                        PopupMenuItem(value: value, child: Text(value)),
+                    ],
+                    child: const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: Text('Use template'),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: busy ? null : _import,
+                    child: const Text('Import policies'),
+                  ),
+                  TextButton(
+                    onPressed: _diagnostics,
+                    child: const Text('Export diagnostics'),
+                  ),
+                  TextButton(
+                    onPressed: policies.value == null
+                        ? null
+                        : () => _showText(
+                            'Export policies',
+                            const JsonEncoder.withIndent('  ').convert(
+                              policies.value!.map((p) => p.toJson()).toList(),
+                            ),
+                          ),
+                    child: const Text('Export policies'),
+                  ),
+                  IconButton(
+                    onPressed: enabled && !busy ? notifier.refresh : null,
+                    icon: const Icon(Icons.refresh),
+                    tooltip: 'Refresh actual runtime',
+                  ),
+                  IconButton(
+                    onPressed: () => _showText(
+                      'Selection audit',
+                      const JsonEncoder.withIndent('  ').convert(state.logs),
+                    ),
+                    icon: const Icon(Icons.receipt_long),
+                    tooltip: 'Selection audit',
+                  ),
                 ],
-                child: const Padding(
-                  padding: EdgeInsets.all(12),
-                  child: Text('Use template'),
+              ),
+              const SizedBox(height: 16),
+              policies.when(
+                loading: () => const LinearProgressIndicator(),
+                error: (error, _) => Text('Could not load policies: $error'),
+                data: (items) => Column(
+                  children: [
+                    if (items.isEmpty)
+                      const ListTile(
+                        title: Text('No service policies'),
+                        subtitle: Text('Add a service or choose a template.'),
+                      ),
+                    for (final policy in items)
+                      Builder(
+                        builder: (context) {
+                          final binding = state.bindings[policy.id];
+                          final assessment = state.assessments[policy.id];
+                          final stale =
+                              binding != null &&
+                              (binding.policyRevision != policy.revision ||
+                                  !binding.valid);
+                          final node = state.snapshot.nodes
+                              .where((n) => n.id == binding?.nodeId)
+                              .firstOrNull;
+                          return Card(
+                            child: ExpansionTile(
+                              key: ValueKey(policy.id),
+                              initiallyExpanded: _expanded.contains(policy.id),
+                              onExpansionChanged: (expanded) {
+                                if (expanded) {
+                                  _expanded.add(policy.id);
+                                } else {
+                                  _expanded.remove(policy.id);
+                                }
+                              },
+                              title: Text(
+                                policy.name.isEmpty ? policy.id : policy.name,
+                              ),
+                              subtitle: Text(
+                                binding == null
+                                    ? 'Unbound · ${policy.domains.join(", ")}'
+                                    : '${node?.name.isNotEmpty == true ? node!.name : binding.nodeId} · ${names[node?.subscriptionId] ?? node?.subscriptionId ?? "Direct"}\n${binding.effective ? "Effective" : "Not effective"}${stale ? " · Re-evaluation required" : ""}',
+                              ),
+                              childrenPadding: const EdgeInsets.all(16),
+                              expandedCrossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Allowed: ${policy.allowedRegions.isEmpty ? "Any" : policy.allowedRegions.join(", ")} · Preferred: ${policy.preferredRegions.join(", ")}',
+                                ),
+                                if (binding != null)
+                                  SelectableText(
+                                    'Score ${binding.score.toStringAsFixed(1)} · Selected ${binding.selectedAt.toLocal()} · Expires ${binding.expiresAt.toLocal()}\n${binding.reason}\n${binding.status}',
+                                  ),
+                                Wrap(
+                                  spacing: 8,
+                                  children: [
+                                    OutlinedButton(
+                                      onPressed:
+                                          enabled && !busy && policy.enabled
+                                          ? () => notifier.evaluate(policy)
+                                          : null,
+                                      child: const Text('Re-evaluate'),
+                                    ),
+                                    FilledButton(
+                                      onPressed:
+                                          enabled &&
+                                              !busy &&
+                                              assessment?.selection.succeeded ==
+                                                  true &&
+                                              policy.selectionMode !=
+                                                  SmartSelectionMode.manual
+                                          ? () => notifier.apply(policy.id)
+                                          : null,
+                                      child: const Text('Apply result'),
+                                    ),
+                                    TextButton(
+                                      onPressed: busy
+                                          ? null
+                                          : () => _edit(policy),
+                                      child: const Text('Edit'),
+                                    ),
+                                    TextButton(
+                                      onPressed: busy
+                                          ? null
+                                          : () => notifier.removePolicy(
+                                              policy.id,
+                                            ),
+                                      child: const Text('Remove'),
+                                    ),
+                                    if (binding != null)
+                                      TextButton(
+                                        onPressed: !enabled || busy
+                                            ? null
+                                            : () async {
+                                                try {
+                                                  final rows = await ref
+                                                      .read(
+                                                        smartRepositoryProvider,
+                                                      )
+                                                      .history(
+                                                        policy,
+                                                        binding.nodeId,
+                                                      );
+                                                  if (mounted) {
+                                                    await _showText(
+                                                      'Probe history',
+                                                      rows
+                                                          .map(
+                                                            (n) =>
+                                                                '${n.testedAt?.toLocal()} · ${n.latencyMs} ms · ${n.effectiveRegion} · ${n.failureReason.isEmpty ? "READY" : n.failureReason}',
+                                                          )
+                                                          .join('\n'),
+                                                    );
+                                                  }
+                                                } on Object catch (e) {
+                                                  if (mounted) {
+                                                    _message(e.toString());
+                                                  }
+                                                }
+                                              },
+                                        child: const Text('History'),
+                                      ),
+                                  ],
+                                ),
+                                if (assessment != null) ...[
+                                  Text(assessment.selection.reason),
+                                  for (final n in assessment.nodes)
+                                    ListTile(
+                                      dense: true,
+                                      title: Text(
+                                        n.name.isEmpty ? n.id : n.name,
+                                      ),
+                                      subtitle: Text(
+                                        '${names[n.subscriptionId] ?? n.subscriptionId} · ${n.effectiveRegion} · ${n.latencyMs ?? "—"} ms · ${n.testedAt?.toLocal() ?? "Untested"}\n${assessment.selection.excluded[n.id] ?? "Eligible · score ${assessment.selection.scores[n.id]?.toStringAsFixed(1)}"}',
+                                      ),
+                                      trailing:
+                                          assessment.selection.scores
+                                              .containsKey(n.id)
+                                          ? TextButton(
+                                              onPressed: enabled && !busy
+                                                  ? () => notifier.apply(
+                                                      policy.id,
+                                                      manualNodeId: n.id,
+                                                    )
+                                                  : null,
+                                              child: const Text('Use node'),
+                                            )
+                                          : null,
+                                    ),
+                                ],
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                  ],
                 ),
               ),
-              TextButton(
-                onPressed: busy ? null : _import,
-                child: const Text('Import policies'),
-              ),
-              TextButton(
-                onPressed: _diagnostics,
-                child: const Text('Export diagnostics'),
-              ),
-              TextButton(
-                onPressed: policies.value == null
-                    ? null
-                    : () => _showText(
-                        'Export policies',
-                        const JsonEncoder.withIndent('  ').convert(
-                          policies.value!.map((p) => p.toJson()).toList(),
-                        ),
-                      ),
-                child: const Text('Export policies'),
+              const SizedBox(height: 24),
+              OutlinedButton.icon(
+                onPressed: () => context.go('/nodes'),
+                icon: const Icon(Icons.public),
+                label: const Text('Manage nodes in Node Selection'),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          policies.when(
-            loading: () => const LinearProgressIndicator(),
-            error: (error, _) => Text('Could not load policies: $error'),
-            data: (items) => Column(
-              children: [
-                if (items.isEmpty)
-                  const ListTile(
-                    title: Text('No service policies'),
-                    subtitle: Text('Add a service or choose a template.'),
-                  ),
-                for (final policy in items)
-                  Builder(
-                    builder: (context) {
-                      final binding = state.bindings[policy.id];
-                      final assessment = state.assessments[policy.id];
-                      final stale =
-                          binding != null &&
-                          (binding.policyRevision != policy.revision ||
-                              !binding.valid);
-                      final node = state.snapshot.nodes
-                          .where((n) => n.id == binding?.nodeId)
-                          .firstOrNull;
-                      return Card(
-                        child: ExpansionTile(
-                          key: ValueKey(policy.id),
-                          initiallyExpanded: _expanded.contains(policy.id),
-                          onExpansionChanged: (expanded) {
-                            if (expanded) {
-                              _expanded.add(policy.id);
-                            } else {
-                              _expanded.remove(policy.id);
-                            }
-                          },
-                          title: Text(
-                            policy.name.isEmpty ? policy.id : policy.name,
-                          ),
-                          subtitle: Text(
-                            binding == null
-                                ? 'Unbound · ${policy.domains.join(", ")}'
-                                : '${node?.name.isNotEmpty == true ? node!.name : binding.nodeId} · ${names[node?.subscriptionId] ?? node?.subscriptionId ?? "Direct"}\n${binding.effective ? "Effective" : "Not effective"}${stale ? " · Re-evaluation required" : ""}',
-                          ),
-                          childrenPadding: const EdgeInsets.all(16),
-                          expandedCrossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Allowed: ${policy.allowedRegions.isEmpty ? "Any" : policy.allowedRegions.join(", ")} · Preferred: ${policy.preferredRegions.join(", ")}',
-                            ),
-                            if (binding != null)
-                              SelectableText(
-                                'Score ${binding.score.toStringAsFixed(1)} · Selected ${binding.selectedAt.toLocal()} · Expires ${binding.expiresAt.toLocal()}\n${binding.reason}\n${binding.status}',
-                              ),
-                            Wrap(
-                              spacing: 8,
-                              children: [
-                                OutlinedButton(
-                                  onPressed: enabled && !busy && policy.enabled
-                                      ? () => notifier.evaluate(policy)
-                                      : null,
-                                  child: const Text('Re-evaluate'),
-                                ),
-                                FilledButton(
-                                  onPressed:
-                                      enabled &&
-                                          !busy &&
-                                          assessment?.selection.succeeded ==
-                                              true &&
-                                          policy.selectionMode !=
-                                              SmartSelectionMode.manual
-                                      ? () => notifier.apply(policy.id)
-                                      : null,
-                                  child: const Text('Apply result'),
-                                ),
-                                TextButton(
-                                  onPressed: busy ? null : () => _edit(policy),
-                                  child: const Text('Edit'),
-                                ),
-                                TextButton(
-                                  onPressed: busy
-                                      ? null
-                                      : () => notifier.removePolicy(policy.id),
-                                  child: const Text('Remove'),
-                                ),
-                                if (binding != null)
-                                  TextButton(
-                                    onPressed: !enabled || busy
-                                        ? null
-                                        : () async {
-                                            try {
-                                              final rows = await ref
-                                                  .read(smartRepositoryProvider)
-                                                  .history(
-                                                    policy,
-                                                    binding.nodeId,
-                                                  );
-                                              if (mounted) {
-                                                await _showText(
-                                                  'Probe history',
-                                                  rows
-                                                      .map(
-                                                        (n) =>
-                                                            '${n.testedAt?.toLocal()} · ${n.latencyMs} ms · ${n.effectiveRegion} · ${n.failureReason.isEmpty ? "READY" : n.failureReason}',
-                                                      )
-                                                      .join('\n'),
-                                                );
-                                              }
-                                            } on Object catch (e) {
-                                              if (mounted) {
-                                                _message(e.toString());
-                                              }
-                                            }
-                                          },
-                                    child: const Text('History'),
-                                  ),
-                              ],
-                            ),
-                            if (assessment != null) ...[
-                              Text(assessment.selection.reason),
-                              for (final n in assessment.nodes)
-                                ListTile(
-                                  dense: true,
-                                  title: Text(n.name.isEmpty ? n.id : n.name),
-                                  subtitle: Text(
-                                    '${names[n.subscriptionId] ?? n.subscriptionId} · ${n.effectiveRegion} · ${n.latencyMs ?? "—"} ms · ${n.testedAt?.toLocal() ?? "Untested"}\n${assessment.selection.excluded[n.id] ?? "Eligible · score ${assessment.selection.scores[n.id]?.toStringAsFixed(1)}"}',
-                                  ),
-                                  trailing:
-                                      assessment.selection.scores.containsKey(
-                                        n.id,
-                                      )
-                                      ? TextButton(
-                                          onPressed: enabled && !busy
-                                              ? () => notifier.apply(
-                                                  policy.id,
-                                                  manualNodeId: n.id,
-                                                )
-                                              : null,
-                                          child: const Text('Use node'),
-                                        )
-                                      : null,
-                                ),
-                            ],
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-              ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RuntimeSummary extends StatelessWidget {
+  const _RuntimeSummary({required this.snapshot, required this.enabled});
+
+  final SmartRuntimeSnapshot snapshot;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final effective = snapshot.bindings.values.where((b) => b.effective).length;
+    final stale = snapshot.bindings.values
+        .where((b) => b.needsEvaluation || !b.valid)
+        .length;
+    final stateLabel = !enabled
+        ? 'Disabled'
+        : snapshot.running
+        ? 'Running'
+        : 'Ready';
+    final stateColor = !enabled
+        ? scheme.onSurfaceVariant
+        : snapshot.running
+        ? Colors.green.shade700
+        : scheme.primary;
+    Widget metric(String label, String value, IconData icon) => SizedBox(
+      width: 150,
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        dense: true,
+        leading: Icon(icon, color: stateColor),
+        title: Text(value, style: const TextStyle(fontWeight: FontWeight.w700)),
+        subtitle: Text(label),
+      ),
+    );
+    return Card(
+      margin: const EdgeInsets.only(top: 16),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+        child: Wrap(
+          spacing: 18,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Chip(
+              avatar: Icon(Icons.circle, size: 12, color: stateColor),
+              label: Text('Runtime · $stateLabel'),
             ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'Unified node pool · ${state.snapshot.nodes.length}',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          for (final node in state.snapshot.nodes)
-            ListTile(
-              title: Text(
-                '${node.favorite ? "★ " : ""}${node.name.isEmpty ? node.id : node.name}',
-              ),
-              subtitle: Text(
-                '${names[node.subscriptionId] ?? node.subscriptionId} · ${node.protocol} · ${node.region.isEmpty ? "Unknown region" : node.region} · ${!node.enabled
-                    ? "Disabled"
-                    : node.excluded
-                    ? "Excluded"
-                    : "Enabled"}\n${node.id}',
-              ),
-              trailing: IconButton(
-                icon: const Icon(Icons.tune),
-                tooltip: 'Smart Connect node preferences',
-                onPressed: busy ? null : () => _nodePreference(node),
-              ),
+            metric(
+              'Nodes in pool',
+              '${snapshot.nodes.length}',
+              Icons.hub_outlined,
             ),
-        ],
+            metric('Effective bindings', '$effective', Icons.route_outlined),
+            metric('Needs review', '$stale', Icons.warning_amber_outlined),
+            if (snapshot.revision.isNotEmpty)
+              Text(
+                'Revision ${snapshot.revision}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+          ],
+        ),
       ),
     );
   }
