@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/models/runtime_settings.dart';
-import '../../data/models/proxy_group.dart';
 import '../logging/app_logger.dart';
 import '../platform/app_platform.dart';
 import 'core_gateway.dart';
@@ -25,7 +24,6 @@ class CoreState {
     this.settings = const RuntimeSettings(),
     this.traffic = TrafficSnapshot.zero,
     this.connections = const [],
-    this.proxyGroups = const [],
     this.busy = false,
     this.available = false,
     this.backendName = 'TargetLib',
@@ -36,7 +34,6 @@ class CoreState {
   final RuntimeSettings settings;
   final TrafficSnapshot traffic;
   final List<CoreConnection> connections;
-  final List<ProxyGroup> proxyGroups;
   final bool busy;
   final bool available;
   final String backendName;
@@ -58,7 +55,6 @@ class CoreState {
     RuntimeSettings? settings,
     TrafficSnapshot? traffic,
     List<CoreConnection>? connections,
-    List<ProxyGroup>? proxyGroups,
     bool? busy,
     bool clearMessage = false,
   }) {
@@ -68,7 +64,6 @@ class CoreState {
       settings: settings ?? this.settings,
       traffic: traffic ?? this.traffic,
       connections: connections ?? this.connections,
-      proxyGroups: proxyGroups ?? this.proxyGroups,
       busy: busy ?? this.busy,
       available: available,
       backendName: backendName,
@@ -150,7 +145,6 @@ class CoreNotifier extends Notifier<CoreState> {
           message: error.toString(),
           traffic: snapshot.traffic,
           connections: snapshot.connections,
-          proxyGroups: snapshot.proxyGroups,
           settings: actual,
         );
       } on Object catch (refreshError, refreshStackTrace) {
@@ -256,7 +250,6 @@ class CoreNotifier extends Notifier<CoreState> {
         message: state.message,
         traffic: state.traffic,
         connections: state.connections,
-        proxyGroups: state.proxyGroups,
       ),
     );
   }
@@ -278,7 +271,6 @@ class CoreNotifier extends Notifier<CoreState> {
         message: snapshot.message,
         traffic: snapshot.traffic,
         connections: snapshot.connections,
-        proxyGroups: snapshot.proxyGroups,
         runtimeSettings: configurationRevision == _configurationRevision
             ? settings
             : null,
@@ -335,20 +327,17 @@ class CoreNotifier extends Notifier<CoreState> {
         message: error.toString(),
         traffic: state.traffic,
         connections: state.connections,
-        proxyGroups: state.proxyGroups,
       ),
     );
   }
 
   void _applySnapshot(CoreSnapshot snapshot) {
-    final runtimeSettings = snapshot.runtimeSettings;
     state = state.copyWith(
       lifecycle: snapshot.lifecycle,
       message: snapshot.message,
       traffic: snapshot.traffic,
       connections: snapshot.connections,
-      proxyGroups: snapshot.proxyGroups,
-      settings: runtimeSettings,
+      settings: snapshot.runtimeSettings,
     );
   }
 }

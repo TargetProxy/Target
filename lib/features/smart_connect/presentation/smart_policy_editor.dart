@@ -1,42 +1,34 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../subscriptions/application/subscriptions_notifier.dart';
 import '../domain/smart_connect_models.dart';
 
-class SmartPolicyEditor extends StatefulWidget {
+class SmartPolicyEditor extends ConsumerStatefulWidget {
   const SmartPolicyEditor({super.key, this.policy});
   final SmartPolicy? policy;
   @override
-  State<SmartPolicyEditor> createState() => _SmartPolicyEditorState();
+  ConsumerState<SmartPolicyEditor> createState() => _SmartPolicyEditorState();
 }
 
-class _SmartPolicyEditorState extends State<SmartPolicyEditor> {
+class _SmartPolicyEditorState extends ConsumerState<SmartPolicyEditor> {
   final _fields = <String, TextEditingController>{};
-  late SmartSelectionMode _mode;
-  late bool _enabled;
   String? _error;
+  late Set<String> _subscriptions;
+  late bool _enabled;
+  String t(String en, String zh) =>
+      Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
   @override
   void initState() {
     super.initState();
     final p = widget.policy ?? const SmartPolicy(id: '');
-    _mode = p.selectionMode;
+    _subscriptions = {...p.allowedSubscriptions};
     _enabled = p.enabled;
     final values = {
-      'id': p.id,
       'name': p.name,
       'domains': p.domains.join(', '),
       'regions': p.allowedRegions.join(', '),
       'preferred': p.preferredRegions.join(', '),
-      'subscriptions': p.allowedSubscriptions.join(', '),
-      'excluded': p.excludedNodes.join(', '),
-      'tags': p.requiredTags.join(', '),
-      'sticky': '${p.stickyDuration.inMinutes}',
-      'validity': '${p.probeValidity.inSeconds}',
-      'urls': p.probeTargets.map((t) => t.url).join('\n'),
-      'egress': p.probeTargets.firstOrNull?.egressUrl ?? '',
-      'status': (p.probeTargets.firstOrNull?.expectedStatus ?? {200}).join(
-        ', ',
-      ),
-      'content': p.probeTargets.firstOrNull?.bodyContains ?? '',
-      'countryHeader': p.probeTargets.firstOrNull?.serviceCountryHeader ?? '',
+      'probe': p.probeTargets.firstOrNull?.url ?? '',
     };
     for (final entry in values.entries) {
       _fields[entry.key] = TextEditingController(text: entry.value);
@@ -60,66 +52,50 @@ class _SmartPolicyEditorState extends State<SmartPolicyEditor> {
       controller: _fields[key],
       minLines: lines,
       maxLines: lines == 1 ? 1 : 6,
-      readOnly: key == 'id' && widget.policy != null,
       decoration: InputDecoration(labelText: label),
     ),
   );
   void save() {
     try {
-      final statuses = values('status').map(int.parse).toSet();
-      final targets = [
-        for (final url in value(
-          'urls',
-        ).split('\n').map((s) => s.trim()).where((s) => s.isNotEmpty))
-          // Preserve per-target advanced values when editing existing URLs.
-          widget.policy?.probeTargets.where((t) => t.url == url).firstOrNull !=
-                      null &&
-                  value('egress') ==
-                      (widget.policy?.probeTargets.firstOrNull?.egressUrl ??
-                          '') &&
-                  value('content') ==
-                      (widget.policy?.probeTargets.firstOrNull?.bodyContains ??
-                          '') &&
-                  value('status') ==
-                      (widget
-                                  .policy
-                                  ?.probeTargets
-                                  .firstOrNull
-                                  ?.expectedStatus ??
-                              {200})
-                          .join(', ') &&
-                  value('countryHeader') ==
-                      (widget
-                              .policy
-                              ?.probeTargets
-                              .firstOrNull
-                              ?.serviceCountryHeader ??
-                          '')
-              ? widget.policy!.probeTargets.firstWhere((t) => t.url == url)
-              : SmartProbeTarget(
-                  url: url,
-                  expectedStatus: statuses,
-                  egressUrl: value('egress'),
-                  bodyContains: value('content'),
-                  serviceCountryHeader: value('countryHeader'),
-                ),
-      ];
+      final domain = values('domains').firstOrNull;
+      final id =
+          widget.policy?.id ?? 'group-${DateTime.now().microsecondsSinceEpoch}';
+      final existingDirect =
+          widget.policy?.selectionMode == SmartSelectionMode.direct;
+      final probe = value('probe').isEmpty && domain != null && !existingDirect
+          ? 'https://$domain/'
+          : value('probe');
+      final previousProbe = widget.policy?.probeTargets.firstOrNull;
+      final targets = probe.isEmpty
+          ? const <SmartProbeTarget>[]
+          : [
+              SmartProbeTarget(
+                url: probe,
+                expectedStatus: previousProbe?.expectedStatus ?? const {200},
+                bodyContains: previousProbe?.bodyContains ?? '',
+                egressUrl: previousProbe?.egressUrl ?? '',
+                serviceCountryHeader: previousProbe?.serviceCountryHeader ?? '',
+              ),
+              ...?widget.policy?.probeTargets.skip(1),
+            ];
       final p = SmartPolicy(
-        id: value('id'),
-        name: value('name'),
+        id: id,
+        name: value('name').isEmpty ? id : value('name'),
         domains: values('domains').map((d) => d.toLowerCase()).toSet(),
         allowedRegions: values('regions').map((r) => r.toUpperCase()).toSet(),
         preferredRegions: values(
           'preferred',
         ).map((r) => r.toUpperCase()).toSet(),
-        allowedSubscriptions: values('subscriptions'),
-        excludedNodes: values('excluded'),
-        requiredTags: values('tags'),
         probeTargets: targets,
-        selectionMode: _mode,
+        selectionMode:
+            widget.policy?.selectionMode ?? SmartSelectionMode.followDefault,
+        allowedSubscriptions: _subscriptions,
+        excludedNodes: widget.policy?.excludedNodes ?? const {},
+        stickyDuration:
+            widget.policy?.stickyDuration ?? const Duration(minutes: 30),
+        probeValidity:
+            widget.policy?.probeValidity ?? const Duration(minutes: 5),
         enabled: _enabled,
-        stickyDuration: Duration(minutes: int.parse(value('sticky'))),
-        probeValidity: Duration(seconds: int.parse(value('validity'))),
       );
       final errors = p.validate();
       if (errors.isNotEmpty) throw FormatException(errors.join('\n'));
@@ -132,7 +108,9 @@ class _SmartPolicyEditorState extends State<SmartPolicyEditor> {
   @override
   Widget build(BuildContext context) => AlertDialog(
     title: Text(
-      widget.policy == null ? 'Add service policy' : 'Edit service policy',
+      widget.policy == null
+          ? t('Add group', '添加分组')
+          : t('Rules & candidate constraints', '匹配规则与候选约束'),
     ),
     content: SizedBox(
       width: 620,
@@ -140,50 +118,77 @@ class _SmartPolicyEditorState extends State<SmartPolicyEditor> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            field('id', 'Stable service ID'),
-            field('name', 'Service name'),
-            field('domains', 'Domain suffixes (comma separated)'),
-            DropdownButtonFormField<SmartSelectionMode>(
-              initialValue: _mode,
-              decoration: const InputDecoration(labelText: 'Selection mode'),
-              items: [
-                for (final mode in SmartSelectionMode.values)
-                  DropdownMenuItem(value: mode, child: Text(mode.name)),
-              ],
-              onChanged: (mode) => setState(() => _mode = mode!),
+            field('name', t('Group name', '分组名称')),
+            field(
+              'domains',
+              t('Domains, separated by commas', '域名，以逗号分隔'),
+              lines: 2,
             ),
+            Text(
+              t(
+                'Includes subdomains. More specific domains match first.',
+                '包含子域名；更具体的域名优先匹配。',
+              ),
+            ),
+            if (widget.policy == null)
+              Text(
+                t(
+                  'New groups follow Default. Choose an independent route after creating the group.',
+                  '新分组跟随默认，创建后可选择独立出口。',
+                ),
+              ),
             SwitchListTile(
-              title: const Text('Allow evaluation for this policy'),
+              title: Text(t('Enable independent routing', '启用此分组独立选路')),
+              subtitle: Text(
+                t(
+                  'When disabled, traffic follows base routing rules.',
+                  '关闭后流量沿用基础路由规则。',
+                ),
+              ),
               value: _enabled,
-              onChanged: (v) => setState(() => _enabled = v),
+              onChanged: (value) => setState(() => _enabled = value),
             ),
-            field('regions', 'Allowed regions, e.g. SG, JP, US (empty = any)'),
-            field('preferred', 'Preferred regions'),
-            field('subscriptions', 'Allowed subscription IDs (empty = all)'),
-            field('excluded', 'Excluded node IDs'),
-            field('tags', 'Required node tags'),
-            field('sticky', 'Binding duration (minutes)'),
-            field('validity', 'Probe validity (seconds)'),
-            if (_mode != SmartSelectionMode.direct) ...[
-              field(
-                'urls',
-                'Service probe URLs (one per line, all must pass)',
-                lines: 3,
+            ExpansionTile(
+              title: Text(
+                t('Candidate constraints & service probe', '候选约束与服务检测'),
               ),
-              field('status', 'Expected HTTP status codes'),
-              field('content', 'Required response text (optional)'),
-              field(
-                'egress',
-                'Exit region JSON URL (optional, returns ip and country)',
-              ),
-              field(
-                'countryHeader',
-                'Service country response header (optional)',
-              ),
-              const Text(
-                'An HTTP response alone does not prove regional unlock. Configure response content or a service country header when required.',
-              ),
-            ],
+              children: [
+                field(
+                  'regions',
+                  t(
+                    'Allowed country codes (empty = any)',
+                    '允许的国家代码（留空不限，如 US, JP）',
+                  ),
+                ),
+                field('preferred', t('Preferred country codes', '偏好的国家代码')),
+                Text(
+                  t(
+                    'Allowed subscriptions · none selected means all',
+                    '允许的订阅 · 不勾选表示全部',
+                  ),
+                ),
+                for (final subscription
+                    in ref.watch(subscriptionsProvider).subscriptions)
+                  CheckboxListTile(
+                    title: Text(subscription.name),
+                    value: _subscriptions.contains(subscription.id),
+                    onChanged: (value) => setState(() {
+                      if (value == true) {
+                        _subscriptions.add(subscription.id);
+                      } else {
+                        _subscriptions.remove(subscription.id);
+                      }
+                    }),
+                  ),
+                field(
+                  'probe',
+                  t(
+                    'Probe URL (defaults to the first domain)',
+                    '检测 URL（默认使用第一个域名）',
+                  ),
+                ),
+              ],
+            ),
             if (_error != null)
               Text(
                 _error!,
@@ -196,9 +201,16 @@ class _SmartPolicyEditorState extends State<SmartPolicyEditor> {
     actions: [
       TextButton(
         onPressed: () => Navigator.pop(context),
-        child: const Text('Cancel'),
+        child: Text(t('Cancel', '取消')),
       ),
-      FilledButton(onPressed: save, child: const Text('Save policy')),
+      FilledButton(
+        onPressed: save,
+        child: Text(
+          widget.policy == null
+              ? t('Create group', '创建分组')
+              : t('Update draft', '更新草稿'),
+        ),
+      ),
     ],
   );
 }

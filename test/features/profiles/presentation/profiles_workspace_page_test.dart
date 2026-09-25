@@ -9,8 +9,6 @@ import 'package:target/core/theme/app_theme.dart';
 import 'package:target/app/shell/app_shell.dart';
 import 'package:target/core/runtime/core_notifier.dart';
 import 'package:target/core/runtime/subscription_gateway.dart';
-import 'package:target/data/models/proxy_group.dart';
-import 'package:target/data/models/proxy_node.dart';
 import 'package:target/data/models/runtime_settings.dart';
 import 'package:target/features/maps/presentation/widgets/abstract_world_map.dart';
 import 'package:target/features/profiles/presentation/profiles_workspace_page.dart';
@@ -185,14 +183,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(container.read(proxiesProvider).groups, isEmpty);
     expect(find.text('0 subscriptions enabled · 0 nodes'), findsOneWidget);
-    gateway.runtimeChanges.add(
-      CoreSnapshot(proxyGroups: gateway.subscriptions.first.profile.groups),
-    );
+    gateway.runtimeChanges.add(const CoreSnapshot());
     await tester.pumpAndSettle();
     expect(container.read(proxiesProvider).groups, isEmpty);
   });
 
-  testWidgets('map filters the shared pool before explicit node selection', (
+  testWidgets('node library filters the shared pool without changing a route', (
     tester,
   ) async {
     final container = await mount(
@@ -222,11 +218,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       container.read(proxiesProvider).selectedGroup?.selectedNodeId,
-      'jp-1',
+      isNull,
     );
     expect(
       tester.widget<ListTile>(find.byKey(const ValueKey('node-jp-1'))).selected,
-      isTrue,
+      isFalse,
     );
 
     await tester.ensureVisible(find.byKey(const ValueKey('source-primary')));
@@ -236,7 +232,7 @@ void main() {
     expect(map.nodes.single.countryCode, 'SG');
     expect(
       container.read(proxiesProvider).selectedGroup?.selectedNodeId,
-      'jp-1',
+      isNull,
     );
     await tester.enterText(find.byType(TextField), 'no-match');
     await tester.pumpAndSettle();
@@ -248,7 +244,7 @@ void main() {
     expect(map.nodes, hasLength(2));
     expect(
       container.read(proxiesProvider).selectedGroup?.selectedNodeId,
-      'jp-1',
+      isNull,
     );
   });
 
@@ -295,8 +291,7 @@ void main() {
   }
 }
 
-class _ProfilesGateway extends UnavailableCoreGateway
-    implements SubscriptionGateway {
+class _ProfilesGateway extends UnavailableCoreGateway {
   final _subscriptionChanges = StreamController<void>.broadcast(sync: true);
   final runtimeChanges = StreamController<CoreSnapshot>.broadcast(sync: true);
   final enabled = {'primary': true, 'backup': true};
@@ -316,26 +311,8 @@ class _ProfilesGateway extends UnavailableCoreGateway
   Future<CoreSnapshot> current() async => const CoreSnapshot();
 
   List<RuntimeSubscription> get subscriptions => [
-    _subscription(
-      id: 'primary',
-      name: 'Primary',
-      node: const ProxyNode(
-        id: 'sg-1',
-        name: 'Singapore',
-        type: 'vmess',
-        countryCode: 'SG',
-      ),
-    ),
-    _subscription(
-      id: 'backup',
-      name: 'Backup',
-      node: const ProxyNode(
-        id: 'jp-1',
-        name: 'Tokyo',
-        type: 'vmess',
-        countryCode: 'JP',
-      ),
-    ),
+    _subscription(id: 'primary', name: 'Primary'),
+    _subscription(id: 'backup', name: 'Backup'),
   ];
 
   @override
@@ -346,14 +323,13 @@ class _ProfilesGateway extends UnavailableCoreGateway
   Future<targetlib.NodePool> getNodePool() async => targetlib.NodePool(
     nodes: [
       for (final sub in subscriptions.where((sub) => sub.enabled))
-        for (final node in sub.profile.nodes)
-          targetlib.ProfileNode(
-            tag: node.id,
-            name: node.name,
-            type: node.type,
-            countryCode: node.countryCode,
-            subscriptionId: sub.id,
-          ),
+        targetlib.ProfileNode(
+          tag: sub.id == 'primary' ? 'sg-1' : 'jp-1',
+          name: sub.id == 'primary' ? 'Singapore' : 'Tokyo',
+          type: 'vmess',
+          countryCode: sub.id == 'primary' ? 'SG' : 'JP',
+          subscriptionId: sub.id,
+        ),
     ],
   );
 
@@ -373,7 +349,6 @@ class _ProfilesGateway extends UnavailableCoreGateway
   RuntimeSubscription _subscription({
     required String id,
     required String name,
-    required ProxyNode node,
   }) => RuntimeSubscription(
     id: id,
     name: name,
@@ -382,17 +357,7 @@ class _ProfilesGateway extends UnavailableCoreGateway
     autoUpdate: false,
     updateIntervalSeconds: 86400,
     status: RuntimeSubscriptionStatus.ready,
-    profile: RuntimeProfile(
-      nodes: [node],
-      groups: [
-        ProxyGroup(
-          id: ProxyGroup.runtimeSelectorGroupId,
-          name: 'proxy',
-          type: 'selector',
-          nodes: [node],
-        ),
-      ],
-    ),
+    nodeCount: 1,
   );
 
   @override

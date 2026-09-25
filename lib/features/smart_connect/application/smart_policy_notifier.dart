@@ -35,8 +35,8 @@ class SmartPolicyNotifier extends AsyncNotifier<List<SmartPolicy>> {
             .toSet()
             .intersection(policy.domains.map((d) => d.toLowerCase()).toSet())
             .isNotEmpty) {
-          throw const FormatException(
-            'A domain is already owned by another enabled service',
+          throw FormatException(
+            'Domain conflicts with ${other.name.isEmpty ? other.id : other.name}',
           );
         }
       }

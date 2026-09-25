@@ -2,20 +2,22 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../domain/smart_connect_models.dart';
 
-/// Separate keys ensure ordinary proxy settings never change with feature data.
+/// Local persistence for the editable policy documents and the selection audit.
+///
+/// Node preferences and subscription priorities are not here: the core owns
+/// those, so a second copy would need reconciling.
 class SmartPolicyStore {
   SmartPolicyStore({this.key = 'smart_connect.policies'});
   final String key;
 
-  Future<bool> hasManagedRuntime() async =>
-      (await SharedPreferences.getInstance()).getBool('$key.runtime_owned') ??
-      false;
-  Future<void> markManagedRuntime() async {
-    if (!await (await SharedPreferences.getInstance()).setBool(
-      '$key.runtime_owned',
-      true,
+  Future<void> ensureDefaultPolicies() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.containsKey(key)) return;
+    if (!await prefs.setString(
+      key,
+      jsonEncode([for (final policy in defaultSmartPolicies) policy.toJson()]),
     )) {
-      throw StateError('Could not persist Smart Connect runtime ownership');
+      throw StateError('Could not initialize Smart Connect policies');
     }
   }
 
@@ -40,50 +42,6 @@ class SmartPolicyStore {
       jsonEncode([for (final p in policies) p.toJson()]),
     )) {
       throw StateError('Could not save Smart Connect policies');
-    }
-  }
-
-  Future<Map<String, SmartNodePreference>> nodePreferences() async {
-    final prefs = await SharedPreferences.getInstance();
-    final json =
-        jsonDecode(prefs.getString('$key.nodes') ?? '{}')
-            as Map<String, dynamic>;
-    return json.map(
-      (key, value) => MapEntry(
-        key,
-        SmartNodePreference.fromJson(Map<String, dynamic>.from(value as Map)),
-      ),
-    );
-  }
-
-  Future<void> saveNodePreference(
-    String id,
-    SmartNodePreference preference,
-  ) async {
-    final nodes = await nodePreferences();
-    nodes[id] = preference;
-    final prefs = await SharedPreferences.getInstance();
-    if (!await prefs.setString(
-      '$key.nodes',
-      jsonEncode(nodes.map((k, v) => MapEntry(k, v.toJson()))),
-    )) {
-      throw StateError('Could not save node preference');
-    }
-  }
-
-  Future<Map<String, int>> subscriptionPriorities() async {
-    final prefs = await SharedPreferences.getInstance();
-    return (jsonDecode(prefs.getString('$key.priorities') ?? '{}')
-            as Map<String, dynamic>)
-        .cast<String, int>();
-  }
-
-  Future<void> saveSubscriptionPriority(String id, int priority) async {
-    final priorities = await subscriptionPriorities();
-    priorities[id] = priority;
-    final prefs = await SharedPreferences.getInstance();
-    if (!await prefs.setString('$key.priorities', jsonEncode(priorities))) {
-      throw StateError('Could not save subscription priority');
     }
   }
 

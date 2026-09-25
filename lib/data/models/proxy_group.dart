@@ -25,25 +25,24 @@ class ProxyGroup {
 
   ProxyNode? get selectedNode {
     if (selectedNodeId == null) return null;
-    try {
-      return nodes.firstWhere((n) => n.id == selectedNodeId);
-    } catch (_) {
-      return null;
+    for (final node in nodes) {
+      if (node.id == selectedNodeId) return node;
     }
+    return null;
   }
 
   ProxyGroup copyWith({
-    String? id,
     String? name,
     String? type,
     String? selectedNodeId,
+    bool clearSelection = false,
     List<ProxyNode>? nodes,
   }) {
     return ProxyGroup(
-      id: id ?? this.id,
+      id: id,
       name: name ?? this.name,
       type: type ?? this.type,
-      selectedNodeId: selectedNodeId ?? this.selectedNodeId,
+      selectedNodeId: clearSelection ? null : selectedNodeId ?? this.selectedNodeId,
       nodes: nodes ?? this.nodes,
     );
   }

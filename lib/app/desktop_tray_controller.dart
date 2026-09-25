@@ -8,15 +8,11 @@ import '../core/logging/app_logger.dart';
 import '../core/runtime/core_notifier.dart';
 import 'app_identity.dart';
 
-class DesktopTrayController with tray.TrayListener, window.WindowListener {
+class DesktopTrayController with window.WindowListener {
   DesktopTrayController({
     required this.onToggleConnection,
     required this.onExit,
   });
-
-  static const _showWindowKey = 'show_window';
-  static const _toggleConnectionKey = 'toggle_connection';
-  static const _exitKey = 'exit';
 
   final Future<void> Function() onToggleConnection;
   final Future<void> Function() onExit;
@@ -27,25 +23,36 @@ class DesktopTrayController with tray.TrayListener, window.WindowListener {
   bool _busy = false;
   bool _available = false;
   bool? _windowVisible;
+  tray.TrayIcon? _trayIcon;
 
   Future<void> initialize(CoreState core) async {
     if (_initialized) return;
 
-    tray.trayManager.addListener(this);
     window.windowManager.addListener(this);
     try {
       await window.windowManager.ensureInitialized();
       await window.windowManager.setPreventClose(true);
-      await tray.trayManager.setIcon(
+      final trayIcon = tray.TrayIcon.create();
+      if (trayIcon == null) throw StateError('Unable to create tray icon');
+      final icon = tray.ImageAsset.fromAsset(
         Platform.isWindows
             ? 'windows/runner/resources/app_icon.ico'
             : 'assets/TargetAppIcon.png',
       );
-      await tray.trayManager.setToolTip(AppIdentity.displayName);
+      if (icon == null) throw StateError('Unable to load tray icon image');
+      trayIcon.icon = icon;
+      trayIcon.setTooltip(AppIdentity.displayName);
+      trayIcon.setContextMenuTrigger(tray.ContextMenuTrigger.rightClicked);
+      trayIcon.addListener((event) {
+        if (event is tray.TrayIconClickedEvent) unawaited(_showWindow());
+      });
+      trayIcon.setVisible(true);
+      _trayIcon = trayIcon;
       _initialized = true;
       await updateCoreState(core, force: true);
     } on Object catch (error, stackTrace) {
-      tray.trayManager.removeListener(this);
+      _trayIcon?.dispose();
+      _trayIcon = null;
       window.windowManager.removeListener(this);
       AppLogger.warning(
         'Desktop tray initialization failed',
@@ -70,7 +77,8 @@ class DesktopTrayController with tray.TrayListener, window.WindowListener {
   }
 
   void dispose() {
-    tray.trayManager.removeListener(this);
+    _trayIcon?.dispose();
+    _trayIcon = null;
     window.windowManager.removeListener(this);
   }
 
@@ -81,44 +89,43 @@ class DesktopTrayController with tray.TrayListener, window.WindowListener {
     }
   }
 
-  @override
-  void onTrayIconMouseDown() {
-    unawaited(_showWindow());
-  }
-
-  @override
-  void onTrayIconRightMouseDown() {
-    if (Platform.isWindows) {
-      unawaited(tray.trayManager.popUpContextMenu());
-    }
-  }
-
   Future<void> _updateMenu() async {
     final visible = await _isWindowVisible();
-    final menu = tray.Menu(
-      items: [
-        tray.MenuItem(
-          key: _showWindowKey,
-          label: visible
-              ? 'Hide ${AppIdentity.displayName}'
-              : 'Show ${AppIdentity.displayName}',
-          onClick: (_) => unawaited(visible ? _hideWindow() : _showWindow()),
-        ),
-        tray.MenuItem(
-          key: _toggleConnectionKey,
-          label: _running ? 'Disconnect' : 'Connect',
-          disabled: _busy || !_available,
-          onClick: (_) => unawaited(_toggleConnection()),
-        ),
-        tray.MenuItem.separator(),
-        tray.MenuItem(
-          key: _exitKey,
-          label: 'Exit',
-          onClick: (_) => unawaited(_exit()),
-        ),
-      ],
+    final menu = tray.Menu.create();
+    if (menu == null || _trayIcon == null) return;
+
+    final showItem = tray.MenuItem.createWithLabelAndType(
+      visible
+          ? 'Hide ${AppIdentity.displayName}'
+          : 'Show ${AppIdentity.displayName}',
+      tray.MenuItemType.normal,
     );
-    await tray.trayManager.setContextMenu(menu);
+    final toggleItem = tray.MenuItem.createWithLabelAndType(
+      _running ? 'Disconnect' : 'Connect',
+      tray.MenuItemType.normal,
+    );
+    final exitItem = tray.MenuItem.createWithLabelAndType(
+      'Exit',
+      tray.MenuItemType.normal,
+    );
+    if (showItem == null || toggleItem == null || exitItem == null) return;
+    toggleItem.isEnabled = !_busy && _available;
+    showItem.addListener((event) {
+      if (event is tray.MenuItemClickedEvent) {
+        unawaited(visible ? _hideWindow() : _showWindow());
+      }
+    });
+    toggleItem.addListener((event) {
+      if (event is tray.MenuItemClickedEvent) unawaited(_toggleConnection());
+    });
+    exitItem.addListener((event) {
+      if (event is tray.MenuItemClickedEvent) unawaited(_exit());
+    });
+    menu.addItem(showItem);
+    menu.addItem(toggleItem);
+    menu.addSeparator();
+    menu.addItem(exitItem);
+    _trayIcon!.setContextMenu(menu);
   }
 
   Future<void> _toggleConnection() async {
@@ -153,7 +160,8 @@ class DesktopTrayController with tray.TrayListener, window.WindowListener {
     try {
       await onExit();
       await window.windowManager.setPreventClose(false);
-      await tray.trayManager.destroy();
+      _trayIcon?.dispose();
+      _trayIcon = null;
       await window.windowManager.destroy();
     } on Object catch (error, stackTrace) {
       _exiting = false;

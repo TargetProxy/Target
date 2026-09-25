@@ -1,8 +1,23 @@
 # Smart Connect 实验框架交付说明
 
+## 2026-09-24：收敛到 intent 单一路径
+
+删除 Dart 侧的旧运行模型路径和本地评分：`TargetSmartConnectRepository`、`selectSmartNode`、
+`smartCandidateExclusion`、`policyForDomain` 及仅供它们使用的 `SmartNode` 质量字段
+（`probePassed`/`successRate`/`packetLoss`/`policyRevision`/`expiresAt`/`serviceRegion`）。
+`SmartConnectRepository` 保留为测试替身用的接缝，唯一实现是 `IntentSmartConnectRepository`。
+`SmartRuntimeGateway` 收窄到 `smartCapabilities`/`smartConfig`，探测、事件、质量历史和
+`updateSmartModel` 一并移除。
+
+同时删除已被焊死为 true 的总开关残留：`AppSettings.smartConnectEnabled`、`SettingsNotifier`
+里的强制覆写、`SmartConnectNotifier.setEnabled`/`enabled`/`initialize`/`prepareForStart`、
+两个 repository 的 `disable()`、`SmartPolicyStore` 的运行配置所有权标记，以及
+`node_pool_page.dart` 中永远为真的判断。Smart Connect 现在是应用唯一的服务路由路径，
+不再有"关闭后回到普通模式"的语义。
+
 ## 2026-09-19：TargetLib intent API 接入
 
-实际依赖的 `../TargetLib` 支持 `smart_connect_intent_api` 时，Target 现在通过核心持久化服务策略和节点偏好，请求评估并审批 proposal（或显式 Force Direct/节点），等待持久化 operation 的最终状态，再读取核心的实际绑定。该路径不再由 Dart 拼装运行模型或决定最终评分；旧 repository 仅保留给不实现 intent gateway 的测试/兼容实现。核心评估会在质量缺失/过期时进行指定节点探测，多个目标必须全部通过；Direct 不依赖探测。首选地区是评分偏好，硬性地区/订阅及节点排除在核心检查。
+实际依赖的 `../TargetLib` 支持 `smart_connect_intent_api` 时，Target 现在通过核心持久化服务策略和节点偏好，请求评估并审批 proposal（或显式 Force Direct/节点），等待持久化 operation 的最终状态，再读取核心的实际绑定。该路径不再由 Dart 拼装运行模型或决定最终评分。核心评估会在质量缺失/过期时进行指定节点探测，多个目标必须全部通过；Direct 不依赖探测。首选地区是评分偏好，硬性地区/订阅及节点排除在核心检查。
 
 部署时必须用这份 `../TargetLib` 源码重新构建并安装服务；仅重建 Flutter UI 不会替换系统服务。当前 intent 契约没有取消正在运行的评估的 RPC，UI 取消只放弃本次结果并在提案出现后拒绝它。核心也没有“必需节点标签”策略字段：配置此限制时应用明确拒绝同步，不会绕过。离线编辑的本地策略会在下次评估时同步到核心；策略导入仍是本地操作，需逐项评估或编辑后同步。真实机场和目标服务的地区解锁尚未做端到端验收。
 
@@ -13,14 +28,14 @@
 ## 使用流程
 
 1. 在现有订阅页面添加并启用订阅。
-2. 打开 Smart Connect，启用实验功能。默认关闭；开启只查询能力与运行状态，不自动切换出口。
+2. 打开 Smart Connect。功能常开，没有总开关；打开页面只查询能力与运行状态，不自动切换出口。
 3. 添加自定义服务，或编辑 ChatGPT / Disney+ / YouTube / Direct 模板。配置域名、地区、订阅、排除节点、标签和探测目标。
 4. 点击“Re-evaluate”。每个候选节点的所有服务目标都必须通过；评估不会改变当前绑定。
 5. 查看分数、地区、最近测试时间和排除原因；点击“Apply result”或“Use node”才提交服务路由。Manual 策略必须明确选择节点。
 6. 查看核心返回的 Effective / Not effective 状态。配置已保存不等于运行中，也不等于服务健康。
-7. 关闭总开关后，删除 Target Smart Connect 自己的运行 selector、路由和绑定，保留普通 proxy 选择、基础配置、外部服务模型及本地策略、偏好与审计。重新开启后需要明确评估和应用。
+7. 要撤销某个服务的路由，使用该服务的 Remove；核心删除对应 selector、路由和绑定，本地策略、偏好与审计保留。
 
-`Allow evaluation for this policy` 控制后续评估资格；编辑策略会令现有绑定待评估，不会后台更换出口。要撤销现有服务路由，使用 Remove 或关闭总开关。
+`Allow evaluation for this policy` 控制后续评估资格；编辑策略会令现有绑定待评估，不会后台更换出口。要撤销现有服务路由，使用 Remove。
 
 ## 模块边界
 
@@ -47,9 +62,9 @@
 | FR-006 绑定 | 核心保存选中时间、有效期、评分、原因、策略 revision；评估/失败/取消均保留原绑定；应用必须显式触发；绑定过期不自动换节点。 |
 | FR-007 运行路由 | 每服务独立 singleton selector，保留普通 proxy；原子更新整个模型并检查 revision；实际状态读取和事件流；本地真实 sing-box 流量测试验证两个服务不同出口、失败不切换和停用后普通代理接管。 |
 | FR-008 可解释性 | 来源、地区、评估时间、分数、选中与排除原因、运行状态、历史及审计；多目标历史共同决定是否需要重新评估。 |
-| 可选性 | 默认关闭；关闭时评估/刷新/应用不会调用 Smart RPC；关闭总开关清除自有运行模型；保存所有权标记以便重启时清理与关闭设置不一致的残留路由。 |
+| 核心要求 | 只有 intent 路径；核心不实现 intent API 时 `smartRepositoryProvider` 抛 UnsupportedError，界面显示未支持，不回退本地评分。 |
 | 持久化与恢复 | 策略、偏好、优先级和审计跨 store/container 恢复；启用状态下核心绑定与模型沿用核心持久化；串行写入及保存失败不发布未保存策略均有测试。 |
-| 普通模式隔离 | 保留基础 settings、全局 selector 与外部服务模型；默认关闭测试、已有普通代理测试、核心真实流量测试共同验证。 |
+| 普通模式隔离 | 保留基础 settings、全局 selector 与外部服务模型；已有普通代理测试与核心真实流量测试共同验证。 |
 | 体验与阶段四 | 测试历史、出口地区探测、可配置区域/内容检查、绑定有效期、策略模板、自定义服务及策略/诊断 JSON 导出已接入。 |
 
 ## 核心修复

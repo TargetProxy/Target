@@ -66,32 +66,17 @@ void main() {
     );
     expect((await SmartPolicyStore().load()).map((p) => p.id), ['a']);
   });
-  test(
-    'node preferences, priorities and safe structured audit survive store recreation',
-    () async {
-      final store = SmartPolicyStore();
-      await store.saveNodePreference(
-        'stable-id',
-        const SmartNodePreference(
-          favorite: true,
-          excluded: true,
-          tags: {'work'},
-        ),
-      );
-      await store.saveSubscriptionPriority('source', 5);
-      await store.saveAudit([
-        {
-          'action': 'evaluation',
-          'serviceId': 'a',
-          'outcome': 'ready',
-          'scores': {'stable-id': 90.0},
-        },
-      ]);
-      final restored = SmartPolicyStore();
-      expect((await restored.nodePreferences())['stable-id']!.favorite, true);
-      expect((await restored.nodePreferences())['stable-id']!.tags, {'work'});
-      expect((await restored.subscriptionPriorities())['source'], 5);
-      expect((await restored.loadAudit()).single['action'], 'evaluation');
-    },
-  );
+  test('structured selection audit survives store recreation', () async {
+    final store = SmartPolicyStore();
+    await store.saveAudit([
+      {
+        'action': 'evaluation',
+        'serviceId': 'a',
+        'outcome': 'ready',
+        'scores': {'stable-id': 90.0},
+      },
+    ]);
+    final restored = SmartPolicyStore();
+    expect((await restored.loadAudit()).single['action'], 'evaluation');
+  });
 }

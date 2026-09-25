@@ -1,488 +1,529 @@
 import 'dart:async';
-import 'package:fixnum/fixnum.dart';
+import 'dart:convert';
+
 import 'package:targetlib/targetlib.dart' as pb;
+
 import '../../../core/runtime/core_gateway.dart';
-import '../../../core/runtime/smart_runtime_gateway.dart';
+import '../../../data/models/proxy_node.dart';
 import '../domain/smart_connect_models.dart';
-import 'smart_policy_store.dart';
 import '../domain/smart_runtime_models.dart';
 
+/// Cancels the app's interest in an evaluation. The core contract has no
+/// cancellation RPC, so the operation keeps running and its proposal is
+/// rejected once it materializes.
 class SmartCancellation {
   bool cancelled = false;
-  Future<void> Function()? cancelStream;
-  Future<void> cancel() async {
-    cancelled = true;
-    await cancelStream?.call();
-  }
-
+  void cancel() => cancelled = true;
   void check() {
     if (cancelled) throw StateError('Evaluation cancelled');
   }
 }
 
-abstract class SmartConnectRepository {
-  Future<SmartRuntimeSnapshot> load();
-  Stream<void> events();
-  Future<SmartAssessment> evaluate(
-    SmartPolicy policy,
-    SmartCancellation cancellation,
-  );
-  Future<void> apply(SmartAssessment assessment, {String? manualNodeId});
-  Future<void> disable();
-  Future<void> remove(String policyId);
-  Future<List<SmartNode>> history(SmartPolicy policy, String nodeId);
-}
+/// Translates between the app's models and the core's intent API.
+///
+/// The core is authoritative for policy, scoring and binding, so there is no
+/// local copy to reconcile and no interface seam: tests substitute a fake
+/// [CoreGateway] instead.
+class SmartConnectRepository {
+  SmartConnectRepository(this.core);
 
-/// The only feature layer aware of protobuf. No service operation selects the
-/// ordinary proxy group, and evaluation never writes the runtime model.
-class TargetSmartConnectRepository implements SmartConnectRepository {
-  TargetSmartConnectRepository(
-    this.core, {
-    SmartPolicyStore? store,
-    this.existingPoolLoader,
-  }) : store = store ?? SmartPolicyStore();
-  final SmartPolicyStore store;
   final CoreGateway core;
-  final Future<List<SmartNode>?> Function()? existingPoolLoader;
+
   static const prefix = 'target.smart.';
-  String _probeId(String policyId, int index) =>
-      index == 0 ? '$prefix$policyId' : '$prefix$policyId.probe.$index';
-  SmartRuntimeGateway get api {
-    final gateway = core;
-    if (gateway is! SmartRuntimeGateway) {
-      throw UnsupportedError('This core does not support Smart Connect');
+  int _nonce = 0;
+  String _key() => '${DateTime.now().microsecondsSinceEpoch}-${_nonce++}';
+  String _id(String id) => '$prefix$id';
+
+  Future<pb.Operation> _wait(
+    pb.Operation operation, {
+    SmartCancellation? cancellation,
+  }) async {
+    for (var i = 0; i < 120; i++) {
+      final waitingApproval =
+          operation.status ==
+          pb.OperationStatus.OPERATION_STATUS_WAITING_APPROVAL;
+      if (cancellation?.cancelled == true &&
+          waitingApproval &&
+          operation.proposalId.isNotEmpty) {
+        final snapshot = await core.smartSnapshot();
+        await core.rejectSmartProposal(
+          pb.ProposalCommandRequest(
+            proposalId: operation.proposalId,
+            expectedRevision: snapshot.revision,
+            idempotencyKey: _key(),
+          ),
+        );
+        throw StateError('Evaluation cancelled');
+      }
+      if (operation.status == pb.OperationStatus.OPERATION_STATUS_SUCCEEDED ||
+          waitingApproval) {
+        return operation;
+      }
+      if (operation.status == pb.OperationStatus.OPERATION_STATUS_FAILED ||
+          operation.status == pb.OperationStatus.OPERATION_STATUS_CANCELLED ||
+          operation.status == pb.OperationStatus.OPERATION_STATUS_ROLLED_BACK) {
+        throw StateError('${operation.errorCode}: ${operation.errorMessage}');
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      operation = await core.smartOperation(operation.id);
     }
-    return gateway as SmartRuntimeGateway;
+    throw TimeoutException(
+      'Smart Connect operation is still running; refresh its status',
+    );
   }
 
-  DateTime _date(Int64 value) =>
-      DateTime.fromMillisecondsSinceEpoch(value.toInt(), isUtc: true);
-
-  @override
   Future<SmartRuntimeSnapshot> load() async {
-    final caps = await api.smartCapabilities();
-    if (!caps.smartConnect || !caps.serviceProbes) {
+    final capabilities = await core.smartCapabilities();
+    if (!capabilities.smartConnectIntentApi) {
       throw UnsupportedError(
-        'TargetLib does not support service routing and probes; update the core',
+        'TargetLib intent API is unavailable; update the core',
       );
     }
+    final snapshot = await core.smartSnapshot();
     final pool = await core.getNodePool();
-    final preferences = await store.nodePreferences();
-    final priorities = await store.subscriptionPriorities();
-    final existingNodes = await existingPoolLoader?.call();
-    final config = await api.smartConfig();
+    final config = await core.smartConfig();
     final runtime = await core.getSmartConnectRuntimeState();
-    final policies = {for (final p in await store.load()) p.id: p};
-    final bindings = <String, SmartBinding>{};
-    for (final b in config.serviceBindings.where(
-      (b) => b.serviceId.startsWith(prefix),
-    )) {
-      final id = b.serviceId.substring(prefix.length);
-      bindings[id] = await _bindingWithQuality(b, runtime, policies[id]);
-    }
+    final defaultSelector = config.selectors
+        .where((selector) => selector.tag == 'proxy')
+        .firstOrNull;
+    final actualDefault = runtime.selectors
+        .where((selector) => selector.desired.tag == 'proxy')
+        .firstOrNull;
     return SmartRuntimeSnapshot(
-      nodes: [
-        ...(existingNodes ??
-            [
-              for (final n in pool.nodes)
-                _node(n, preferences[n.tag], priorities[n.subscriptionId] ?? 0),
-            ]),
-      ],
+      nodes: _nodes(pool, snapshot),
+      bindings: _bindings(config, runtime),
       revision: config.revision,
       poolRevision: pool.revision,
       running: runtime.running,
-      eventsSupported: caps.runtimeEvents,
-      bindings: bindings,
+      eventsSupported: capabilities.runtimeEvents,
+      defaultNodeId: defaultSelector?.selectedNodeId,
+      actualDefaultNodeId: actualDefault?.actualNodeId,
+      defaultEffective: actualDefault?.effective ?? false,
+      loaded: true,
     );
   }
 
-  SmartNode _node(
-    pb.ProfileNode node,
-    SmartNodePreference? preference,
-    int priority,
-  ) => SmartNode(
-    id: node.tag,
-    name: node.name,
-    subscriptionId: node.subscriptionId,
-    protocol: node.type,
-    region: node.countryCode,
-    enabled:
-        (preference?.enabled ?? true) &&
-        node.phase != pb.ProfileNodePhase.PROFILE_NODE_PHASE_FAILED,
-    excluded: preference?.excluded ?? false,
-    favorite: preference?.favorite ?? false,
-    tags: preference?.tags ?? {},
-    subscriptionPriority: priority,
+  List<ProxyNode> _nodes(pb.NodePool pool, pb.SmartConnectSnapshot snapshot) {
+    final preferences = {
+      for (final preference in snapshot.nodePreferences)
+        preference.nodeId: preference,
+    };
+    return [
+      for (final node in pool.nodes)
+        ProxyNode(
+          id: node.tag,
+          name: node.name.isEmpty ? node.tag : node.name,
+          type: node.type,
+          subscriptionId: node.subscriptionId,
+          countryCode: node.countryCode.isEmpty ? null : node.countryCode,
+          server: node.server,
+          port: node.port,
+          errorMessage: node.errorMessage,
+          isAvailable:
+              node.phase != pb.ProfileNodePhase.PROFILE_NODE_PHASE_FAILED,
+          enabled:
+              (preferences[node.tag]?.enabled ?? true) &&
+              node.phase != pb.ProfileNodePhase.PROFILE_NODE_PHASE_FAILED,
+          excluded: preferences[node.tag]?.excluded ?? false,
+          favorite: preferences[node.tag]?.favorite ?? false,
+          tags: preferences[node.tag]?.labels.toSet() ?? const {},
+          subscriptionPriority:
+              preferences[node.tag]?.subscriptionPriority ?? 0,
+        ),
+    ];
+  }
+
+  Map<String, SmartBinding> _bindings(
+    pb.RuntimeConfig config,
+    pb.RuntimeState runtime,
+  ) {
+    final states = {
+      for (final state in runtime.serviceBindings)
+        state.desired.serviceId: state,
+    };
+    return {
+      for (final binding in config.serviceBindings)
+        if (binding.serviceId.startsWith(prefix))
+          binding.serviceId.substring(prefix.length): SmartBinding(
+            serviceId: binding.serviceId.substring(prefix.length),
+            nodeId: binding.nodeId,
+            selectedAt: DateTime.fromMillisecondsSinceEpoch(
+              binding.selectedAtUnixMs.toInt(),
+            ),
+            expiresAt: DateTime.fromMillisecondsSinceEpoch(
+              binding.expiresAtUnixMs.toInt(),
+            ),
+            reason: binding.selectionReason,
+            score: binding.selectedScore,
+            effective: states[binding.serviceId]?.effective ?? false,
+            needsEvaluation: states[binding.serviceId]?.needsEvaluation ?? true,
+            status:
+                states[binding.serviceId]?.evaluationReason ??
+                'Runtime status unavailable',
+          ),
+    };
+  }
+
+  Stream<void> events() => core.smartIntentEvents().map((_) {});
+
+  pb.ServicePolicy _policy(SmartPolicy policy) => pb.ServicePolicy(
+    serviceId: _id(policy.id),
+    displayName: policy.name,
+    domains: policy.domains.toList(),
+    probes: [
+      for (final target in policy.probeTargets)
+        pb.ServiceProbe(
+          serviceId: _id(policy.id),
+          url: target.url,
+          expectedStatus: target.expectedStatus.toList(),
+          bodyContains: target.bodyContains,
+          allowedCountries: policy.allowedRegions.toList(),
+          egressUrl: target.egressUrl,
+          serviceCountryHeader: target.serviceCountryHeader,
+          timeoutMilliseconds: 10000,
+          validitySeconds: policy.probeValidity.inSeconds,
+        ),
+    ],
+    selection: pb.ServiceSelectionPolicy(
+      serviceId: _id(policy.id),
+      preferredCountries: policy.preferredRegions.toList(),
+      subscriptionIds: policy.allowedSubscriptions.toList(),
+      excludedNodeIds: policy.excludedNodes.toList(),
+      allowDirect: policy.selectionMode == SmartSelectionMode.direct,
+    ),
+    switchPolicy: pb.SwitchPolicy(
+      mode: policy.selectionMode == SmartSelectionMode.direct
+          ? pb.SwitchMode.SWITCH_MODE_DIRECT
+          : pb.SwitchMode.SWITCH_MODE_MANUAL,
+      allowedCountries: policy.allowedRegions.toList(),
+      allowedSubscriptionIds: policy.allowedSubscriptions.toList(),
+      allowDirect: policy.selectionMode == SmartSelectionMode.direct,
+    ),
+    bindingValiditySeconds: policy.stickyDuration.inSeconds,
+    qualityValiditySeconds: policy.probeValidity.inSeconds,
   );
 
-  SmartBinding _binding(pb.ServiceBinding binding, pb.RuntimeState runtime) {
-    final states = runtime.serviceBindings.where(
-      (b) => b.desired.serviceId == binding.serviceId,
+  /// Pushes the policy unconditionally. The core stores it and returns the
+  /// revision it recorded, so the app does not compare field by field first.
+  Future<String> syncPolicy(
+    SmartPolicy policy, {
+    String? expectedRevision,
+  }) async {
+    final revision = expectedRevision ?? (await core.smartSnapshot()).revision;
+    final operation = await _wait(
+      await core.upsertSmartPolicy(
+        pb.UpsertServicePolicyRequest(
+          policy: _policy(policy),
+          expectedRevision: revision,
+          idempotencyKey: _key(),
+        ),
+      ),
     );
-    final actual = states.isEmpty ? null : states.first;
-    return SmartBinding(
-      serviceId: binding.serviceId.substring(prefix.length),
-      nodeId: binding.nodeId,
-      selectedAt: _date(binding.selectedAtUnixMs),
-      expiresAt: _date(binding.expiresAtUnixMs),
-      reason: binding.selectionReason,
-      score: binding.selectedScore,
-      policyRevision: binding.selectionPolicyRevision,
-      effective: actual?.effective ?? false,
-      needsEvaluation: actual?.needsEvaluation ?? true,
-      status: actual?.evaluationReason ?? 'Runtime status unavailable',
-    );
+    return operation.runtimeRevision.isEmpty
+        ? revision
+        : operation.runtimeRevision;
   }
 
-  Future<SmartBinding> _bindingWithQuality(
-    pb.ServiceBinding raw,
-    pb.RuntimeState runtime,
-    SmartPolicy? policy,
-  ) async {
-    final binding = _binding(raw, runtime);
-    var reason = binding.status;
-    var needsEvaluation = binding.needsEvaluation;
-    if (policy == null ||
-        !policy.enabled ||
-        binding.policyRevision != policy.revision) {
-      reason = 'Policy missing, disabled or changed; re-evaluation required';
-      needsEvaluation = true;
-    } else if (policy.selectionMode != SmartSelectionMode.direct) {
-      for (var i = 0; i < policy.probeTargets.length; i++) {
-        final history = await api.smartHistory(
-          pb.QualityHistoryRequest(
-            serviceId: _probeId(policy.id, i),
-            nodeId: binding.nodeId,
-            limit: 1,
-          ),
-        );
-        final latest = history.results.firstOrNull;
-        if (latest == null ||
-            latest.stage != pb.ProbeStage.PROBE_STAGE_READY ||
-            latest.successes == 0 ||
-            latest.expiresAtUnixMs.toInt() <=
-                DateTime.now().millisecondsSinceEpoch) {
-          reason =
-              'Target ${i + 1}: ${latest == null
-                  ? "not probed"
-                  : latest.stage == pb.ProbeStage.PROBE_STAGE_READY
-                  ? "quality expired"
-                  : latest.stage.name.replaceFirst("PROBE_STAGE_", "")}';
-          needsEvaluation = true;
-          break;
-        }
-      }
-    }
-    return SmartBinding(
-      serviceId: binding.serviceId,
-      nodeId: binding.nodeId,
-      selectedAt: binding.selectedAt,
-      expiresAt: binding.expiresAt,
-      reason: binding.reason,
-      score: binding.score,
-      policyRevision: binding.policyRevision,
-      effective: binding.effective,
-      needsEvaluation: needsEvaluation,
-      status: reason,
-    );
-  }
-
-  @override
-  Stream<void> events() => api.smartEvents().map((_) {});
-
-  @override
   Future<SmartAssessment> evaluate(
     SmartPolicy policy,
     SmartCancellation cancellation,
   ) async {
     final errors = policy.validate();
     if (errors.isNotEmpty) throw FormatException(errors.join('; '));
-    final snapshot = await load();
+    await syncPolicy(policy);
     cancellation.check();
-    final candidates = snapshot.nodes
-        .where((n) => smartCandidateExclusion(policy, n) == null)
-        .toList();
-    final results = <String, Map<int, pb.ProbeResult>>{};
-    if (policy.selectionMode != SmartSelectionMode.direct &&
-        candidates.isNotEmpty) {
-      for (var i = 0; i < policy.probeTargets.length; i++) {
-        cancellation.check();
-        final target = policy.probeTargets[i];
-        final probe = await api.putSmartProbe(
-          pb.ServiceProbe(
-            serviceId: _probeId(policy.id, i),
-            url: target.url,
-            expectedStatus: target.expectedStatus,
-            bodyContains: target.bodyContains,
-            allowedCountries: policy.allowedRegions,
-            egressUrl: target.egressUrl,
-            serviceCountryHeader: target.serviceCountryHeader,
-            timeoutMilliseconds: 10000,
-            validitySeconds: policy.probeValidity.inSeconds,
-          ),
-        );
-        cancellation.check();
-        for (var offset = 0; offset < candidates.length; offset += 256) {
-          cancellation.check();
-          final batch = candidates
-              .skip(offset)
-              .take(256)
-              .map((n) => n.id)
-              .toList();
-          final done = Completer<void>();
-          final subscription = api
-              .probeSmartService(
-                pb.ProbeServiceRequest(
-                  serviceId: probe.serviceId,
-                  nodeIds: batch,
-                  attempts: 3,
-                  maxConcurrency: 4,
-                ),
-              )
-              .listen(
-                (result) {
-                  if (!cancellation.cancelled &&
-                      result.serviceId == probe.serviceId &&
-                      result.probeRevision == probe.revision &&
-                      result.nodePoolRevision == snapshot.poolRevision &&
-                      batch.contains(result.nodeId)) {
-                    results.putIfAbsent(result.nodeId, () => {})[i] = result;
-                  }
-                },
-                onError: (Object error, StackTrace stack) {
-                  if (!done.isCompleted) done.completeError(error, stack);
-                },
-                onDone: () {
-                  if (!done.isCompleted) done.complete();
-                },
-              );
-          cancellation.cancelStream = () async {
-            await subscription.cancel();
-            if (!done.isCompleted) done.complete();
-          };
-          try {
-            await done.future;
-          } finally {
-            await subscription.cancel();
-            cancellation.cancelStream = null;
-          }
-          cancellation.check();
-        }
-      }
+    final snapshot = await core.smartSnapshot();
+    if (policy.selectionMode == SmartSelectionMode.direct) {
+      final pool = await core.getNodePool();
+      return SmartAssessment(
+        policy: policy,
+        nodes: _nodes(pool, snapshot),
+        selection: const SmartSelection(
+          direct: true,
+          reason: 'Explicit Direct policy',
+        ),
+        poolRevision: pool.revision,
+        evaluatedAt: DateTime.now(),
+      );
     }
-    final nodes = [
-      for (final n in snapshot.nodes)
-        _aggregate(n, results[n.id]?.values.toList() ?? [], policy),
-    ];
+    final operation = await _wait(
+      await core.requestSmartEvaluation(
+        pb.RequestServiceEvaluationRequest(
+          serviceId: _id(policy.id),
+          expectedRevision: snapshot.revision,
+          idempotencyKey: _key(),
+        ),
+      ),
+      cancellation: cancellation,
+    );
+    cancellation.check();
+    final latest = await core.smartSnapshot();
+    final proposal = latest.proposals
+        .where((p) => p.id == operation.proposalId)
+        .firstOrNull;
+    if (proposal == null) {
+      throw StateError('Evaluation completed without a proposal');
+    }
+    final pool = await core.getNodePool();
+    final nodes = _nodes(pool, latest);
     return SmartAssessment(
       policy: policy,
       nodes: nodes,
-      selection: selectSmartNode(policy, nodes),
-      runtimeRevision: snapshot.revision,
-      poolRevision: snapshot.poolRevision,
-      evaluatedAt: DateTime.now(),
+      selection: SmartSelection(
+        node: nodes.where((n) => n.id == proposal.suggestedNodeId).firstOrNull,
+        scores: {
+          for (final c in proposal.candidates.where((c) => c.eligible))
+            c.nodeId: c.score,
+        },
+        excluded: {
+          for (final c in proposal.candidates.where((c) => !c.eligible))
+            c.nodeId: c.reason,
+        },
+        direct: proposal.suggestedNodeId == 'direct',
+        reason: proposal.reason,
+      ),
+      poolRevision: pool.revision,
+      evaluatedAt: DateTime.fromMillisecondsSinceEpoch(
+        proposal.createdAtUnixMs.toInt(),
+      ),
+      proposalId: proposal.id,
     );
   }
 
-  SmartNode _aggregate(
-    SmartNode node,
-    List<pb.ProbeResult> results,
+  /// Applies a usable first choice immediately. Quality evaluation can refine
+  /// this choice later, but it is not required before the service works.
+  Future<void> connectDefault(SmartPolicy policy) async {
+    final errors = policy.validate();
+    if (errors.isNotEmpty) throw FormatException(errors.join('; '));
+    await syncPolicy(policy);
+    final snapshot = await core.smartSnapshot();
+    if (policy.selectionMode == SmartSelectionMode.direct) {
+      await _forceBinding(policy.id, 'direct', snapshot.revision);
+      return;
+    }
+    final pool = await core.getNodePool();
+    final nodes = _nodes(pool, snapshot).where((node) {
+      final region = node.effectiveCountryCode;
+      return node.isAvailable &&
+          node.enabled &&
+          !node.excluded &&
+          (policy.allowedRegions.isEmpty ||
+              policy.allowedRegions.contains(region)) &&
+          (policy.allowedSubscriptions.isEmpty ||
+              policy.allowedSubscriptions.contains(node.subscriptionId));
+    }).toList();
+    nodes.sort((a, b) {
+      final aPreferred = policy.preferredRegions.contains(
+        a.effectiveCountryCode,
+      );
+      final bPreferred = policy.preferredRegions.contains(
+        b.effectiveCountryCode,
+      );
+      if (aPreferred != bPreferred) return aPreferred ? -1 : 1;
+      if (a.favorite != b.favorite) return a.favorite ? -1 : 1;
+      final priority = b.subscriptionPriority.compareTo(a.subscriptionPriority);
+      if (priority != 0) return priority;
+      final aLatency = a.latencyMs ?? 1 << 30;
+      final bLatency = b.latencyMs ?? 1 << 30;
+      final latency = aLatency.compareTo(bLatency);
+      return latency != 0 ? latency : a.name.compareTo(b.name);
+    });
+    if (nodes.isEmpty) {
+      throw StateError('No available node matches this service');
+    }
+    await _forceBinding(policy.id, nodes.first.id, snapshot.revision);
+  }
+
+  /// Applies an explicit node choice for one service route. This is the
+  /// service-level counterpart of selecting the global Default node.
+  Future<void> forceNode(SmartPolicy policy, String nodeId) async {
+    final errors = policy.validate();
+    if (errors.isNotEmpty) throw FormatException(errors.join('; '));
+    if (policy.selectionMode == SmartSelectionMode.direct) {
+      throw StateError('Direct routes do not use a proxy node');
+    }
+    final snapshot = await core.smartSnapshot();
+    final pool = await core.getNodePool();
+    final node = _nodes(
+      pool,
+      snapshot,
+    ).where((candidate) => candidate.id == nodeId).firstOrNull;
+    if (node == null || !_eligibleFor(node, policy)) {
+      throw StateError('Node is not eligible for this service');
+    }
+    await syncPolicy(policy, expectedRevision: snapshot.revision);
+    await _forceBinding(
+      policy.id,
+      nodeId,
+      (await core.smartSnapshot()).revision,
+    );
+  }
+
+  Future<void> selectDefault(String nodeId) =>
+      core.selectOutbound('proxy', nodeId);
+
+  Future<void> applyRoute(
     SmartPolicy policy, {
-    bool historyRow = false,
-  }) {
-    final passed =
-        (historyRow || results.length == policy.probeTargets.length) &&
-        results.isNotEmpty &&
-        results.every(
-          (r) => r.stage == pb.ProbeStage.PROBE_STAGE_READY && r.successes > 0,
+    String? nodeId,
+    SmartAssessment? assessment,
+  }) async {
+    if (!policy.enabled ||
+        policy.selectionMode == SmartSelectionMode.followDefault) {
+      await remove(policy.id);
+      return;
+    }
+    switch (policy.selectionMode) {
+      case SmartSelectionMode.manual:
+        if (nodeId == null) throw StateError('Choose a node for this group');
+        await forceNode(policy, nodeId);
+      case SmartSelectionMode.direct:
+        await syncPolicy(policy);
+        await _forceBinding(
+          policy.id,
+          'direct',
+          (await core.smartSnapshot()).revision,
         );
-    final regions = results
-        .map((r) => r.observedCountry)
-        .where((r) => r.isNotEmpty)
-        .toSet();
-    final serviceRegions = results
-        .map((r) => r.serviceCountry)
-        .where((r) => r.isNotEmpty)
-        .toSet();
-    final losses =
-        results
-            .where((r) => r.packetLossAvailable)
-            .map((r) => r.packetLossRatio)
-            .toList()
-          ..sort();
-    final failures = results.where(
-      (r) => r.stage != pb.ProbeStage.PROBE_STAGE_READY,
-    );
-    final attempts = results.fold<int>(0, (v, r) => v + r.attempts);
-    final successes = results.fold<int>(0, (v, r) => v + r.successes);
-    final times = results.map((r) => r.testedAtUnixMs.toInt()).toList()..sort();
-    final expiry = results.map((r) => r.expiresAtUnixMs.toInt()).toList()
-      ..sort();
-    return SmartNode(
-      id: node.id,
-      name: node.name,
-      subscriptionId: node.subscriptionId,
-      protocol: node.protocol,
-      region: node.region,
-      enabled: node.enabled,
-      tags: node.tags,
-      excluded: node.excluded,
-      favorite: node.favorite,
-      subscriptionPriority: node.subscriptionPriority,
-      observedRegion: regions.length == 1 ? regions.single : '',
-      serviceRegion: serviceRegions.length == 1 ? serviceRegions.single : '',
-      packetLoss: losses.length == results.length && losses.isNotEmpty
-          ? losses.last
-          : null,
-      probePassed: passed && regions.length <= 1 && serviceRegions.length <= 1,
-      successRate: attempts == 0 ? 0 : successes / attempts,
-      latencyMs: results.isEmpty
-          ? null
-          : (results.fold<int>(0, (v, r) => v + r.latencyMilliseconds) /
-                    results.length)
-                .round(),
-      testedAt: times.isEmpty
-          ? null
-          : DateTime.fromMillisecondsSinceEpoch(times.first),
-      expiresAt: expiry.isEmpty
-          ? null
-          : DateTime.fromMillisecondsSinceEpoch(expiry.first),
-      policyRevision: policy.revision,
-      failureReason: regions.length > 1 || serviceRegions.length > 1
-          ? 'Conflicting observed regions across targets'
-          : failures.isNotEmpty
-          ? failures.first.stage.name.replaceFirst('PROBE_STAGE_', '')
-          : !passed
-          ? 'Not all service targets returned a valid result'
-          : '',
-    );
+      case SmartSelectionMode.automatic:
+        if (assessment == null) {
+          throw StateError('Get a recommendation before applying');
+        }
+        if (jsonEncode(assessment.policy.toJson()) !=
+            jsonEncode(policy.toJson())) {
+          throw StateError('Group settings changed; get a new recommendation');
+        }
+        await apply(assessment);
+      case SmartSelectionMode.followDefault:
+        break;
+    }
   }
 
-  @override
-  Future<void> apply(SmartAssessment assessment, {String? manualNodeId}) async {
-    final policy = assessment.policy;
-    final eligible = selectSmartNode(policy, assessment.nodes);
-    if (!eligible.succeeded) throw StateError(eligible.reason);
-    final nodeId = eligible.direct
-        ? 'direct'
-        : manualNodeId ?? eligible.node!.id;
-    if (!eligible.direct && !eligible.scores.containsKey(nodeId)) {
-      throw StateError('Node is excluded or its probe has expired');
-    }
-    final current = await load();
-    if (!eligible.direct) {
-      final node = current.nodes.where((n) => n.id == nodeId).firstOrNull;
-      if (node == null || smartCandidateExclusion(policy, node) != null) {
-        throw StateError('Node preferences changed; re-evaluate');
-      }
-    }
-    if (current.poolRevision != assessment.poolRevision) {
-      throw StateError('Node pool changed; re-evaluate');
-    }
-    final config = await api.smartConfig();
-    if (config.revision != assessment.runtimeRevision) {
-      throw StateError('Runtime changed; re-evaluate');
-    }
-    final serviceId = '$prefix${policy.id}';
-    final selectorTag = '$serviceId.selector';
-    final now = DateTime.now();
-    final model = _model(config);
-    model.selectors.removeWhere((s) => s.tag == selectorTag);
-    model.serviceRoutes.removeWhere((r) => r.serviceId == serviceId);
-    model.serviceBindings.removeWhere((b) => b.serviceId == serviceId);
-    // A singleton selector cannot silently switch to another candidate.
-    model.selectors.add(
-      pb.SelectorConfig(
-        tag: selectorTag,
-        nodeIds: [nodeId],
-        selectedNodeId: nodeId,
-      ),
-    );
-    model.serviceRoutes.add(
-      pb.ServiceRoute(
-        serviceId: serviceId,
-        domains: policy.domains,
-        selectorTag: selectorTag,
-        enabled: true,
-      ),
-    );
-    model.serviceBindings.add(
-      pb.ServiceBinding(
-        serviceId: serviceId,
-        selectorTag: selectorTag,
-        nodeId: nodeId,
-        selectedAtUnixMs: Int64(now.millisecondsSinceEpoch),
-        expiresAtUnixMs: Int64(
-          now.add(policy.stickyDuration).millisecondsSinceEpoch,
-        ),
-        selectedScore: eligible.scores[nodeId] ?? 0,
-        selectionReason: manualNodeId == null
-            ? eligible.reason
-            : 'Explicit manual selection; all policy checks passed',
-        selectionPolicyRevision: policy.revision,
-      ),
-    );
-    await api.updateSmartModel(model, config.revision);
+  bool _eligibleFor(ProxyNode node, SmartPolicy policy) {
+    final region = node.effectiveCountryCode;
+    return node.isAvailable &&
+        node.enabled &&
+        !node.excluded &&
+        !policy.excludedNodes.contains(node.id) &&
+        (policy.allowedRegions.isEmpty ||
+            policy.allowedRegions.contains(region)) &&
+        (policy.allowedSubscriptions.isEmpty ||
+            policy.allowedSubscriptions.contains(node.subscriptionId));
   }
 
-  pb.RuntimeModel _model(pb.RuntimeConfig config) => pb.RuntimeModel(
-    selectors: config.selectors.map((s) => s.deepCopy()),
-    serviceRoutes: config.serviceRoutes.map((r) => r.deepCopy()),
-    serviceBindings: config.serviceBindings.map((b) => b.deepCopy()),
-  );
-
-  @override
-  Future<void> disable() async {
-    final config = await api.smartConfig();
-    final model = _model(config);
-    final ownedSelectors = model.serviceRoutes
-        .where((r) => r.serviceId.startsWith(prefix))
-        .map((r) => r.selectorTag)
-        .toSet();
-    final changed =
-        ownedSelectors.isNotEmpty ||
-        model.selectors.any((s) => s.tag.startsWith(prefix)) ||
-        model.serviceBindings.any((b) => b.serviceId.startsWith(prefix));
-    // Removing dormant selectors is essential: otherwise deleted subscription
-    // nodes can invalidate later ordinary proxy config updates while opted out.
-    model.serviceRoutes.removeWhere((r) => r.serviceId.startsWith(prefix));
-    model.serviceBindings.removeWhere((b) => b.serviceId.startsWith(prefix));
-    model.selectors.removeWhere(
-      (s) => ownedSelectors.contains(s.tag) || s.tag.startsWith(prefix),
-    );
-    if (changed) await api.updateSmartModel(model, config.revision);
-  }
-
-  @override
-  Future<void> remove(String policyId) async {
-    final config = await api.smartConfig();
-    final id = '$prefix$policyId';
-    final model = _model(config);
-    model.selectors.removeWhere((s) => s.tag == '$id.selector');
-    model.serviceRoutes.removeWhere((r) => r.serviceId == id);
-    model.serviceBindings.removeWhere((b) => b.serviceId == id);
-    await api.updateSmartModel(model, config.revision);
-  }
-
-  @override
-  Future<List<SmartNode>> history(SmartPolicy policy, String nodeId) async {
-    final snapshot = await load();
-    final node = snapshot.nodes.where((n) => n.id == nodeId).firstOrNull;
-    if (node == null) return [];
-    final rows = <SmartNode>[];
-    for (var i = 0; i < policy.probeTargets.length; i++) {
-      final history = await api.smartHistory(
-        pb.QualityHistoryRequest(
-          serviceId: _probeId(policy.id, i),
+  Future<void> _forceBinding(
+    String policyId,
+    String nodeId,
+    String revision,
+  ) async {
+    await _wait(
+      await core.forceSmartBinding(
+        pb.ForceServiceBindingRequest(
+          serviceId: _id(policyId),
           nodeId: nodeId,
-          limit: 100,
+          expectedRevision: revision,
+          idempotencyKey: _key(),
+        ),
+      ),
+    );
+  }
+
+  Future<void> apply(SmartAssessment assessment, {String? manualNodeId}) async {
+    final snapshot = await core.smartSnapshot();
+    if (manualNodeId != null || assessment.selection.direct) {
+      final nodeId = manualNodeId ?? 'direct';
+      if (!assessment.selection.direct &&
+          !assessment.selection.scores.containsKey(nodeId)) {
+        throw StateError('Node is not eligible in the latest evaluation');
+      }
+      await _wait(
+        await core.forceSmartBinding(
+          pb.ForceServiceBindingRequest(
+            serviceId: _id(assessment.policy.id),
+            nodeId: nodeId,
+            expectedRevision: snapshot.revision,
+            idempotencyKey: _key(),
+          ),
         ),
       );
-      for (final result in history.results) {
-        rows.add(_aggregate(node, [result], policy, historyRow: true));
-      }
+      return;
     }
-    rows.sort((a, b) => b.testedAt!.compareTo(a.testedAt!));
-    return rows;
+    final proposal = snapshot.proposals
+        .where((p) => p.id == assessment.proposalId)
+        .firstOrNull;
+    if (proposal == null ||
+        proposal.expiresAtUnixMs.toInt() <=
+            DateTime.now().millisecondsSinceEpoch ||
+        proposal.nodePoolRevision != assessment.poolRevision) {
+      throw StateError('Proposal expired or node pool changed; re-evaluate');
+    }
+    await _wait(
+      await core.approveSmartProposal(
+        pb.ProposalCommandRequest(
+          proposalId: proposal.id,
+          expectedRevision: snapshot.revision,
+          idempotencyKey: _key(),
+        ),
+      ),
+    );
+  }
+
+  Future<void> remove(String policyId) async {
+    final snapshot = await core.smartSnapshot();
+    if (snapshot.policies.any((p) => p.serviceId == _id(policyId))) {
+      await _wait(
+        await core.deleteSmartPolicy(
+          pb.DeleteServicePolicyRequest(
+            serviceId: _id(policyId),
+            expectedRevision: snapshot.revision,
+            idempotencyKey: _key(),
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> setPreference(String nodeId, NodePreference preference) async {
+    final snapshot = await core.smartSnapshot();
+    await _wait(
+      await core.setSmartPreference(
+        pb.SetNodePreferenceRequest(
+          preference: pb.NodePreference(
+            nodeId: nodeId,
+            enabled: preference.enabled,
+            excluded: preference.excluded,
+            favorite: preference.favorite,
+            labels: preference.tags.toList(),
+            subscriptionPriority: preference.subscriptionPriority,
+          ),
+          expectedRevision: snapshot.revision,
+          idempotencyKey: _key(),
+        ),
+      ),
+    );
+  }
+
+  /// Probe results the core recorded for one node, newest last.
+  Future<List<ProxyNode>> history(SmartPolicy policy, String nodeId) async {
+    final snapshot = await core.smartSnapshot();
+    final pool = await core.getNodePool();
+    final node = _nodes(
+      pool,
+      snapshot,
+    ).where((n) => n.id == nodeId).firstOrNull;
+    if (node == null) return const [];
+    return [
+      for (final result in snapshot.results.where(
+        (r) => r.serviceId == _id(policy.id) && r.nodeId == nodeId,
+      ))
+        node.copyWith(
+          latencyMs: result.latencyMilliseconds,
+          observedCountryCode: result.observedCountry,
+          testedAt: DateTime.fromMillisecondsSinceEpoch(
+            result.testedAtUnixMs.toInt(),
+          ),
+          failureReason: result.stage == pb.ProbeStage.PROBE_STAGE_READY
+              ? ''
+              : result.stage.name,
+        ),
+    ];
   }
 }

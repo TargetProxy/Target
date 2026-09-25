@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:targetlib/targetlib.dart' as targetlib;
 
+import '../../../core/runtime/core_gateway.dart';
 import '../../../core/runtime/core_notifier.dart';
 import '../../../core/runtime/subscription_gateway.dart';
 import '../../../core/logging/app_logger.dart';
@@ -43,7 +44,7 @@ class SubscriptionsState {
 }
 
 class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
-  SubscriptionGateway? _gateway;
+  CoreGateway? _gateway;
   StreamSubscription<void>? _changes;
   Future<void> _operationTail = Future<void>.value();
 
@@ -51,15 +52,12 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
 
   @override
   SubscriptionsState build() {
-    final coreGateway = ref.read(coreGatewayProvider);
-    if (coreGateway is SubscriptionGateway) {
-      final gateway = coreGateway as SubscriptionGateway;
-      _gateway = gateway;
-      _changes = gateway.subscriptionChanges.listen((_) {
-        unawaited(_loadSubscriptions());
-      });
-      ref.onDispose(() => unawaited(_changes?.cancel()));
-    }
+    final gateway = ref.read(coreGatewayProvider);
+    _gateway = gateway;
+    _changes = gateway.subscriptionChanges.listen((_) {
+      unawaited(_loadSubscriptions());
+    });
+    ref.onDispose(() => unawaited(_changes?.cancel()));
     ref.read(coreProvider.notifier).setStartupBarrier(() => ready);
     return const SubscriptionsState();
   }
@@ -100,16 +98,14 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
               id: node.tag,
               name: node.name.isEmpty ? node.tag : node.name,
               type: node.type,
+              subscriptionId: node.subscriptionId,
               countryCode: node.countryCode.isEmpty ? null : node.countryCode,
+              server: node.server,
+              port: node.port,
+              errorMessage: node.errorMessage,
               isAvailable:
                   node.phase !=
                   targetlib.ProfileNodePhase.PROFILE_NODE_PHASE_FAILED,
-              metadata: {
-                'server': node.server,
-                'port': node.port,
-                'subscriptionId': node.subscriptionId,
-                if (node.errorMessage.isNotEmpty) 'error': node.errorMessage,
-              },
             ),
         ];
         if (nodes.isEmpty) {
@@ -330,7 +326,7 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
       uploadBytes: runtime.uploadBytes,
       downloadBytes: runtime.downloadBytes,
       totalBytes: runtime.totalBytes,
-      nodeCount: runtime.profile.nodes.length,
+      nodeCount: runtime.nodeCount,
       enabled: runtime.enabled,
     );
   }

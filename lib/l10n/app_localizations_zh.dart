@@ -15,10 +15,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get profiles => '订阅';
 
   @override
-  String get nodeSelection => '节点选择';
+  String get nodeSelection => '代理分组';
 
   @override
-  String get subscriptionsHint => '复选订阅，将它们的节点汇入 Smart Connect 统一节点池。';
+  String get subscriptionsHint => '勾选订阅，为所有代理分组提供可选节点。';
 
   @override
   String get addSubscription => '添加订阅';

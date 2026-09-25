@@ -80,28 +80,33 @@ class ProxiesState {
   }
 }
 
+/// Presents the catalog's pool and applies selections to the running core. The
+/// catalog owns node data, so this notifier never merges pool snapshots itself.
 class ProxiesNotifier extends Notifier<ProxiesState> {
   final Map<String, String> _runtimeSelections = {};
 
   @override
   ProxiesState build() {
     ref.listen(proxyCatalogProvider, (_, next) {
-      state = _syncFromCatalog(state, next);
+      state = _fromCatalog(state, next);
     });
     ref.listen(coreProvider, (previous, next) {
-      state = _syncFromCore(state, next);
       if (!next.running) {
         _runtimeSelections.clear();
       } else if (previous?.running != true) {
         unawaited(_syncAllSelectionsToRuntime());
       }
     });
-    var result = _syncFromCatalog(
-      const ProxiesState(),
-      ref.read(proxyCatalogProvider),
+    return _fromCatalog(const ProxiesState(), ref.read(proxyCatalogProvider));
+  }
+
+  ProxiesState _fromCatalog(ProxiesState current, ProxyCatalogState next) {
+    final selectedGroupId = current.selectedGroup?.id;
+    final index = next.groups.indexWhere((group) => group.id == selectedGroupId);
+    return current.copyWith(
+      groups: next.groups,
+      selectedGroupIndex: index >= 0 ? index : 0,
     );
-    result = _syncFromCore(result, ref.read(coreProvider));
-    return result;
   }
 
   void selectGroup(int index) {
@@ -111,37 +116,18 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
   }
 
   Future<void> selectNode(String nodeId) async {
-    if (state.groups.isEmpty) return;
-    final group = state.groups[state.selectedGroupIndex];
-    if (!group.nodes.any((node) => node.id == nodeId)) return;
+    final group = state.selectedGroup;
+    if (group == null || !group.nodes.any((node) => node.id == nodeId)) return;
     if (group.selectedNodeId != nodeId) {
       if (ref.read(coreProvider).running &&
           !await _selectRuntime(group.id, nodeId)) {
         return;
       }
-      _applyLocalSelection(group.id, state.selectedGroupIndex, nodeId);
+      ref.read(proxyCatalogProvider.notifier).selectNode(group.id, nodeId);
+      state = state.copyWith(clearError: true);
       return;
     }
     await _selectRuntime(group.id, nodeId);
-  }
-
-  void _applyLocalSelection(String groupId, int groupIndex, String nodeId) {
-    ref.read(proxyCatalogProvider.notifier).selectNode(groupId, nodeId);
-    state = state.copyWith(
-      groups: [
-        for (var i = 0; i < state.groups.length; i++)
-          i == groupIndex
-              ? state.groups[i].copyWith(
-                  selectedNodeId: nodeId,
-                  nodes: [
-                    for (final node in state.groups[i].nodes)
-                      node.copyWith(isSelected: node.id == nodeId),
-                  ],
-                )
-              : state.groups[i],
-      ],
-      clearError: true,
-    );
   }
 
   Future<void> _syncAllSelectionsToRuntime() async {
@@ -182,15 +168,10 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
     state = state.copyWith(testing: true, clearError: true);
 
     try {
-      // The Flutter snapshot exposes the user-facing `proxy` selector. The
-      // daemon's URLTest group is intentionally internal to TargetLib and is
-      // not mirrored into CoreState.proxyGroups. TargetLib maps these node
-      // tags back to its URLTest group when TestOutbounds is called, so
-      // filtering for a Flutter-side URLTest group makes every real pool look
-      // untestable.
-      final candidateGroups = state.groups;
+      // TargetLib maps these node tags back to its internal URLTest group, so
+      // every node in the pool is testable regardless of client-side grouping.
       final nodeIds = {
-        for (final group in candidateGroups)
+        for (final group in state.groups)
           for (final node in group.nodes)
             if (_isTestableNode(node)) node.id,
       };
@@ -208,6 +189,7 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
         );
         return;
       }
+      final catalog = ref.read(proxyCatalogProvider.notifier);
       var successCount = 0;
       final errors = <String>[];
       await for (final result
@@ -215,11 +197,11 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
         final latency = result.delayMilliseconds;
         if (result.succeeded && latency != null) {
           successCount++;
-          _mergeLatency(result.outboundId, latency);
+          catalog.applyLatency(result.outboundId, latencyMs: latency);
         } else {
-          _markLatencyTimeout(result.outboundId);
+          catalog.applyLatency(result.outboundId, timedOut: true);
           if (result.errorMessage.isNotEmpty) {
-          errors.add('${result.outboundId}: ${result.errorMessage}');
+            errors.add('${result.outboundId}: ${result.errorMessage}');
           }
         }
       }
@@ -244,141 +226,6 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
         type != 'direct' &&
         type != 'block' &&
         type != 'dns';
-  }
-
-  void _mergeLatency(String nodeId, int latency) {
-    // Merge into the latest snapshot because group updates can arrive while
-    // the server-side test stream is still producing results.
-    state = state.copyWith(
-      groups: [
-        for (final group in state.groups)
-          group.copyWith(
-            nodes: [
-              for (final node in group.nodes)
-                node.id == nodeId ? node.copyWith(latencyMs: latency, latencyTimedOut: false) : node,
-            ],
-          ),
-      ],
-    );
-  }
-
-  void _markLatencyTimeout(String nodeId) {
-    state = state.copyWith(groups: [for (final group in state.groups) group.copyWith(nodes: [for (final node in group.nodes) node.id == nodeId ? node.copyWith(latencyTimedOut: true) : node])]);
-  }
-
-  Map<String, ProxyNode> _latencySnapshot(ProxiesState current) {
-    final result = <String, ProxyNode>{};
-    for (final group in current.groups) {
-      for (final node in group.nodes) {
-        if (node.latencyMs != null || node.latencyTimedOut) {
-          result[node.id] = node;
-        }
-      }
-    }
-    return result;
-  }
-
-  ProxyNode _withPreservedLatency(ProxyNode node, ProxyNode? cached) {
-    if (cached == null) return node;
-    // Fresh latency data wins over previously cached results.
-    if (node.latencyMs != null || node.latencyTimedOut) return node;
-    if (cached.latencyMs == null && !cached.latencyTimedOut) return node;
-    return node.copyWith(
-      latencyMs: cached.latencyMs,
-      latencyTimedOut: cached.latencyTimedOut,
-    );
-  }
-
-  ProxyNode _mergeRuntimeLatency(
-    ProxyNode node,
-    ProxyNode? runtime,
-    ProxyNode? cached,
-  ) {
-    final withRuntime =
-        (runtime?.latencyMs != null || (runtime?.latencyTimedOut ?? false))
-        ? node.copyWith(
-            latencyMs: runtime!.latencyMs,
-            latencyTimedOut: runtime.latencyTimedOut,
-          )
-        : node;
-    return _withPreservedLatency(withRuntime, cached);
-  }
-
-  ProxiesState _syncFromCatalog(ProxiesState current, ProxyCatalogState next) {
-    final selectedGroupId = current.selectedGroup?.id;
-    final latencies = _latencySnapshot(current);
-    final groups = [
-      for (final group in next.groups)
-        group.copyWith(
-          nodes: [
-            for (final node in group.nodes)
-              _withPreservedLatency(node, latencies[node.id]),
-          ],
-        ),
-    ];
-    final index = groups.indexWhere((group) => group.id == selectedGroupId);
-    final selectedGroupIndex = index >= 0 ? index : 0;
-    return current.copyWith(
-      groups: groups,
-      selectedGroupIndex: selectedGroupIndex >= groups.length
-          ? 0
-          : selectedGroupIndex,
-    );
-  }
-
-  ProxiesState _syncFromCore(ProxiesState current, CoreState core) {
-    if (core.proxyGroups.isEmpty) {
-      return current;
-    }
-    final catalog = ref.read(proxyCatalogProvider);
-    final catalogGroups = catalog.groups;
-    // An empty loaded pool is authoritative (for example, all sources disabled).
-    // Older runtime snapshots must not put those nodes back into the UI.
-    if (catalog.initialized) {
-      final runtimeNodes = <String, ProxyNode>{
-        for (final group in core.proxyGroups)
-          for (final node in group.nodes) node.id: node,
-      };
-      final latencies = _latencySnapshot(current);
-      final groups = [
-        for (final group in catalogGroups)
-          group.copyWith(
-            nodes: [
-              for (final node in group.nodes)
-                _mergeRuntimeLatency(
-                  node,
-                  runtimeNodes[node.id],
-                  latencies[node.id],
-                ),
-            ],
-          ),
-      ];
-      final selectedGroupId = current.selectedGroup?.id;
-      final index = groups.indexWhere((group) => group.id == selectedGroupId);
-      return current.copyWith(
-        groups: groups,
-        selectedGroupIndex: index >= 0 ? index : 0,
-      );
-    }
-    final selectedGroupId = current.selectedGroup?.id;
-    final latencies = _latencySnapshot(current);
-    final groups = [
-      for (final group in core.proxyGroups)
-        group.copyWith(
-          nodes: [
-            for (final node in group.nodes)
-              _withPreservedLatency(node, latencies[node.id]),
-          ],
-        ),
-    ];
-    final index = groups.indexWhere((group) => group.id == selectedGroupId);
-    final selectedGroupIndex = index >= 0 ? index : 0;
-    return current.copyWith(
-      groups: groups,
-      selectedGroupIndex: selectedGroupIndex >= groups.length
-          ? 0
-          : selectedGroupIndex,
-    );
   }
 }
 

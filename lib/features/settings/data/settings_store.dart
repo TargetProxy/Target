@@ -27,7 +27,6 @@ class SharedPreferencesSettingsStore implements AppSettingsStore {
         prefs.getString(_k('themeMode')),
       ),
       systemProxy: prefs.getBool(_k('systemProxy')) ?? true,
-      smartConnectEnabled: prefs.getBool(_k('smartConnectEnabled')) ?? false,
     );
   }
 
@@ -37,7 +36,6 @@ class SharedPreferencesSettingsStore implements AppSettingsStore {
     await Future.wait([
       prefs.setString(_k('themeMode'), settings.themeMode.name),
       prefs.setBool(_k('systemProxy'), settings.systemProxy),
-      prefs.setBool(_k('smartConnectEnabled'), settings.smartConnectEnabled),
     ]);
   }
 }

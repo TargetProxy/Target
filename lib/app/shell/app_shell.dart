@@ -27,7 +27,6 @@ class AppShell extends StatelessWidget {
   static const _navigationRoutes = [
     AppRoute.home,
     AppRoute.proxies,
-    AppRoute.nodes,
     AppRoute.smartConnect,
     AppRoute.connections,
     AppRoute.traffic,
@@ -35,6 +34,7 @@ class AppShell extends StatelessWidget {
   ];
 
   int _selectedIndexFor(String location) {
+    if (location == '/node-library' || location == '/nodes') return 2;
     final index = _navigationRoutes.indexWhere((route) {
       if (route.path == AppRoute.home.path) {
         return location == route.path;
@@ -71,13 +71,8 @@ class AdaptiveScaffold extends StatelessWidget {
         label: l10n.profiles,
       ),
       NavigationDestination(
-        icon: const Icon(Icons.public),
+        icon: const Icon(Icons.alt_route),
         label: l10n.nodeSelection,
-      ),
-      const NavigationDestination(
-        icon: Icon(Icons.auto_awesome_outlined),
-        selectedIcon: Icon(Icons.auto_awesome),
-        label: 'Smart Connect',
       ),
       NavigationDestination(
         icon: Icon(Icons.cable_outlined),
@@ -174,11 +169,10 @@ class _DesktopSidebar extends StatelessWidget {
               ),
               item(0, l10n.dashboard, Icons.dashboard_outlined),
               item(1, l10n.profiles, Icons.hub_outlined),
-              item(2, l10n.nodeSelection, Icons.public),
-              item(3, 'Smart Connect', Icons.auto_awesome_outlined),
-              item(4, l10n.connections, Icons.cable_outlined),
-              item(5, l10n.traffic, Icons.show_chart),
-              item(6, l10n.logs, Icons.receipt_long_outlined),
+              item(2, l10n.nodeSelection, Icons.alt_route),
+              item(3, l10n.connections, Icons.cable_outlined),
+              item(4, l10n.traffic, Icons.show_chart),
+              item(5, l10n.logs, Icons.receipt_long_outlined),
             ],
           ),
         ),

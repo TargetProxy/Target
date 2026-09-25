@@ -1,59 +1,25 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/runtime/core_notifier.dart';
+import '../../../data/models/proxy_node.dart';
 import '../../proxies/application/proxy_catalog.dart';
-import '../../settings/application/settings_notifier.dart';
 import '../data/smart_connect_repository.dart';
-import '../data/smart_policy_store.dart';
 import '../domain/smart_connect_models.dart';
 import '../domain/smart_runtime_models.dart';
 import 'smart_policy_notifier.dart';
 export '../domain/smart_runtime_models.dart' show SmartBinding;
 
-final smartRepositoryProvider = Provider<SmartConnectRepository>((ref) {
-  final core = ref.read(coreGatewayProvider);
-  final store = ref.read(smartPolicyStoreProvider);
-  return TargetSmartConnectRepository(
-    core,
-    store: store,
-    existingPoolLoader: () => _loadExistingPool(ref, store),
-  );
-});
+final smartRepositoryProvider = Provider<SmartConnectRepository>(
+  (ref) => SmartConnectRepository(ref.read(coreGatewayProvider)),
+);
 
-Future<List<SmartNode>?> _loadExistingPool(
-  Ref ref,
-  SmartPolicyStore store,
-) async {
-  final catalog = ref.read(proxyCatalogProvider);
-  if (!catalog.initialized) return null;
-  final preferences = await store.nodePreferences();
-  final priorities = await store.subscriptionPriorities();
-  return [
-    for (final group in catalog.groups)
-      for (final node in group.nodes)
-        SmartNode(
-          id: node.id,
-          name: node.name,
-          subscriptionId: node.metadata['subscriptionId'] as String? ?? '',
-          protocol: node.type,
-          region: node.countryCode ?? '',
-          latencyMs: node.latencyMs,
-          enabled: node.isAvailable && (preferences[node.id]?.enabled ?? true),
-          excluded: preferences[node.id]?.excluded ?? false,
-          favorite: preferences[node.id]?.favorite ?? false,
-          tags: preferences[node.id]?.tags ?? const {},
-          subscriptionPriority:
-              priorities[node.metadata['subscriptionId'] as String? ?? ''] ?? 0,
-        ),
-  ];
-}
+enum SmartConnectActivity { idle, evaluating, applying }
 
 class SmartConnectState {
   const SmartConnectState({
     this.snapshot = const SmartRuntimeSnapshot(),
     this.assessments = const {},
-    this.evaluating = false,
-    this.busy = false,
+    this.activity = SmartConnectActivity.idle,
     this.error,
     this.message = '',
     this.activeService,
@@ -61,16 +27,19 @@ class SmartConnectState {
   });
   final SmartRuntimeSnapshot snapshot;
   final Map<String, SmartAssessment> assessments;
-  final bool evaluating, busy;
+  final SmartConnectActivity activity;
   final String? error, activeService;
   final String message;
   final List<Map<String, Object>> logs;
+
   Map<String, SmartBinding> get bindings => snapshot.bindings;
+  bool get busy => activity != SmartConnectActivity.idle;
+  bool get evaluating => activity == SmartConnectActivity.evaluating;
+
   SmartConnectState copyWith({
     SmartRuntimeSnapshot? snapshot,
     Map<String, SmartAssessment>? assessments,
-    bool? evaluating,
-    bool? busy,
+    SmartConnectActivity? activity,
     String? error,
     bool clearError = false,
     String? message,
@@ -79,8 +48,7 @@ class SmartConnectState {
   }) => SmartConnectState(
     snapshot: snapshot ?? this.snapshot,
     assessments: assessments ?? this.assessments,
-    evaluating: evaluating ?? this.evaluating,
-    busy: busy ?? this.busy,
+    activity: activity ?? this.activity,
     error: clearError ? null : error ?? this.error,
     message: message ?? this.message,
     activeService: activeService ?? this.activeService,
@@ -91,153 +59,84 @@ class SmartConnectState {
 class SmartConnectNotifier extends Notifier<SmartConnectState> {
   SmartCancellation? _cancellation;
   StreamSubscription<void>? _events;
-  bool _refreshing = false;
+  Future<void> _tail = Future.value();
   bool _auditLoaded = false;
-  bool _refreshAgain = false;
   int _epoch = 0;
+
   @override
   SmartConnectState build() {
     ref.onDispose(() {
       _epoch++;
-      unawaited(_cancellation?.cancel());
+      _cancellation?.cancel();
       unawaited(_events?.cancel());
     });
+    ref.listen(proxyCatalogProvider, (_, _) => unawaited(refresh()));
     ref.listen(smartPoliciesProvider, (previous, next) {
-      if (next.value == null) return;
-      final policies = {for (final p in next.value!) p.id: p.revision};
+      if (previous?.value == next.value) return;
+      ++_epoch;
+      _cancellation?.cancel();
+      _cancellation = null;
       state = state.copyWith(
-        assessments: {
-          for (final e in state.assessments.entries)
-            if (policies[e.key] == e.value.policy.revision) e.key: e.value,
-        },
+        assessments: const {},
+        activity: state.evaluating ? SmartConnectActivity.idle : state.activity,
       );
-    });
-    ref.listen(proxyCatalogProvider, (_, _) {
-      if (enabled) unawaited(refresh());
     });
     return const SmartConnectState();
   }
 
-  bool get enabled => ref.read(settingsProvider).settings.smartConnectEnabled;
   SmartConnectRepository get repository => ref.read(smartRepositoryProvider);
 
-  /// Also used before core start: a failed flag save cannot revive owned routes
-  /// while the persisted user setting says the feature is disabled.
-  Future<void> prepareForStart() async {
-    if (!enabled &&
-        await ref.read(smartPolicyStoreProvider).hasManagedRuntime()) {
-      await repository.disable();
-    }
+  /// Serializes refreshes so a burst of runtime events cannot interleave reads.
+  Future<void> refresh() {
+    final task = _tail.then((_) => _refreshOnce());
+    _tail = task.then<void>((_) {}, onError: (Object _, StackTrace _) {});
+    return task;
   }
 
-  Future<void> initialize() async {
+  Future<void> _refreshOnce() async {
     try {
-      await prepareForStart();
-      if (enabled) await refresh();
-    } on Object catch (error) {
-      if (ref.mounted) state = state.copyWith(error: _safeError(error));
-    }
-  }
-
-  Future<void> setEnabled(bool value) async {
-    if (state.busy) return;
-    state = state.copyWith(busy: true, clearError: true);
-    try {
-      if (!value) {
-        await cancel();
-        // Keep the switch on if the core rejects disabling its routes.
-        await repository.disable();
-        final actual = await repository.load();
-        state = state.copyWith(snapshot: actual);
-        await _events?.cancel();
-        _events = null;
-      } else {
-        final snapshot = await repository.load();
-        state = state.copyWith(snapshot: snapshot);
+      final snapshot = await repository.load();
+      if (!ref.mounted) return;
+      state = state.copyWith(snapshot: snapshot, clearError: true);
+      if (!_auditLoaded) {
+        _auditLoaded = true;
+        final logs = await ref.read(smartPolicyStoreProvider).loadAudit();
+        if (ref.mounted) state = state.copyWith(logs: logs);
       }
-      ref
-          .read(settingsProvider.notifier)
-          .updateSettings((s) => s.copyWith(smartConnectEnabled: value));
-      state = state.copyWith(
-        message: value
-            ? 'Enabled. Evaluate and apply a service explicitly.'
-            : 'Smart service routes disabled. Normal proxy mode is active.',
-        assessments: value ? null : {},
-      );
-      if (value) await refresh();
-    } on Object catch (error) {
-      state = state.copyWith(error: _safeError(error));
-    } finally {
-      state = state.copyWith(busy: false);
-    }
-  }
-
-  Future<void> refresh() async {
-    if (!enabled) return;
-    if (_refreshing) {
-      _refreshAgain = true;
-      return;
-    }
-    _refreshing = true;
-    try {
-      do {
-        _refreshAgain = false;
-        final snapshot = await repository.load();
-        if (!_auditLoaded) {
-          final logs = await ref.read(smartPolicyStoreProvider).loadAudit();
-          if (ref.mounted) state = state.copyWith(logs: logs);
-          _auditLoaded = true;
-        }
-        if (!ref.mounted || !enabled) return;
-        state = state.copyWith(snapshot: snapshot, clearError: true);
-        if (snapshot.eventsSupported && _events == null) {
-          _events = repository.events().listen(
-            (_) {
-              unawaited(refresh());
-            },
-            onError: (Object error) {
-              if (ref.mounted) {
-                state = state.copyWith(
-                  error: 'Runtime event stream failed; refresh to reconnect.',
-                );
-              }
-              unawaited(_events?.cancel());
-              _events = null;
-            },
-            onDone: () {
-              _events = null;
-            },
-          );
-        }
-      } while (_refreshAgain);
+      if (snapshot.eventsSupported && _events == null) {
+        _events = repository.events().listen(
+          (_) => unawaited(refresh()),
+          onError: (Object _) {
+            if (ref.mounted) {
+              state = state.copyWith(
+                error: 'Runtime event stream failed; refresh to reconnect.',
+              );
+            }
+            unawaited(_events?.cancel());
+            _events = null;
+          },
+          onDone: () => _events = null,
+        );
+      }
     } on Object catch (error) {
       if (ref.mounted) state = state.copyWith(error: _safeError(error));
-    } finally {
-      _refreshing = false;
     }
   }
 
   Future<void> evaluate(SmartPolicy policy) async {
-    if (!enabled || state.busy || state.evaluating) return;
+    if (state.busy) return;
     final cancellation = SmartCancellation();
     _cancellation = cancellation;
     final epoch = ++_epoch;
     state = state.copyWith(
-      evaluating: true,
+      activity: SmartConnectActivity.evaluating,
       activeService: policy.id,
       clearError: true,
       assessments: {...state.assessments}..remove(policy.id),
     );
     try {
       final assessment = await repository.evaluate(policy, cancellation);
-      if (!ref.mounted || epoch != _epoch || !enabled) return;
-      final latest = await ref.read(smartPoliciesProvider.future);
-      if (!latest.any(
-        (p) => p.id == policy.id && p.revision == policy.revision,
-      )) {
-        throw StateError('Policy changed; re-evaluate');
-      }
-      if (epoch != _epoch || !enabled) return;
+      if (!ref.mounted || epoch != _epoch) return;
       state = state.copyWith(
         assessments: {...state.assessments, policy.id: assessment},
         message: assessment.selection.reason,
@@ -252,7 +151,6 @@ class SmartConnectNotifier extends Notifier<SmartConnectState> {
               (assessment.selection.direct ? 'direct' : ''),
           'scores': assessment.selection.scores,
           'excluded': assessment.selection.excluded,
-          'policyRevision': policy.revision,
           'poolRevision': assessment.poolRevision,
         },
       );
@@ -263,25 +161,48 @@ class SmartConnectNotifier extends Notifier<SmartConnectState> {
     } finally {
       if (ref.mounted && epoch == _epoch) {
         _cancellation = null;
-        state = state.copyWith(evaluating: false);
+        state = state.copyWith(activity: SmartConnectActivity.idle);
       }
+    }
+  }
+
+  /// Runs the common path users expect: find a node and apply it immediately.
+  Future<void> connect(SmartPolicy policy) async {
+    if (state.busy) return;
+    state = state.copyWith(
+      activity: SmartConnectActivity.applying,
+      activeService: policy.id,
+      clearError: true,
+    );
+    try {
+      await repository.connectDefault(policy);
+      state = state.copyWith(
+        message:
+            '${policy.name.isEmpty ? policy.id : policy.name} connected. Quality optimization runs when needed.',
+        assessments: {...state.assessments}..remove(policy.id),
+      );
+      await refresh();
+    } on Object catch (error) {
+      state = state.copyWith(error: _safeError(error));
+    } finally {
+      state = state.copyWith(activity: SmartConnectActivity.idle);
     }
   }
 
   Future<void> cancel() async {
     ++_epoch;
-    await _cancellation?.cancel();
+    _cancellation?.cancel();
     _cancellation = null;
     if (ref.mounted) {
       state = state.copyWith(
-        evaluating: false,
+        activity: SmartConnectActivity.idle,
         message: 'Evaluation cancelled; existing bindings preserved.',
       );
     }
   }
 
   Future<void> apply(String policyId, {String? manualNodeId}) async {
-    if (!enabled || state.busy || state.evaluating) return;
+    if (state.busy) return;
     final assessment = state.assessments[policyId];
     if (assessment == null) return;
     if (assessment.policy.selectionMode == SmartSelectionMode.manual &&
@@ -291,17 +212,12 @@ class SmartConnectNotifier extends Notifier<SmartConnectState> {
       );
       return;
     }
-    state = state.copyWith(busy: true, clearError: true);
+    state = state.copyWith(
+      activity: SmartConnectActivity.applying,
+      clearError: true,
+    );
     try {
-      final policies = await ref.read(smartPoliciesProvider.future);
-      if (!policies.any(
-        (p) => p.id == policyId && p.revision == assessment.policy.revision,
-      )) {
-        throw StateError('Policy changed; re-evaluate');
-      }
-      await ref.read(smartPolicyStoreProvider).markManagedRuntime();
       await repository.apply(assessment, manualNodeId: manualNodeId);
-      await refresh();
       await _log(
         'apply',
         policyId,
@@ -309,7 +225,6 @@ class SmartConnectNotifier extends Notifier<SmartConnectState> {
         details: {
           'selectedNode':
               manualNodeId ?? assessment.selection.node?.id ?? 'direct',
-          'policyRevision': assessment.policy.revision,
         },
       );
       state = state.copyWith(
@@ -321,17 +236,18 @@ class SmartConnectNotifier extends Notifier<SmartConnectState> {
     } on Object catch (error) {
       state = state.copyWith(error: _safeError(error));
     } finally {
-      state = state.copyWith(busy: false);
+      state = state.copyWith(activity: SmartConnectActivity.idle);
     }
   }
 
   Future<void> removePolicy(String policyId) async {
-    if (state.busy || state.evaluating) return;
-    state = state.copyWith(busy: true, clearError: true);
+    if (state.busy) return;
+    state = state.copyWith(
+      activity: SmartConnectActivity.applying,
+      clearError: true,
+    );
     try {
-      if (state.bindings.containsKey(policyId)) {
-        await repository.remove(policyId);
-      }
+      await repository.remove(policyId);
       await ref.read(smartPoliciesProvider.notifier).removePolicy(policyId);
       state = state.copyWith(
         assessments: {...state.assessments}..remove(policyId),
@@ -340,9 +256,94 @@ class SmartConnectNotifier extends Notifier<SmartConnectState> {
     } on Object catch (error) {
       state = state.copyWith(error: _safeError(error));
     } finally {
-      state = state.copyWith(busy: false);
+      state = state.copyWith(activity: SmartConnectActivity.idle);
     }
   }
+
+  Future<void> savePreference(String nodeId, NodePreference preference) async {
+    await repository.setPreference(nodeId, preference);
+    await refresh();
+  }
+
+  Future<void> selectNode(SmartPolicy policy, String nodeId) async {
+    if (state.busy) return;
+    state = state.copyWith(
+      activity: SmartConnectActivity.applying,
+      clearError: true,
+    );
+    try {
+      await repository.forceNode(policy, nodeId);
+      state = state.copyWith(
+        message:
+            '${policy.name.isEmpty ? policy.id : policy.name} now uses the selected node.',
+      );
+      await refresh();
+    } on Object catch (error) {
+      state = state.copyWith(error: _safeError(error));
+    } finally {
+      state = state.copyWith(activity: SmartConnectActivity.idle);
+    }
+  }
+
+  Future<void> selectDefault(String nodeId) async {
+    if (state.busy) return;
+    state = state.copyWith(
+      activity: SmartConnectActivity.applying,
+      clearError: true,
+    );
+    try {
+      await repository.selectDefault(nodeId);
+      ref.read(proxyCatalogProvider.notifier).selectNode('proxy', nodeId);
+      state = state.copyWith(
+        message: 'Default route now uses the selected node.',
+      );
+      await refresh();
+    } on Object catch (error) {
+      state = state.copyWith(error: _safeError(error));
+    } finally {
+      state = state.copyWith(activity: SmartConnectActivity.idle);
+    }
+  }
+
+  Future<void> applyRoute(SmartPolicy policy, {String? nodeId}) async {
+    if (state.busy) return;
+    final assessment = state.assessments[policy.id];
+    state = state.copyWith(
+      activity: SmartConnectActivity.applying,
+      clearError: true,
+    );
+    SmartPolicy? previous;
+    var saved = false;
+    try {
+      previous = (await ref.read(
+        smartPoliciesProvider.future,
+      )).where((item) => item.id == policy.id).firstOrNull;
+      await ref.read(smartPoliciesProvider.notifier).savePolicy(policy);
+      saved = true;
+      await repository.applyRoute(
+        policy,
+        nodeId: nodeId,
+        assessment: assessment,
+      );
+      state = state.copyWith(
+        assessments: {...state.assessments}..remove(policy.id),
+        message:
+            '${policy.name.isEmpty ? policy.id : policy.name} route saved.',
+      );
+      await refresh();
+    } on Object catch (error) {
+      if (saved && previous != null) {
+        await ref.read(smartPoliciesProvider.notifier).savePolicy(previous);
+      }
+      await refresh();
+      state = state.copyWith(error: _safeError(error));
+    } finally {
+      state = state.copyWith(activity: SmartConnectActivity.idle);
+    }
+  }
+
+  Future<List<ProxyNode>> history(SmartPolicy policy, String nodeId) =>
+      repository.history(policy, nodeId);
 
   Future<void> _log(
     String action,

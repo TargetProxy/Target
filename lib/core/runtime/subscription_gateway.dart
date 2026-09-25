@@ -1,6 +1,5 @@
-import '../../data/models/proxy_group.dart';
-import '../../data/models/proxy_node.dart';
-
+/// Subscription data shapes exchanged with the core. The operations themselves
+/// live on [CoreGateway]; there is one core, so there is one gateway type.
 class RuntimeSubscriptionSnapshot {
   const RuntimeSubscriptionSnapshot({required this.subscriptions});
 
@@ -18,7 +17,7 @@ class RuntimeSubscription {
     required this.autoUpdate,
     required this.updateIntervalSeconds,
     required this.status,
-    this.profile = const RuntimeProfile(),
+    this.nodeCount = 0,
     this.errorCode,
     this.errorMessage,
     this.updatedAt,
@@ -39,7 +38,10 @@ class RuntimeSubscription {
   final bool autoUpdate;
   final int updateIntervalSeconds;
   final RuntimeSubscriptionStatus status;
-  final RuntimeProfile profile;
+
+  /// Nodes this subscription contributed. The shared pool itself comes from
+  /// the core's node pool, not from per-subscription profiles.
+  final int nodeCount;
   final String? errorCode;
   final String? errorMessage;
   final DateTime? updatedAt;
@@ -51,16 +53,6 @@ class RuntimeSubscription {
   final String? webPageUrl;
   final String? supportUrl;
   final String? movedPermanentlyTo;
-}
-
-class RuntimeProfile {
-  const RuntimeProfile({this.nodes = const [], this.groups = const []});
-
-  final List<ProxyNode> nodes;
-
-  /// Client-owned runtime selector groups built from TargetLib's node-only
-  /// profile view.
-  final List<ProxyGroup> groups;
 }
 
 class RuntimeSubscriptionUpdate {
@@ -79,29 +71,4 @@ class RuntimeSubscriptionUpdate {
   final Duration duration;
   final String originalConfig;
   final String generatedConfig;
-}
-
-abstract interface class SubscriptionGateway {
-  Stream<void> get subscriptionChanges;
-
-  Future<RuntimeSubscriptionSnapshot> listSubscriptions();
-
-  Future<RuntimeSubscription> addSubscription({
-    required String id,
-    required String name,
-    required String url,
-    required bool enabled,
-    required bool autoUpdate,
-    required int updateIntervalSeconds,
-    required Map<String, String> headers,
-    bool updateNow = false,
-  });
-
-  Future<void> removeSubscription(String id);
-
-  Future<RuntimeSubscription> renameSubscription(String id, String name);
-
-  Future<RuntimeSubscription> setSubscriptionEnabled(String id, bool enabled);
-
-  Future<RuntimeSubscriptionUpdate> updateSubscription(String id);
 }

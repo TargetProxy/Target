@@ -13,6 +13,8 @@ import 'shell/app_shell.dart';
 class AppRouter {
   AppRouter();
 
+  final _groupsKey = GlobalKey<SmartConnectPageState>();
+
   late final GoRouter router = GoRouter(
     initialLocation: AppRoute.home.path,
     routes: [
@@ -30,11 +32,17 @@ class AppRouter {
           ),
           GoRoute(
             path: AppRoute.nodes.path,
-            pageBuilder: _fadePageBuilder(const NodePoolPage()),
+            redirect: (_, _) => AppRoute.smartConnect.path,
           ),
           GoRoute(
             path: AppRoute.smartConnect.path,
-            pageBuilder: _fadePageBuilder(const SmartConnectPage()),
+            pageBuilder: _fadePageBuilder(SmartConnectPage(key: _groupsKey)),
+            onExit: (_, _) async =>
+                await _groupsKey.currentState?.confirmLeave() ?? true,
+          ),
+          GoRoute(
+            path: '/node-library',
+            pageBuilder: _fadePageBuilder(const NodePoolPage()),
           ),
           GoRoute(
             path: AppRoute.connections.path,

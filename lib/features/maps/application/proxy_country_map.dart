@@ -135,8 +135,8 @@ List<ProxyCountryMapEntry> proxyCountryMapEntries(Iterable<ProxyNode> nodes) {
 }
 
 String? proxyNodeCountryCode(ProxyNode node) {
-  final explicit = node.countryCode?.trim().toUpperCase();
-  if (explicit != null && _locations.containsKey(explicit)) {
+  final explicit = node.effectiveCountryCode;
+  if (_locations.containsKey(explicit)) {
     return explicit;
   }
 

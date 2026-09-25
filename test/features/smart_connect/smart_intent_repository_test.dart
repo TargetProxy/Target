@@ -1,105 +1,100 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:targetlib/targetlib.dart' as pb;
-import 'package:target/core/runtime/core_gateway.dart';
-import 'package:target/core/runtime/smart_runtime_gateway.dart';
 import 'package:target/features/smart_connect/data/smart_connect_repository.dart';
-import 'package:target/features/smart_connect/data/smart_intent_repository.dart';
-import 'package:target/features/smart_connect/data/smart_policy_store.dart';
 import 'package:target/features/smart_connect/domain/smart_connect_models.dart';
-
-class FakeIntentCore extends UnavailableCoreGateway
-    implements SmartIntentGateway, SmartRuntimeGateway {
-  pb.SmartConnectSnapshot snapshot = pb.SmartConnectSnapshot(revision: 's1');
-  pb.RuntimeConfig config = pb.RuntimeConfig(revision: 'r1');
-  int modelWrites = 0;
-  int forceCalls = 0;
-
-  @override
-  Future<pb.CapabilitiesResponse> smartCapabilities() async =>
-      pb.CapabilitiesResponse(smartConnectIntentApi: true, runtimeEvents: true);
-  @override
-  Future<pb.SmartConnectSnapshot> smartSnapshot() async => snapshot.deepCopy();
-  @override
-  Future<pb.NodePool> getNodePool() async => pb.NodePool(revision: 'pool1');
-  @override
-  Future<pb.RuntimeConfig> smartConfig() async => config.deepCopy();
-  @override
-  Future<pb.RuntimeState> getSmartConnectRuntimeState() async =>
-      pb.RuntimeState(running: true);
-  @override
-  Future<pb.Operation> setSmartEnabled(
-    pb.SetSmartConnectEnabledRequest request,
-  ) async {
-    snapshot.enabled = request.enabled;
-    snapshot.revision = 's${request.enabled ? 2 : 5}';
-    return pb.Operation(status: pb.OperationStatus.OPERATION_STATUS_SUCCEEDED);
-  }
-
-  @override
-  Future<pb.Operation> upsertSmartPolicy(
-    pb.UpsertServicePolicyRequest request,
-  ) async {
-    snapshot.policies.add(request.policy..revision = 'policy1');
-    snapshot.revision = 's3';
-    return pb.Operation(status: pb.OperationStatus.OPERATION_STATUS_SUCCEEDED);
-  }
-
-  @override
-  Future<pb.Operation> forceSmartBinding(
-    pb.ForceServiceBindingRequest request,
-  ) async {
-    forceCalls++;
-    expect(request.nodeId, 'direct');
-    expect(request.serviceId, 'target.smart.direct');
-    config.serviceBindings.add(
-      pb.ServiceBinding(
-        serviceId: request.serviceId,
-        nodeId: request.nodeId,
-        selectionPolicyRevision: 'policy1',
-      ),
-    );
-    return pb.Operation(status: pb.OperationStatus.OPERATION_STATUS_SUCCEEDED);
-  }
-
-  @override
-  Future<pb.RuntimeConfig> updateSmartModel(
-    pb.RuntimeModel model,
-    String revision,
-  ) async {
-    modelWrites++;
-    throw StateError('legacy model mutation');
-  }
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-}
+import 'fake_intent_core.dart';
 
 void main() {
-  TestWidgetsFlutterBinding.ensureInitialized();
+  test('direct route binds only the requested service', () async {
+    final core = FakeIntentCore();
+    final repository = SmartConnectRepository(core);
+    const policy = SmartPolicy(
+      id: 'direct',
+      domains: {'example.com'},
+      selectionMode: SmartSelectionMode.direct,
+    );
+    await repository.applyRoute(policy);
+    expect(core.forced.single.nodeId, 'direct');
+    expect(core.forced.single.serviceId, 'target.smart.direct');
+    expect(core.selections, isEmpty);
+  });
   test(
-    'intent path owns Direct policy and binding without runtime model writes',
+    'following Default removes service rules without copying its node',
     () async {
-      SharedPreferences.setMockInitialValues({});
       final core = FakeIntentCore();
-      final repository = IntentSmartConnectRepository(
-        core,
-        core,
-        SmartPolicyStore(),
-      );
+      final repository = SmartConnectRepository(core);
       const policy = SmartPolicy(
-        id: 'direct',
+        id: 'service',
         domains: {'example.com'},
         selectionMode: SmartSelectionMode.direct,
       );
-      await repository.enable();
+      await repository.applyRoute(policy);
+      await repository.applyRoute(
+        policy.copyWith(selectionMode: SmartSelectionMode.followDefault),
+      );
+      expect(core.snapshot.policies, isEmpty);
+      expect(core.config.serviceBindings, isEmpty);
+      expect(core.bindingWrites, 1);
+      expect(core.selections, isEmpty);
+    },
+  );
+  test(
+    'manual selection rejects a node outside service constraints before syncing',
+    () async {
+      final core = FakeIntentCore()
+        ..pool = pb.NodePool(
+          nodes: [pb.ProfileNode(tag: 'jp', countryCode: 'JP')],
+        );
+      final repository = SmartConnectRepository(core);
+      const policy = SmartPolicy(
+        id: 'disney',
+        domains: {'disneyplus.com'},
+        selectionMode: SmartSelectionMode.manual,
+        allowedRegions: {'US'},
+      );
+      await expectLater(
+        repository.applyRoute(policy, nodeId: 'jp'),
+        throwsStateError,
+      );
+      expect(core.snapshot.policies, isEmpty);
+      expect(core.bindingWrites, 0);
+    },
+  );
+  test('stopped runtime still saves default selection via the core', () async {
+    final core = FakeIntentCore()..running = false;
+    await SmartConnectRepository(core).selectDefault('direct');
+    final loaded = await SmartConnectRepository(core).load();
+    expect(loaded.defaultNodeId, 'direct');
+    expect(loaded.running, false);
+    expect(loaded.defaultEffective, false);
+  });
+  test(
+    'recommendation is not applied automatically and stale settings are rejected',
+    () async {
+      final core = FakeIntentCore()
+        ..pool = pb.NodePool(
+          revision: 'pool1',
+          nodes: [pb.ProfileNode(tag: 'us', countryCode: 'US')],
+        );
+      final repository = SmartConnectRepository(core);
+      const policy = SmartPolicy(
+        id: 'service',
+        domains: {'example.com'},
+        probeTargets: [SmartProbeTarget(url: 'https://example.com/')],
+      );
       final assessment = await repository.evaluate(policy, SmartCancellation());
-      expect(assessment.selection.direct, isTrue);
-      await repository.apply(assessment);
-      expect(core.forceCalls, 1);
-      expect(core.modelWrites, 0);
-      await repository.disable();
-      expect(core.snapshot.enabled, isFalse);
+      expect(core.bindingWrites, 0);
+      final changed = SmartPolicy.fromJson({
+        ...policy.toJson(),
+        'allowedRegions': ['JP'],
+      });
+      await expectLater(
+        repository.applyRoute(changed, assessment: assessment),
+        throwsStateError,
+      );
+      expect(core.bindingWrites, 0);
+      await repository.applyRoute(policy, assessment: assessment);
+      expect(core.bindingWrites, 1);
     },
   );
 }

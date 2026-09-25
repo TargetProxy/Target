@@ -15,11 +15,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get profiles => 'Subscriptions';
 
   @override
-  String get nodeSelection => 'Node selection';
+  String get nodeSelection => 'Proxy groups';
 
   @override
   String get subscriptionsHint =>
-      'Select the subscriptions to include in your Smart Connect node pool.';
+      'Select subscriptions to supply nodes for all your proxy groups.';
 
   @override
   String get addSubscription => 'Add subscription';

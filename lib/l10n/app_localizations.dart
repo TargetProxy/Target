@@ -113,13 +113,13 @@ abstract class AppLocalizations {
   /// No description provided for @nodeSelection.
   ///
   /// In en, this message translates to:
-  /// **'Node selection'**
+  /// **'Proxy groups'**
   String get nodeSelection;
 
   /// No description provided for @subscriptionsHint.
   ///
   /// In en, this message translates to:
-  /// **'Select the subscriptions to include in your Smart Connect node pool.'**
+  /// **'Select subscriptions to supply nodes for all your proxy groups.'**
   String get subscriptionsHint;
 
   /// No description provided for @addSubscription.

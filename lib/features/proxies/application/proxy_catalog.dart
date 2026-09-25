@@ -4,22 +4,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/proxy_group.dart';
 import '../../../data/models/proxy_node.dart';
 
-/// Immutable snapshot of the parsed proxy catalog.
+/// Immutable snapshot of the shared node pool.
 @immutable
 class ProxyCatalogState {
   const ProxyCatalogState({this.groups = const [], this.initialized = false});
 
   final List<ProxyGroup> groups;
   final bool initialized;
-
-  ProxyCatalogState copyWith({List<ProxyGroup>? groups}) {
-    return ProxyCatalogState(
-      groups: groups ?? this.groups,
-      initialized: initialized,
-    );
-  }
 }
 
+/// Owns the node pool and the latency results measured against it. Latency
+/// merging lives here only, so a pool refresh cannot drop measurements.
 class ProxyCatalogNotifier extends Notifier<ProxyCatalogState> {
   @override
   ProxyCatalogState build() => const ProxyCatalogState();
@@ -30,82 +25,87 @@ class ProxyCatalogNotifier extends Notifier<ProxyCatalogState> {
   }
 
   void replaceGroups(List<ProxyGroup> sourceGroups) {
-    final previousSelections = {
-      for (final group in state.groups) group.id: group.selectedNodeId,
-    };
-    state = ProxyCatalogState(
-      initialized: true,
-      groups: [
-        for (final group in sourceGroups)
-          _mergeGroup(group, previousSelections[group.id]),
-      ],
-    );
-  }
-
-  ProxyGroup _mergeGroup(ProxyGroup source, String? previousSelection) {
-    final nodes = _mergeLatency(source.nodes);
-    final selected = _restoreSelection(
-      previousSelection ?? source.selectedNodeId,
-      nodes,
-    );
-    return ProxyGroup(
-      id: source.id,
-      name: source.name,
-      type: source.type,
-      selectedNodeId: selected,
-      nodes: _markSelected(nodes, selected),
-    );
-  }
-
-  void selectNode(String groupId, String nodeId) {
-    state = state.copyWith(
-      groups: [
-        for (final group in state.groups)
-          if (group.id == groupId)
-            group.copyWith(
-              selectedNodeId: nodeId,
-              nodes: _markSelected(group.nodes, nodeId),
-            )
-          else
-            group,
-      ],
-    );
-  }
-
-  List<ProxyNode> _mergeLatency(List<ProxyNode> nodes) {
     final previous = <String, ProxyNode>{};
     for (final group in state.groups) {
       for (final node in group.nodes) {
         previous[node.id] = node;
       }
     }
-    return [
-      for (final node in nodes) _withPreviousLatency(node, previous[node.id]),
+    final selections = {
+      for (final group in state.groups) group.id: group.selectedNodeId,
+    };
+    state = ProxyCatalogState(
+      initialized: true,
+      groups: [
+        for (final group in sourceGroups)
+          _rebuild(group, selections[group.id] ?? group.selectedNodeId, previous),
+      ],
+    );
+  }
+
+  void selectNode(String groupId, String nodeId) {
+    state = ProxyCatalogState(
+      initialized: state.initialized,
+      groups: [
+        for (final group in state.groups)
+          if (group.id == groupId) _select(group, nodeId) else group,
+      ],
+    );
+  }
+
+  void applyLatency(String nodeId, {int? latencyMs, bool timedOut = false}) {
+    state = ProxyCatalogState(
+      initialized: state.initialized,
+      groups: [
+        for (final group in state.groups)
+          group.copyWith(
+            nodes: [
+              for (final node in group.nodes)
+                if (node.id == nodeId)
+                  node.copyWith(latencyMs: latencyMs, latencyTimedOut: timedOut)
+                else
+                  node,
+            ],
+          ),
+      ],
+    );
+  }
+
+  ProxyGroup _rebuild(
+    ProxyGroup source,
+    String? previousSelection,
+    Map<String, ProxyNode> previous,
+  ) {
+    final nodes = [
+      for (final node in source.nodes) _withPreviousLatency(node, previous[node.id]),
     ];
+    return _select(source.copyWith(nodes: nodes), previousSelection);
+  }
+
+  /// Removing a source must not silently choose a different connection, so an
+  /// absent selection clears rather than falling back to another node.
+  ProxyGroup _select(ProxyGroup group, String? nodeId) {
+    final selected = nodeId != null && group.nodes.any((n) => n.id == nodeId)
+        ? nodeId
+        : null;
+    return group.copyWith(
+      selectedNodeId: selected,
+      clearSelection: selected == null,
+      nodes: [
+        for (final node in group.nodes)
+          node.copyWith(isSelected: node.id == selected),
+      ],
+    );
   }
 
   ProxyNode _withPreviousLatency(ProxyNode node, ProxyNode? previous) {
-    if (previous == null) return node;
-    if (previous.latencyMs == null && !previous.latencyTimedOut) return node;
+    if (previous == null || node.hasLatencyResult || !previous.hasLatencyResult) {
+      return node;
+    }
     return node.copyWith(
       latencyMs: previous.latencyMs,
       latencyTimedOut: previous.latencyTimedOut,
     );
-  }
-
-  String? _restoreSelection(String? previous, List<ProxyNode> nodes) {
-    if (previous != null && nodes.any((node) => node.id == previous)) {
-      return previous;
-    }
-    // Removing a source must not silently choose a different connection.
-    return null;
-  }
-
-  List<ProxyNode> _markSelected(List<ProxyNode> nodes, String? selectedNodeId) {
-    final selected = _restoreSelection(selectedNodeId, nodes);
-    return [
-      for (final node in nodes) node.copyWith(isSelected: node.id == selected),
-    ];
   }
 }
 

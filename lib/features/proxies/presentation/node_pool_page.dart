@@ -2,16 +2,12 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/runtime/core_notifier.dart';
 import '../../../core/widgets/target_page_layout.dart';
 import '../../../data/models/proxy_node.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../maps/application/proxy_country_map.dart';
 import '../../maps/presentation/widgets/abstract_world_map.dart';
-import '../../settings/application/settings_notifier.dart';
 import '../../smart_connect/application/smart_connect_notifier.dart';
-import '../../smart_connect/application/smart_policy_notifier.dart';
-import '../../smart_connect/domain/smart_connect_models.dart';
 import '../../subscriptions/application/subscriptions_notifier.dart';
 import '../application/proxies_notifier.dart';
 
@@ -26,7 +22,6 @@ class _NodePoolPageState extends ConsumerState<NodePoolPage> {
   final _search = TextEditingController();
   String? _source;
   String? _country;
-  bool _selecting = false;
 
   @override
   void dispose() {
@@ -34,121 +29,26 @@ class _NodePoolPageState extends ConsumerState<NodePoolPage> {
     super.dispose();
   }
 
-  Future<void> _selectNode(String id) async {
-    if (_selecting) return;
-    setState(() => _selecting = true);
-    try {
-      await ref.read(proxiesProvider.notifier).selectNode(id);
-    } finally {
-      if (mounted) setState(() => _selecting = false);
-    }
-  }
-
   Future<void> _editSmartPreference(ProxyNode node) async {
-    final store = ref.read(smartPolicyStoreProvider);
+    final smart = ref.read(smartConnectProvider);
     final current =
-        (await store.nodePreferences())[node.id] ?? const SmartNodePreference();
-    var enabled = current.enabled;
-    var excluded = current.excluded;
-    var favorite = current.favorite;
-    final tags = TextEditingController(text: current.tags.join(', '));
-    final subscriptionId = node.metadata['subscriptionId'] as String? ?? '';
-    final priority = TextEditingController(
-      text: '${(await store.subscriptionPriorities())[subscriptionId] ?? 0}',
-    );
-    if (!mounted) {
-      tags.dispose();
-      priority.dispose();
-      return;
-    }
-    final saved = await showDialog<bool>(
+        smart.snapshot.nodes.where((n) => n.id == node.id).firstOrNull ?? node;
+    final result = await showDialog<NodePreference>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: Text(node.name.isEmpty ? node.id : node.name),
-          content: SizedBox(
-            width: 450,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SwitchListTile(
-                  title: const Text('Enabled for Smart Connect'),
-                  value: enabled,
-                  onChanged: (value) => setState(() => enabled = value),
-                ),
-                SwitchListTile(
-                  title: const Text('Exclude from Smart Connect'),
-                  value: excluded,
-                  onChanged: (value) => setState(() => excluded = value),
-                ),
-                SwitchListTile(
-                  title: const Text('Favorite'),
-                  value: favorite,
-                  onChanged: (value) => setState(() => favorite = value),
-                ),
-                TextField(
-                  controller: tags,
-                  decoration: const InputDecoration(
-                    labelText: 'Tags, comma separated',
-                  ),
-                ),
-                TextField(
-                  controller: priority,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Subscription priority (higher wins ties)',
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (int.tryParse(priority.text) != null) {
-                  Navigator.pop(context, true);
-                }
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        ),
-      ),
+      builder: (_) => _NodePreferenceDialog(node: current),
     );
-    if (saved == true && mounted) {
-      try {
-        await store.saveNodePreference(
-          node.id,
-          SmartNodePreference(
-            enabled: enabled,
-            excluded: excluded,
-            favorite: favorite,
-            tags: tags.text
-                .split(',')
-                .map((value) => value.trim())
-                .where((value) => value.isNotEmpty)
-                .toSet(),
-          ),
-        );
-        await store.saveSubscriptionPriority(
-          subscriptionId,
-          int.parse(priority.text),
-        );
-        await ref.read(smartConnectProvider.notifier).refresh();
-      } on Object catch (error) {
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(error.toString())));
-        }
+    if (result == null || !mounted) return;
+    try {
+      await ref
+          .read(smartConnectProvider.notifier)
+          .savePreference(node.id, result);
+    } on Object catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.toString())));
       }
     }
-    tags.dispose();
-    priority.dispose();
   }
 
   Color _latencyColor(BuildContext context, ProxyNode node) {
@@ -168,10 +68,6 @@ class _NodePoolPageState extends ConsumerState<NodePoolPage> {
     final theme = Theme.of(context);
     final proxies = ref.watch(proxiesProvider);
     final subscriptions = ref.watch(subscriptionsProvider);
-    final smartEnabled = ref
-        .watch(settingsProvider)
-        .settings
-        .smartConnectEnabled;
     final notifier = ref.read(proxiesProvider.notifier);
     final enabled = subscriptions.subscriptions.where((sub) => sub.enabled);
     final names = {
@@ -181,11 +77,11 @@ class _NodePoolPageState extends ConsumerState<NodePoolPage> {
     final nodes = proxies.selectedGroup?.nodes ?? const <ProxyNode>[];
     final query = _search.text.trim().toLowerCase();
     String sourceName(ProxyNode node) =>
-        names[node.metadata['subscriptionId']] ?? l10n.unknownSource;
+        names[node.subscriptionId] ?? l10n.unknownSource;
     final matching = nodes
         .where(
           (node) =>
-              (source == null || node.metadata['subscriptionId'] == source) &&
+              (source == null || node.subscriptionId == source) &&
               (query.isEmpty ||
                   '${node.name} ${node.type} ${proxyNodeCountryCode(node) ?? ''} ${sourceName(node)}'
                       .toLowerCase()
@@ -201,10 +97,7 @@ class _NodePoolPageState extends ConsumerState<NodePoolPage> {
           (node) => country == null || proxyNodeCountryCode(node) == country,
         )
         .toList();
-    final busy =
-        _selecting ||
-        subscriptions.busy ||
-        subscriptions.changingIds.isNotEmpty;
+    final busy = subscriptions.busy || subscriptions.changingIds.isNotEmpty;
     final error = proxies.lastError ?? subscriptions.lastError;
 
     return SafeArea(
@@ -222,8 +115,19 @@ class _NodePoolPageState extends ConsumerState<NodePoolPage> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       TargetPageHeader(
-                        title: l10n.nodeSelection,
-                        subtitle: l10n.nodePoolHint,
+                        title:
+                            Localizations.localeOf(context).languageCode == 'zh'
+                            ? '节点库与地图'
+                            : 'Node library & map',
+                        subtitle:
+                            Localizations.localeOf(context).languageCode == 'zh'
+                            ? '查看节点、测速与候选偏好。出口请在代理分组中选择。'
+                            : 'Inspect nodes, latency and candidate preferences. Choose routes in Proxy groups.',
+                      ),
+                      TextButton.icon(
+                        onPressed: () => context.go('/smart-connect'),
+                        icon: const Icon(Icons.arrow_back),
+                        label: Text(l10n.nodeSelection),
                       ),
                       const SizedBox(height: 16),
                       Wrap(
@@ -238,24 +142,13 @@ class _NodePoolPageState extends ConsumerState<NodePoolPage> {
                             icon: const Icon(Icons.speed),
                             label: Text(l10n.testLatency),
                           ),
-                          Text(
-                            proxies.selectedGroup?.selectedNode?.name ??
-                                l10n.noNodeSelected,
-                          ),
-                          if (_selecting || proxies.testing)
+                          if (proxies.testing)
                             const SizedBox.square(
                               dimension: 18,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             ),
                         ],
                       ),
-                      if (!ref.watch(coreProvider).running) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          l10n.selectionSavedForNextCoreStart,
-                          style: theme.textTheme.bodySmall,
-                        ),
-                      ],
                       if (error != null)
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
@@ -375,7 +268,7 @@ class _NodePoolPageState extends ConsumerState<NodePoolPage> {
                     return ListTile(
                       key: ValueKey('node-${node.id}'),
                       dense: true,
-                      selected: node.isSelected,
+
                       title: Text(
                         node.name,
                         maxLines: 2,
@@ -400,25 +293,16 @@ class _NodePoolPageState extends ConsumerState<NodePoolPage> {
                       leading: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
-                            node.isSelected
-                                ? Icons.radio_button_checked
-                                : Icons.radio_button_off,
+                          IconButton(
+                            icon: const Icon(Icons.tune),
+                            tooltip: 'Smart Connect node preferences',
+                            onPressed: busy
+                                ? null
+                                : () => _editSmartPreference(node),
                           ),
-                          if (smartEnabled)
-                            IconButton(
-                              icon: const Icon(Icons.tune),
-                              tooltip: 'Smart Connect node preferences',
-                              onPressed: busy
-                                  ? null
-                                  : () => _editSmartPreference(node),
-                            ),
                         ],
                       ),
                       enabled: node.isAvailable,
-                      onTap: busy || !node.isAvailable
-                          ? null
-                          : () => _selectNode(node.id),
                     );
                   },
                 ),
@@ -427,6 +311,105 @@ class _NodePoolPageState extends ConsumerState<NodePoolPage> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _NodePreferenceDialog extends StatefulWidget {
+  const _NodePreferenceDialog({required this.node});
+
+  final ProxyNode node;
+
+  @override
+  State<_NodePreferenceDialog> createState() => _NodePreferenceDialogState();
+}
+
+class _NodePreferenceDialogState extends State<_NodePreferenceDialog> {
+  late bool _enabled = widget.node.enabled;
+  late bool _excluded = widget.node.excluded;
+  late bool _favorite = widget.node.favorite;
+  late final TextEditingController _tags = TextEditingController(
+    text: widget.node.tags.join(', '),
+  );
+  late final TextEditingController _priority = TextEditingController(
+    text: '${widget.node.subscriptionPriority}',
+  );
+
+  @override
+  void dispose() {
+    _tags.dispose();
+    _priority.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final node = widget.node;
+    return AlertDialog(
+      title: Text(node.name.isEmpty ? node.id : node.name),
+      content: SizedBox(
+        width: 450,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SwitchListTile(
+              title: const Text('Enabled for Smart Connect'),
+              value: _enabled,
+              onChanged: (value) => setState(() => _enabled = value),
+            ),
+            SwitchListTile(
+              title: const Text('Exclude from Smart Connect'),
+              value: _excluded,
+              onChanged: (value) => setState(() => _excluded = value),
+            ),
+            SwitchListTile(
+              title: const Text('Favorite'),
+              value: _favorite,
+              onChanged: (value) => setState(() => _favorite = value),
+            ),
+            TextField(
+              controller: _tags,
+              decoration: const InputDecoration(
+                labelText: 'Tags, comma separated',
+              ),
+            ),
+            TextField(
+              controller: _priority,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Subscription priority (higher wins ties)',
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () {
+            final priority = int.tryParse(_priority.text);
+            if (priority == null) return;
+            Navigator.pop(
+              context,
+              NodePreference(
+                enabled: _enabled,
+                excluded: _excluded,
+                favorite: _favorite,
+                tags: _tags.text
+                    .split(',')
+                    .map((value) => value.trim())
+                    .where((value) => value.isNotEmpty)
+                    .toSet(),
+                subscriptionPriority: priority,
+              ),
+            );
+          },
+          child: const Text('Save'),
+        ),
+      ],
     );
   }
 }

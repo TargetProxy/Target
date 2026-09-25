@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 
-import '../../data/models/proxy_group.dart';
 import '../../data/models/runtime_settings.dart';
 
 enum CoreLifecycle { unavailable, stopped, starting, running, stopping, failed }
@@ -68,6 +67,8 @@ class CoreConnection {
   final int closedAt;
 }
 
+/// Lifecycle and traffic only. The node pool is read from the core's node pool
+/// through the catalog, never mirrored into runtime snapshots.
 @immutable
 class CoreSnapshot {
   const CoreSnapshot({
@@ -75,7 +76,6 @@ class CoreSnapshot {
     this.message = '',
     this.traffic = TrafficSnapshot.zero,
     this.connections = const [],
-    this.proxyGroups = const [],
     this.runtimeSettings,
   });
 
@@ -83,6 +83,5 @@ class CoreSnapshot {
   final String message;
   final TrafficSnapshot traffic;
   final List<CoreConnection> connections;
-  final List<ProxyGroup> proxyGroups;
   final RuntimeSettings? runtimeSettings;
 }

@@ -9,26 +9,18 @@ import 'package:grpc/grpc.dart';
 import 'package:protobuf/well_known_types/google/protobuf/empty.pb.dart';
 
 import '../../data/models/ip_info.dart';
-import '../../data/models/proxy_group.dart';
-import '../../data/models/proxy_node.dart';
 import '../../data/models/runtime_settings.dart';
 import '../logging/ansi_escape.dart';
 import '../logging/app_logger.dart';
 import '../platform/app_platform.dart';
 import 'core_gateway.dart';
-import 'smart_runtime_gateway.dart';
 import 'core_models.dart';
 import 'package:targetlib/targetlib.dart' as targetlib_pb;
 import 'package:targetlib/targetlib.dart'
-    hide ProxyMode, RouteMode, RuntimeSettings, LogLevel;
+    hide ProxyMode, RouteMode, RuntimeSettings, LogLevel, NodePreference;
 import 'subscription_gateway.dart';
 
-class TargetLibGateway
-    implements
-        CoreGateway,
-        SubscriptionGateway,
-        SmartRuntimeGateway,
-        SmartIntentGateway {
+class TargetLibGateway implements CoreGateway {
   TargetLibGateway({Directory? workingDirectory, AppCapabilities? capabilities})
     : _workingDirectory = workingDirectory,
       _capabilities = capabilities ?? AppCapabilities.current() {
@@ -45,8 +37,6 @@ class TargetLibGateway
       StreamController<void>.broadcast();
   final Map<String, CoreConnection> _connections = {};
   final List<StreamSubscription<Object?>> _subscriptions = [];
-  final List<StreamSubscription<Object?>> _runtimeSubscriptions = [];
-  Future<void> _runtimeStreamTail = Future<void>.value();
 
   TargetLibClient? _manager;
   final TargetLibRuntime _runtime = TargetLibRuntime();
@@ -75,17 +65,7 @@ class TargetLibGateway
     final manager = _manager;
     if (manager == null) return _current;
     final state = await manager.getState(Empty(), options: _callOptions);
-    final lifecycle = switch (state.state) {
-      targetlib_pb.ServiceStateType.SERVICE_STATE_RUNNING =>
-        CoreLifecycle.running,
-      targetlib_pb.ServiceStateType.SERVICE_STATE_STARTING =>
-        CoreLifecycle.starting,
-      targetlib_pb.ServiceStateType.SERVICE_STATE_STOPPING =>
-        CoreLifecycle.stopping,
-      targetlib_pb.ServiceStateType.SERVICE_STATE_FAILED =>
-        CoreLifecycle.failed,
-      _ => CoreLifecycle.stopped,
-    };
+    final lifecycle = _lifecycle(state.state);
     _publish(
       _copyCurrent(
         lifecycle: lifecycle,
@@ -100,29 +80,26 @@ class TargetLibGateway
   }
 
   @override
-  Future<RuntimeSettings> getRuntimeConfig() => _serialize(() async {
+  Future<RuntimeSettings> getRuntimeConfig() async {
     await _ensureConnected();
     final result = await _manager!.getRuntimeConfig(
       Empty(),
       options: _callOptions,
     );
     return _runtimeSettings(result);
-  });
+  }
 
   @override
-  Future<RuntimeSettings> updateRuntimeConfig(RuntimeSettings settings) =>
-      _serialize(() async {
-        await _ensureConnected();
-        final result = await _manager!.updateRuntimeConfig(
-          targetlib_pb.UpdateRuntimeConfigRequest(
-            settings: _protoRuntimeSettings(settings),
-          ),
-          options: (_callOptions ?? CallOptions()).mergedWith(
-            CallOptions(timeout: const Duration(seconds: 30)),
-          ),
-        );
-        return _runtimeSettings(result);
-      });
+  Future<RuntimeSettings> updateRuntimeConfig(RuntimeSettings settings) async {
+    await _ensureConnected();
+    final result = await _manager!.updateRuntimeConfig(
+      targetlib_pb.UpdateRuntimeConfigRequest(
+        settings: _protoRuntimeSettings(settings),
+      ),
+      options: _withTimeout(const Duration(seconds: 30)),
+    );
+    return _runtimeSettings(result);
+  }
 
   targetlib_pb.RuntimeSettings _protoRuntimeSettings(
     RuntimeSettings settings,
@@ -159,9 +136,7 @@ class TargetLibGateway
   }
 
   @override
-  Future<void> start() => _serialize(_startLocked);
-
-  Future<void> _startLocked() async {
+  Future<void> start() async {
     _ensureAvailable();
     _publish(
       _copyCurrent(
@@ -169,47 +144,41 @@ class TargetLibGateway
         message: 'Starting TargetLib...',
       ),
     );
-    try {
-      if (_capabilities.platform == AppPlatform.android) {
-        final granted = await const AndroidTargetLibHostBridge()
-            .requestPermission();
-        if (!granted) {
-          throw const CoreUnavailableException(
-            'Android VPN permission was not granted.',
-          );
-        }
+    if (_capabilities.platform == AppPlatform.android) {
+      final granted = await const AndroidTargetLibHostBridge()
+          .requestPermission();
+      if (!granted) {
+        throw const CoreUnavailableException(
+          'Android VPN permission was not granted.',
+        );
       }
-      await _ensureConnected();
-      final manager = _manager!;
-      final state = await manager.getState(Empty(), options: _callOptions);
-      if (state.state == targetlib_pb.ServiceStateType.SERVICE_STATE_RUNNING) {
-        return;
-      }
-      await manager.start(Empty(), options: _callOptions);
-      _publish(
-        _copyCurrent(
-          lifecycle: CoreLifecycle.running,
-          message: 'TargetLib is running.',
-        ),
-      );
-    } on Object {
-      rethrow;
     }
+    await _ensureConnected();
+    final manager = _manager!;
+    final state = await manager.getState(Empty(), options: _callOptions);
+    if (state.state == targetlib_pb.ServiceStateType.SERVICE_STATE_RUNNING) {
+      return;
+    }
+    await manager.start(Empty(), options: _callOptions);
+    _publish(
+      _copyCurrent(
+        lifecycle: CoreLifecycle.running,
+        message: 'TargetLib is running.',
+      ),
+    );
   }
 
   @override
-  Future<RuntimeSubscriptionSnapshot> listSubscriptions() => _serialize(
-    () async {
-      await _ensureConnected();
-      final result = await _manager!.listSubscriptions(
-        Empty(),
-        options: _callOptions,
-      );
-      return RuntimeSubscriptionSnapshot(
-        subscriptions: result.subscriptions.map(_runtimeSubscription).toList(),
-      );
-    },
-  );
+  Future<RuntimeSubscriptionSnapshot> listSubscriptions() async {
+    await _ensureConnected();
+    final result = await _manager!.listSubscriptions(
+      Empty(),
+      options: _callOptions,
+    );
+    return RuntimeSubscriptionSnapshot(
+      subscriptions: result.subscriptions.map(_runtimeSubscription).toList(),
+    );
+  }
 
   @override
   Future<RuntimeSubscription> addSubscription({
@@ -221,7 +190,7 @@ class TargetLibGateway
     required int updateIntervalSeconds,
     required Map<String, String> headers,
     bool updateNow = false,
-  }) => _serialize(() async {
+  }) async {
     await _ensureConnected();
     final view = await _manager!.addSubscription(
       targetlib_pb.AddSubscriptionRequest(
@@ -235,74 +204,64 @@ class TargetLibGateway
         updateNow: updateNow,
       ),
       options: updateNow
-          ? (_callOptions ?? CallOptions()).mergedWith(
-              CallOptions(timeout: const Duration(seconds: 45)),
-            )
+          ? _withTimeout(const Duration(seconds: 45))
           : _callOptions,
     );
     return _runtimeSubscription(view);
-  });
+  }
 
   @override
-  Future<void> removeSubscription(String id) => _serialize(() async {
+  Future<void> removeSubscription(String id) async {
     await _ensureConnected();
     await _manager!.removeSubscription(
       targetlib_pb.SubscriptionId(id: id),
       options: _callOptions,
     );
-  });
+  }
 
   @override
-  Future<RuntimeSubscription> renameSubscription(String id, String name) =>
-      _serialize(() async {
-        await _ensureConnected();
-        final view = await _manager!.renameSubscription(
-          targetlib_pb.RenameSubscriptionRequest(id: id, name: name),
-          options: _callOptions,
-        );
-        return _runtimeSubscription(view);
-      });
+  Future<RuntimeSubscription> renameSubscription(String id, String name) async {
+    await _ensureConnected();
+    final view = await _manager!.renameSubscription(
+      targetlib_pb.RenameSubscriptionRequest(id: id, name: name),
+      options: _callOptions,
+    );
+    return _runtimeSubscription(view);
+  }
 
   @override
-  Future<RuntimeSubscription> setSubscriptionEnabled(String id, bool enabled) =>
-      _serialize(() async {
-        await _ensureConnected();
-        final view = await _manager!.setSubscriptionEnabled(
-          targetlib_pb.SetSubscriptionEnabledRequest(id: id, enabled: enabled),
-          options: _callOptions,
-        );
-        return _runtimeSubscription(view);
-      });
+  Future<RuntimeSubscription> setSubscriptionEnabled(
+    String id,
+    bool enabled,
+  ) async {
+    await _ensureConnected();
+    final view = await _manager!.setSubscriptionEnabled(
+      targetlib_pb.SetSubscriptionEnabledRequest(id: id, enabled: enabled),
+      options: _callOptions,
+    );
+    return _runtimeSubscription(view);
+  }
 
   @override
-  Future<RuntimeSubscriptionUpdate> updateSubscription(String id) =>
-      _serialize(() async {
-        await _ensureConnected();
-        final result = await _manager!.updateSubscription(
-          targetlib_pb.SubscriptionId(id: id),
-          options: (_callOptions ?? CallOptions()).mergedWith(
-            CallOptions(timeout: const Duration(seconds: 45)),
-          ),
-        );
-        return RuntimeSubscriptionUpdate(
-          subscription: _runtimeSubscription(result.subscription),
-          changed: result.changed,
-          notModified: result.notModified,
-          duration: Duration(milliseconds: result.durationMilliseconds.toInt()),
-          originalConfig: utf8.decode(
-            result.originalConfig,
-            allowMalformed: true,
-          ),
-          generatedConfig: utf8.decode(
-            result.generatedConfig,
-            allowMalformed: true,
-          ),
-        );
-      });
+  Future<RuntimeSubscriptionUpdate> updateSubscription(String id) async {
+    await _ensureConnected();
+    final result = await _manager!.updateSubscription(
+      targetlib_pb.SubscriptionId(id: id),
+      options: _withTimeout(const Duration(seconds: 45)),
+    );
+    return RuntimeSubscriptionUpdate(
+      subscription: _runtimeSubscription(result.subscription),
+      changed: result.changed,
+      notModified: result.notModified,
+      duration: Duration(milliseconds: result.durationMilliseconds.toInt()),
+      originalConfig: utf8.decode(result.originalConfig, allowMalformed: true),
+      generatedConfig: utf8.decode(result.generatedConfig, allowMalformed: true),
+    );
+  }
 
   /// Queries the egress IP geolocation through the TargetLib backend.
   @override
-  Future<IpInfo> fetchIpInfo() => _serialize(() async {
+  Future<IpInfo> fetchIpInfo() async {
     await _ensureConnected();
     final response = await _manager!.getIpInfo(Empty(), options: _callOptions);
     return IpInfo(
@@ -314,31 +273,15 @@ class TargetLibGateway
       org: response.org,
       asName: response.asName,
     );
-  });
+  }
 
   @override
   Future<targetlib_pb.NodePool> getNodePool() =>
       _smartCall(() => _runtime.getNodePool());
 
   @override
-  Future<targetlib_pb.ServiceBindingList> listServiceBindings() =>
-      _smartCall(() => _runtime.listServiceBindings());
-
-  @override
-  Future<targetlib_pb.SmartConnectDiagnostics> getSmartConnectDiagnostics({
-    String? serviceId,
-  }) => _smartCall(
-    () => _runtime.getSmartConnectDiagnostics(serviceId: serviceId),
-  );
-
-  @override
   Future<targetlib_pb.RuntimeState> getSmartConnectRuntimeState() =>
-      _smartCall(() => _runtime.getRuntimeState());
-
-  Future<T> _smartCall<T>(Future<T> Function() operation) async {
-    await _ensureConnected();
-    return operation();
-  }
+      _smartCall(_runtime.getRuntimeState);
 
   @override
   Future<targetlib_pb.CapabilitiesResponse> smartCapabilities() =>
@@ -349,105 +292,69 @@ class TargetLibGateway
       _smartCall(_runtime.getRuntimeConfig);
 
   @override
-  Future<targetlib_pb.RuntimeConfig> updateSmartModel(
-    targetlib_pb.RuntimeModel model,
-    String expectedRevision,
-  ) => _smartCall(() async {
-    // Re-read settings so a service operation never restores stale proxy/TUN settings.
-    final config = await _runtime.getRuntimeConfig();
-    if (config.revision != expectedRevision) {
-      throw StateError(
-        'Runtime changed; refresh before applying Smart Connect',
-      );
-    }
-    return _runtime.updateRuntimeConfig(
-      config.settings,
-      model: model,
-      expectedRevision: expectedRevision,
-    );
-  });
-
-  @override
-  Future<targetlib_pb.ServiceProbe> putSmartProbe(
-    targetlib_pb.ServiceProbe probe,
-  ) => _smartCall(() => _runtime.putServiceProbe(probe));
-
-  @override
-  Stream<targetlib_pb.ProbeResult> probeSmartService(
-    targetlib_pb.ProbeServiceRequest request,
-  ) async* {
-    await _ensureConnected();
-    yield* _runtime.probeService(request);
-  }
-
-  @override
-  Stream<targetlib_pb.RuntimeEvent> smartEvents() async* {
-    await _ensureConnected();
-    yield* _runtime.subscribeRuntimeEvents();
-  }
-
-  @override
-  Future<targetlib_pb.QualityHistory> smartHistory(
-    targetlib_pb.QualityHistoryRequest request,
-  ) => _smartCall(() => _runtime.getQualityHistory(request));
-
-  @override
   Future<targetlib_pb.SmartConnectSnapshot> smartSnapshot() =>
       _smartCall(() => _requireRuntimeConnection().getSmartConnectSnapshot());
 
-  @override
-  Future<targetlib_pb.Operation> setSmartEnabled(
-    targetlib_pb.SetSmartConnectEnabledRequest request,
-  ) => _smartCall(
-    () => _requireRuntimeConnection().setSmartConnectEnabled(request),
-  );
   @override
   Future<targetlib_pb.Operation> upsertSmartPolicy(
     targetlib_pb.UpsertServicePolicyRequest request,
   ) => _smartCall(
     () => _requireRuntimeConnection().upsertServicePolicy(request),
   );
+
   @override
   Future<targetlib_pb.Operation> deleteSmartPolicy(
     targetlib_pb.DeleteServicePolicyRequest request,
   ) => _smartCall(
     () => _requireRuntimeConnection().deleteServicePolicy(request),
   );
+
   @override
   Future<targetlib_pb.Operation> setSmartPreference(
     targetlib_pb.SetNodePreferenceRequest request,
   ) => _smartCall(() => _requireRuntimeConnection().setNodePreference(request));
+
   @override
   Future<targetlib_pb.Operation> requestSmartEvaluation(
     targetlib_pb.RequestServiceEvaluationRequest request,
   ) => _smartCall(
     () => _requireRuntimeConnection().requestServiceEvaluation(request),
   );
+
   @override
   Future<targetlib_pb.Operation> approveSmartProposal(
     targetlib_pb.ProposalCommandRequest request,
   ) => _smartCall(
     () => _requireRuntimeConnection().approveSwitchProposal(request),
   );
+
   @override
   Future<targetlib_pb.Operation> rejectSmartProposal(
     targetlib_pb.ProposalCommandRequest request,
   ) => _smartCall(
     () => _requireRuntimeConnection().rejectSwitchProposal(request),
   );
+
   @override
   Future<targetlib_pb.Operation> forceSmartBinding(
     targetlib_pb.ForceServiceBindingRequest request,
   ) => _smartCall(
     () => _requireRuntimeConnection().forceServiceBinding(request),
   );
+
   @override
   Future<targetlib_pb.Operation> smartOperation(String id) =>
       _smartCall(() => _requireRuntimeConnection().getOperation(id));
+
   @override
   Stream<targetlib_pb.SmartConnectEvent> smartIntentEvents() async* {
     await _ensureConnected();
     yield* _requireRuntimeConnection().subscribeSmartConnectEvents();
+  }
+
+  Future<T> _smartCall<T>(Future<T> Function() operation) async {
+    await _ensureConnected();
+    return operation();
   }
 
   targetlib_pb.TargetLibConnection _requireRuntimeConnection() {
@@ -477,7 +384,7 @@ class TargetLibGateway
           RuntimeSubscriptionStatus.failed,
         _ => RuntimeSubscriptionStatus.idle,
       },
-      profile: _runtimeProfile(view.profile),
+      nodeCount: view.profile.nodes.length,
       errorCode: view.errorCode.isEmpty ? null : view.errorCode,
       errorMessage: view.errorMessage.isEmpty ? null : view.errorMessage,
       updatedAt: _dateFromUnixMilliseconds(view.updatedAtUnixMs.toInt()),
@@ -494,57 +401,12 @@ class TargetLibGateway
     );
   }
 
-  RuntimeProfile _runtimeProfile(targetlib_pb.ProfileView source) {
-    final nodes = <ProxyNode>[
-      for (final node in source.nodes)
-        ProxyNode(
-          id: node.tag,
-          name: node.name.isEmpty ? node.tag : node.name,
-          type: node.type,
-          countryCode: node.countryCode.isEmpty ? null : node.countryCode,
-          // Only nodes that explicitly failed normalization are excluded;
-          // discovered/normalized phases stay selectable so exits can be
-          // chosen before the core reports READY.
-          isAvailable:
-              node.phase !=
-              targetlib_pb.ProfileNodePhase.PROFILE_NODE_PHASE_FAILED,
-          metadata: {
-            'server': node.server,
-            'port': node.port,
-            if (node.errorMessage.isNotEmpty) 'error': node.errorMessage,
-          },
-        ),
-    ];
-    final exitNodes = [
-      for (final node in nodes)
-        if (_isSelectableExit(node) && node.isAvailable) node,
-    ];
-    return RuntimeProfile(
-      nodes: nodes,
-      groups: exitNodes.isEmpty
-          ? const []
-          : [
-              ProxyGroup(
-                id: ProxyGroup.runtimeSelectorGroupId,
-                name: ProxyGroup.runtimeSelectorGroupId,
-                type: 'selector',
-                nodes: exitNodes,
-              ),
-            ],
-    );
-  }
-
-  static bool _isSelectableExit(ProxyNode node) {
-    final type = node.type.toLowerCase();
-    return type != 'direct' && type != 'block' && type != 'dns';
-  }
-
   DateTime? _dateFromUnixMilliseconds(int value) => value <= 0
       ? null
       : DateTime.fromMillisecondsSinceEpoch(value, isUtc: true);
 
   @override
-  Future<void> stop() => _serialize(_stopLocked);
+  Future<void> stop() => _stopLocked();
 
   Future<void> _stopLocked() async {
     final manager = _manager;
@@ -581,31 +443,19 @@ class TargetLibGateway
 
   @override
   Future<void> selectOutbound(String groupId, String outboundId) async {
-    final manager = _manager;
-    if (manager == null) {
-      throw const CoreUnavailableException(
-        'Start TargetLib before selecting an outbound.',
-      );
-    }
+    final manager = _requireManager('selecting an outbound');
     await manager.selectOutbound(
       targetlib_pb.SelectOutboundRequest(
         groupTag: groupId,
         outboundTag: outboundId,
       ),
-      options: (_callOptions ?? CallOptions()).mergedWith(
-        CallOptions(timeout: const Duration(seconds: 5)),
-      ),
+      options: _withTimeout(const Duration(seconds: 5)),
     );
   }
 
   @override
   Future<int?> testLatency(String outboundId) async {
-    final manager = _manager;
-    if (manager == null) {
-      throw const CoreUnavailableException(
-        'Start TargetLib before testing latency.',
-      );
-    }
+    final manager = _requireManager('testing latency');
     final result = _coreLatencyResult(
       await manager.testOutbound(
         targetlib_pb.TestOutboundRequest(
@@ -623,12 +473,7 @@ class TargetLibGateway
 
   @override
   Stream<CoreLatencyResult> testLatencies(Iterable<String> outboundIds) async* {
-    final manager = _manager;
-    if (manager == null) {
-      throw const CoreUnavailableException(
-        'Start TargetLib before testing latency.',
-      );
-    }
+    final manager = _requireManager('testing latency');
     final stream = manager.testOutbounds(
       targetlib_pb.TestOutboundsRequest(
         outboundTags: outboundIds,
@@ -644,12 +489,7 @@ class TargetLibGateway
 
   @override
   Future<void> closeConnection(String connectionId) async {
-    final manager = _manager;
-    if (manager == null) {
-      throw const CoreUnavailableException(
-        'Start TargetLib before closing a connection.',
-      );
-    }
+    final manager = _requireManager('closing a connection');
     await manager.closeConnection(
       targetlib_pb.CloseConnectionRequest(id: connectionId),
       options: _callOptions,
@@ -658,12 +498,7 @@ class TargetLibGateway
 
   @override
   Future<int> closeAllConnections() async {
-    final manager = _manager;
-    if (manager == null) {
-      throw const CoreUnavailableException(
-        'Start TargetLib before closing connections.',
-      );
-    }
+    final manager = _requireManager('closing connections');
     final count = _connections.length;
     await manager.closeAllConnections(Empty(), options: _callOptions);
     return count;
@@ -678,25 +513,31 @@ class TargetLibGateway
   }
 
   @override
-  Future<void> dispose() => _serialize(() async {
+  Future<void> dispose() async {
     if (_disposed) return;
     await _stopLocked();
     await _shutdownTransport();
     _disposed = true;
     await _snapshots.close();
     await _subscriptionChanges.close();
-  });
+  }
+
+  TargetLibClient _requireManager(String action) {
+    final manager = _manager;
+    if (manager == null) {
+      throw CoreUnavailableException('Start TargetLib before $action.');
+    }
+    return manager;
+  }
+
+  CallOptions _withTimeout(Duration timeout) =>
+      (_callOptions ?? CallOptions()).mergedWith(CallOptions(timeout: timeout));
 
   Future<Directory> _resolveBaseDirectory() async {
     final path = await _runtime.resolveBasePath(
       rootOverride: _workingDirectory?.path,
     );
     return Directory(path);
-  }
-
-  Future<void> _ensureCore() async {
-    final baseDir = await _resolveBaseDirectory();
-    await _runtime.ensureConnected(basePath: baseDir.path);
   }
 
   Future<void> _ensureConnected() async {
@@ -720,11 +561,8 @@ class TargetLibGateway
 
   Future<void> _connectAndSubscribe() async {
     _ensureAvailable();
-    await _ensureCore();
-    await _connectCommandServer();
-  }
-
-  Future<void> _connectCommandServer() async {
+    final baseDir = await _resolveBaseDirectory();
+    await _runtime.ensureConnected(basePath: baseDir.path);
     final connection = _runtime.connection;
     if (connection == null) {
       throw StateError('TargetLib runtime is not connected.');
@@ -754,21 +592,7 @@ class TargetLibGateway
     );
   }
 
-  void _setRuntimeStreamsEnabled(bool enabled) {
-    _runtimeStreamTail = _runtimeStreamTail.then<void>((_) async {
-      final previous = List<StreamSubscription<Object?>>.of(
-        _runtimeSubscriptions,
-      );
-      _runtimeSubscriptions.clear();
-      for (final subscription in previous) {
-        _subscriptions.remove(subscription);
-        await subscription.cancel();
-      }
-      if (!enabled || _manager == null || _disposed) return;
-    });
-  }
-
-  StreamSubscription<Object?> _listen<T>(
+  void _listen<T>(
     Stream<T> stream,
     void Function(T) onData, {
     required String label,
@@ -785,24 +609,24 @@ class TargetLibGateway
         }
       },
     );
-    final tracked = subscription as StreamSubscription<Object?>;
-    _subscriptions.add(tracked);
-    return tracked;
+    _subscriptions.add(subscription as StreamSubscription<Object?>);
   }
 
+  static CoreLifecycle _lifecycle(targetlib_pb.ServiceStateType state) =>
+      switch (state) {
+        targetlib_pb.ServiceStateType.SERVICE_STATE_STARTING =>
+          CoreLifecycle.starting,
+        targetlib_pb.ServiceStateType.SERVICE_STATE_RUNNING =>
+          CoreLifecycle.running,
+        targetlib_pb.ServiceStateType.SERVICE_STATE_STOPPING =>
+          CoreLifecycle.stopping,
+        targetlib_pb.ServiceStateType.SERVICE_STATE_FAILED =>
+          CoreLifecycle.failed,
+        _ => CoreLifecycle.stopped,
+      };
+
   void _applyManagerState(targetlib_pb.ServiceState status) {
-    final lifecycle = switch (status.state) {
-      targetlib_pb.ServiceStateType.SERVICE_STATE_STARTING =>
-        CoreLifecycle.starting,
-      targetlib_pb.ServiceStateType.SERVICE_STATE_RUNNING =>
-        CoreLifecycle.running,
-      targetlib_pb.ServiceStateType.SERVICE_STATE_STOPPING =>
-        CoreLifecycle.stopping,
-      targetlib_pb.ServiceStateType.SERVICE_STATE_FAILED =>
-        CoreLifecycle.failed,
-      _ => CoreLifecycle.stopped,
-    };
-    _setRuntimeStreamsEnabled(lifecycle == CoreLifecycle.running);
+    final lifecycle = _lifecycle(status.state);
     _publish(
       _copyCurrent(
         lifecycle: lifecycle,
@@ -831,7 +655,6 @@ class TargetLibGateway
   }
 
   Future<void> _shutdownTransport() async {
-    _runtimeSubscriptions.clear();
     final subscriptions = List<StreamSubscription<Object?>>.of(_subscriptions);
     _subscriptions.clear();
     for (final subscription in subscriptions) {
@@ -842,24 +665,17 @@ class TargetLibGateway
     await _runtime.close();
   }
 
-  /// Starts each RPC immediately. The returned future represents only this
-  /// operation; unrelated requests must not wait behind a slow RPC such as
-  /// IP geolocation.
-  Future<T> _serialize<T>(Future<T> Function() operation) => operation();
-
   CoreSnapshot _copyCurrent({
     CoreLifecycle? lifecycle,
     String? message,
     TrafficSnapshot? traffic,
     List<CoreConnection>? connections,
-    List<ProxyGroup>? proxyGroups,
   }) {
     return CoreSnapshot(
       lifecycle: lifecycle ?? _current.lifecycle,
       message: message ?? _current.message,
       traffic: traffic ?? _current.traffic,
       connections: connections ?? _current.connections,
-      proxyGroups: proxyGroups ?? _current.proxyGroups,
     );
   }
 
