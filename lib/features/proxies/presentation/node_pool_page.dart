@@ -277,19 +277,24 @@ class _NodePoolPageState extends ConsumerState<NodePoolPage> {
                       subtitle: Text(
                         '${sourceName(node)} · ${node.typeLabel}${node.isAvailable ? '' : ' · ${l10n.nodeUnavailable}'}',
                       ),
-                      trailing: Text(
-                        node.latencyTimedOut
-                            ? 'timeout'
-                            : (node.latencyMs == null
-                                  ? '—'
-                                  : '${node.latencyMs} ms'),
-                        style: TextStyle(
-                          color: _latencyColor(context, node),
-                          fontWeight: node.latencyTimedOut
-                              ? FontWeight.bold
-                              : FontWeight.w600,
-                        ),
-                      ),
+                      trailing: proxies.testing
+                          ? const SizedBox.square(
+                              dimension: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Text(
+                              node.latencyTimedOut
+                                  ? 'timeout'
+                                  : (node.latencyMs == null
+                                        ? '—'
+                                        : '${node.latencyMs} ms'),
+                              style: TextStyle(
+                                color: _latencyColor(context, node),
+                                fontWeight: node.latencyTimedOut
+                                    ? FontWeight.bold
+                                    : FontWeight.w600,
+                              ),
+                            ),
                       leading: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [

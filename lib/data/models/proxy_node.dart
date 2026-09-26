@@ -13,12 +13,8 @@ class ProxyNode {
     this.observedCountryCode = '',
     this.server = '',
     this.port = 0,
-    this.errorMessage = '',
     this.latencyMs,
     this.latencyTimedOut = false,
-    this.testedAt,
-    this.failureReason = '',
-    this.isSelected = false,
     this.isAvailable = true,
     this.enabled = true,
     this.excluded = false,
@@ -37,12 +33,8 @@ class ProxyNode {
   final String observedCountryCode;
   final String server;
   final int port;
-  final String errorMessage;
   final int? latencyMs;
   final bool latencyTimedOut;
-  final DateTime? testedAt;
-  final String failureReason;
-  final bool isSelected;
   final bool isAvailable;
   final bool enabled;
   final bool excluded;
@@ -70,9 +62,6 @@ class ProxyNode {
     String? observedCountryCode,
     int? latencyMs,
     bool? latencyTimedOut,
-    DateTime? testedAt,
-    String? failureReason,
-    bool? isSelected,
     bool? isAvailable,
     bool? enabled,
     bool? excluded,
@@ -89,12 +78,8 @@ class ProxyNode {
       observedCountryCode: observedCountryCode ?? this.observedCountryCode,
       server: server,
       port: port,
-      errorMessage: errorMessage,
       latencyMs: latencyMs ?? this.latencyMs,
       latencyTimedOut: latencyTimedOut ?? this.latencyTimedOut,
-      testedAt: testedAt ?? this.testedAt,
-      failureReason: failureReason ?? this.failureReason,
-      isSelected: isSelected ?? this.isSelected,
       isAvailable: isAvailable ?? this.isAvailable,
       enabled: enabled ?? this.enabled,
       excluded: excluded ?? this.excluded,

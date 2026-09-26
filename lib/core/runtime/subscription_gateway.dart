@@ -58,7 +58,6 @@ class RuntimeSubscription {
 class RuntimeSubscriptionUpdate {
   const RuntimeSubscriptionUpdate({
     required this.subscription,
-    required this.changed,
     required this.notModified,
     required this.duration,
     this.originalConfig = '',
@@ -66,7 +65,6 @@ class RuntimeSubscriptionUpdate {
   });
 
   final RuntimeSubscription subscription;
-  final bool changed;
   final bool notModified;
   final Duration duration;
   final String originalConfig;

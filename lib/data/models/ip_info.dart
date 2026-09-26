@@ -8,7 +8,6 @@ class IpInfo {
     required this.countryCode,
     required this.city,
     required this.isp,
-    required this.org,
     required this.asName,
   });
 
@@ -17,7 +16,6 @@ class IpInfo {
   final String countryCode;
   final String city;
   final String isp;
-  final String org;
   final String asName;
 
   String get flagEmoji {

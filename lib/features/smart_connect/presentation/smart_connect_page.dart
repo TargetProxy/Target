@@ -8,12 +8,43 @@ import 'package:material_ui/material_ui.dart';
 import '../../../core/runtime/core_notifier.dart';
 import '../../../data/models/proxy_node.dart';
 import '../../../data/models/runtime_settings.dart';
+import '../../maps/application/proxy_country_map.dart';
+import '../../maps/presentation/widgets/abstract_world_map.dart';
 import '../../proxies/application/proxies_notifier.dart';
 import '../../subscriptions/application/subscriptions_notifier.dart';
 import '../application/smart_connect_notifier.dart';
 import '../application/smart_policy_notifier.dart';
 import '../domain/smart_connect_models.dart';
 import 'smart_policy_editor.dart';
+
+class _RouteDragData {
+  const _RouteDragData(this.policy);
+
+  final SmartPolicy? policy;
+}
+
+class _RouteDragFeedback extends StatelessWidget {
+  const _RouteDragFeedback({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    elevation: 6,
+    borderRadius: BorderRadius.circular(20),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.alt_route, size: 18),
+          const SizedBox(width: 6),
+          Text(label),
+        ],
+      ),
+    ),
+  );
+}
 
 class SmartConnectPage extends ConsumerStatefulWidget {
   const SmartConnectPage({super.key});
@@ -132,21 +163,29 @@ class SmartConnectPageState extends ConsumerState<SmartConnectPage> {
       setState(() => _error = t('Choose a node first.', '请先选择节点。'));
       return false;
     }
-    if (policy?.enabled == true &&
-        policy?.selectionMode == SmartSelectionMode.automatic &&
-        (smart.assessments[policy!.id]?.selection.node == null ||
-            jsonEncode(smart.assessments[policy.id]?.policy.toJson()) !=
-                jsonEncode(policy.toJson()))) {
-      setState(
-        () => _error = t('Get a usable recommendation first.', '请先获取可用的推荐节点。'),
-      );
-      return false;
-    }
     setState(() {
       _applying = true;
       _error = null;
     });
     try {
+      if (policy?.enabled == true &&
+          policy?.selectionMode == SmartSelectionMode.automatic) {
+        await notifier.evaluate(policy!);
+        if (!mounted) return false;
+        final result = ref.read(smartConnectProvider);
+        if (result.error != null ||
+            result.assessments[policy.id]?.selection.node == null) {
+          setState(
+            () => _error =
+                result.error ??
+                t(
+                  'No eligible node. Adjust the service settings.',
+                  '没有符合条件的节点，请调整服务设置。',
+                ),
+          );
+          return false;
+        }
+      }
       if (policy == null) {
         await notifier.selectDefault(nodeId!);
       } else {
@@ -234,7 +273,7 @@ class SmartConnectPageState extends ConsumerState<SmartConnectPage> {
   String _modeName(SmartSelectionMode mode) => switch (mode) {
     SmartSelectionMode.followDefault => t('Follow Default', '跟随默认'),
     SmartSelectionMode.manual => t('Manual node', '手动选择'),
-    SmartSelectionMode.automatic => t('Recommend node', '推荐节点'),
+    SmartSelectionMode.automatic => t('Automatic', '自动选择'),
     SmartSelectionMode.direct => t('Direct', '直连'),
   };
 
@@ -270,7 +309,6 @@ class SmartConnectPageState extends ConsumerState<SmartConnectPage> {
     final policies = ref.watch(smartPoliciesProvider);
     ref.watch(proxiesProvider);
     ref.watch(subscriptionsProvider);
-    final core = ref.watch(coreProvider);
     final theme = Theme.of(context);
     return SafeArea(
       child: LayoutBuilder(
@@ -288,7 +326,7 @@ class SmartConnectPageState extends ConsumerState<SmartConnectPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            t('Proxy groups', '代理分组'),
+                            t('Smart Connect', '智能连接'),
                             style: theme.textTheme.headlineSmall?.copyWith(
                               fontWeight: FontWeight.w700,
                             ),
@@ -296,8 +334,8 @@ class SmartConnectPageState extends ConsumerState<SmartConnectPage> {
                           const SizedBox(height: 4),
                           Text(
                             t(
-                              'Choose a group, then choose its route.',
-                              '先选分组，再决定这组流量怎么走。',
+                              'Drag a node onto a service below.',
+                              '将节点拖到下方服务图标，即可切换出口。',
                             ),
                             style: theme.textTheme.bodyMedium,
                           ),
@@ -354,83 +392,7 @@ class SmartConnectPageState extends ConsumerState<SmartConnectPage> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 8,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Chip(
-                      avatar: Icon(
-                        smart.snapshot.running
-                            ? Icons.check_circle_outline
-                            : Icons.pause_circle_outline,
-                        size: 18,
-                      ),
-                      label: Text(
-                        !smart.snapshot.loaded
-                            ? t('Status unknown', '状态未知')
-                            : smart.snapshot.running
-                            ? t('Connected', '已连接')
-                            : t('Disconnected', '未连接'),
-                      ),
-                    ),
-                    SizedBox(
-                      width: constraints.maxWidth < 400
-                          ? constraints.maxWidth - 32
-                          : 340,
-                      child: DropdownButton<RouteMode>(
-                        isExpanded: true,
-                        value: core.settings.routeMode,
-                        items: [
-                          DropdownMenuItem(
-                            value: RouteMode.rule,
-                            child: Text(
-                              t('Group rules + local bypass', '分组规则 · 国内直连'),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          DropdownMenuItem(
-                            value: RouteMode.all,
-                            child: Text(
-                              t(
-                                'Group rules · no local bypass',
-                                '分组规则 · 不启用国内直连',
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          DropdownMenuItem(
-                            value: RouteMode.direct,
-                            child: Text(t('All direct', '全部直连')),
-                          ),
-                        ],
-                        onChanged: core.busy || _busy
-                            ? null
-                            : (value) {
-                                if (value != null) {
-                                  ref
-                                      .read(coreProvider.notifier)
-                                      .updateRuntimeConfig(
-                                        core.settings.copyWith(
-                                          routeMode: value,
-                                        ),
-                                      );
-                                }
-                              },
-                      ),
-                    ),
-                  ],
-                ),
-                if (core.settings.routeMode == RouteMode.direct)
-                  _notice(
-                    t(
-                      'All traffic uses the local network. Group settings are retained but bypassed.',
-                      '当前全部直连；分组配置已保留，暂不参与选路。',
-                    ),
-                  ),
+                const SizedBox(height: 8),
                 if (_error != null || smart.error != null)
                   _notice(_error ?? smart.error!, error: true),
                 if (policies.hasError)
@@ -440,24 +402,29 @@ class SmartConnectPageState extends ConsumerState<SmartConnectPage> {
                   ),
                 if (policies.isLoading || _busy)
                   const LinearProgressIndicator(),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 Expanded(
-                  child: wide
-                      ? Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            SizedBox(
-                              width: 250,
-                              child: _groups(policies.value ?? []),
-                            ),
-                            const SizedBox(width: 20),
-                            Expanded(child: _detail(false)),
-                          ],
-                        )
-                      : _detailOpen
+                  child: _detailOpen
                       ? _detail(true)
-                      : _groups(policies.value ?? []),
+                      : ListView(
+                          key: const ValueKey('node-overview'),
+                          children: [
+                            if (smart.snapshot.nodes.isNotEmpty) ...[
+                              AbstractWorldMap(
+                                height: 250,
+                                nodes: proxyCountryMapEntries(
+                                  smart.snapshot.nodes,
+                                ),
+                                onDrop: _dropCountry,
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                            _nodeList(null, smart.snapshot.defaultNodeId),
+                          ],
+                        ),
                 ),
+                const SizedBox(height: 8),
+                _groups(policies.value ?? []),
               ],
             ),
           );
@@ -476,65 +443,198 @@ class SmartConnectPageState extends ConsumerState<SmartConnectPage> {
     ),
   );
 
-  Widget _groups(List<SmartPolicy> policies) => Card(
-    margin: EdgeInsets.zero,
-    clipBehavior: Clip.antiAlias,
-    child: Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  t('Traffic groups', '流量分组'),
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-              ),
-              Text('${policies.length + 1}'),
-            ],
-          ),
+  Future<void> _dropNode(SmartPolicy? policy, ProxyNode node) async {
+    if (_busy || !await confirmLeave() || !mounted) return;
+    setState(() => _error = null);
+    final notifier = ref.read(smartConnectProvider.notifier);
+    if (policy == null) {
+      await notifier.selectDefault(node.id);
+    } else {
+      await notifier.applyRoute(
+        policy.copyWith(
+          selectionMode: SmartSelectionMode.manual,
+          enabled: true,
         ),
-        const Divider(height: 1),
-        Expanded(
-          child: ListView(
-            children: [
-              _groupTile(null),
-              for (final policy in policies) _groupTile(policy),
-            ],
-          ),
+        nodeId: node.id,
+      );
+    }
+    if (!mounted || ref.read(smartConnectProvider).error != null) return;
+    setState(_resetDraft);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '${policy?.name ?? t('Default', '默认')} → ${node.displayName}',
         ),
-        const Divider(height: 1),
-        ListTile(
-          leading: const Icon(Icons.add),
-          title: Text(t('Add group', '添加分组')),
-          onTap: _busy ? null : () => _edit(create: true),
+      ),
+    );
+  }
+
+  Future<void> _dropCountry(String countryCode, Object data) async {
+    if (data is! _RouteDragData || _busy) return;
+    final policy = data.policy;
+    final nodes = ref
+        .read(smartConnectProvider)
+        .snapshot
+        .nodes
+        .where((node) => proxyNodeCountryCode(node) == countryCode)
+        .where((node) => _canDrop(policy, node))
+        .toList();
+    if (nodes.isEmpty) {
+      setState(
+        () => _error = t('No eligible node in this country.', '这个国家没有符合条件的节点。'),
+      );
+      return;
+    }
+    final node = nodes.length == 1
+        ? nodes.single
+        : await _chooseNode(policy, nodes);
+    if (node != null && mounted) await _dropNode(policy, node);
+  }
+
+  bool _canDrop(SmartPolicy? policy, ProxyNode node) =>
+      !_busy &&
+      node.isAvailable &&
+      (policy == null ||
+          (node.enabled &&
+              !node.excluded &&
+              !policy.excludedNodes.contains(node.id) &&
+              (policy.allowedRegions.isEmpty ||
+                  policy.allowedRegions.contains(node.effectiveRegion)) &&
+              (policy.allowedSubscriptions.isEmpty ||
+                  policy.allowedSubscriptions.contains(node.subscriptionId))));
+
+  Widget _groups(List<SmartPolicy> policies) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: Center(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _groupTile(null),
+            for (final policy in policies) _groupTile(policy),
+            const SizedBox(width: 4),
+            IconButton(
+              tooltip: t('Add group', '添加分组'),
+              onPressed: _busy ? null : () => _edit(create: true),
+              icon: const Icon(Icons.add),
+            ),
+          ],
         ),
-      ],
+      ),
     ),
   );
 
-  Widget _groupTile(SmartPolicy? policy) => ListTile(
-    key: ValueKey('group-${policy?.id ?? 'default'}'),
-    selected: _groupId == policy?.id,
-    selectedTileColor: Theme.of(
-      context,
-    ).colorScheme.primaryContainer.withValues(alpha: .45),
-    leading: Icon(policy == null ? Icons.public : Icons.alt_route),
-    title: Text(
-      policy == null
-          ? t('Default', '默认 Default')
-          : policy.name.isEmpty
-          ? policy.id
-          : policy.name,
-    ),
-    subtitle: Text(
-      _routeSummary(policy),
-      maxLines: 3,
-      overflow: TextOverflow.ellipsis,
-    ),
-    onTap: _busy ? null : () => _selectGroup(policy?.id),
-  );
+  Widget _groupTile(SmartPolicy? policy) {
+    final colors = Theme.of(context).colorScheme;
+    final name = policy == null
+        ? t('Default', '默认')
+        : policy.name.isEmpty
+        ? policy.id
+        : policy.name;
+    return DragTarget<Object>(
+      key: ValueKey('drop-${policy?.id ?? 'default'}'),
+      onWillAcceptWithDetails: (details) {
+        final data = details.data;
+        return data is ProxyNode ||
+            (data is List<ProxyNode> &&
+                data.any((node) => _canDrop(policy, node)));
+      },
+      onAcceptWithDetails: (details) {
+        final data = details.data;
+        if (data is ProxyNode) {
+          _dropNode(policy, data);
+        } else if (data is List<ProxyNode>) {
+          final eligible = data
+              .where((node) => _canDrop(policy, node))
+              .toList();
+          if (eligible.length == 1) _dropNode(policy, eligible.single);
+          if (eligible.length > 1) _chooseNode(policy, eligible);
+        }
+      },
+      builder: (context, candidates, rejected) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: Tooltip(
+          message: t('Drop a node on $name', '将节点拖到$name'),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: candidates.isNotEmpty
+                  ? colors.primaryContainer
+                  : rejected.isNotEmpty
+                  ? colors.errorContainer
+                  : _detailOpen && _groupId == policy?.id
+                  ? colors.secondaryContainer
+                  : colors.surfaceContainerHighest,
+              border: Border.all(
+                color: candidates.isNotEmpty
+                    ? colors.primary
+                    : colors.outlineVariant,
+                width: candidates.isNotEmpty ? 2 : 1,
+              ),
+            ),
+            child: Draggable<_RouteDragData>(
+              data: _RouteDragData(policy),
+              feedback: _RouteDragFeedback(label: name),
+              child: IconButton(
+                key: ValueKey('group-${policy?.id ?? 'default'}'),
+                onPressed: _busy ? null : () => _selectGroup(policy?.id),
+                padding: const EdgeInsets.all(14),
+                icon: Semantics(
+                  label: name,
+                  child: policy?.id == 'chatgpt'
+                      ? Image.asset(
+                          'assets/services/openai.png',
+                          width: 28,
+                          height: 28,
+                          color: colors.onSurface,
+                        )
+                      : Icon(switch (policy?.id) {
+                          null => Icons.public,
+                          'youtube' => Icons.smart_display_outlined,
+                          'disney' => Icons.movie_outlined,
+                          'direct' => Icons.wifi,
+                          _ => Icons.language,
+                        }, size: 28),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<ProxyNode?> _chooseNode(
+    SmartPolicy? policy,
+    List<ProxyNode> nodes,
+  ) async {
+    return showModalBottomSheet<ProxyNode>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+              child: Text(
+                t('Choose a node', '选择节点'),
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            for (final node in nodes)
+              ListTile(
+                leading: const Icon(Icons.dns_outlined),
+                title: Text(node.displayName),
+                subtitle: Text(node.effectiveRegion),
+                onTap: () => Navigator.pop(context, node),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _detail(bool mobile) {
     final smart = ref.read(smartConnectProvider);
@@ -552,15 +652,6 @@ class SmartConnectPageState extends ConsumerState<SmartConnectPage> {
     final savedNode = policy == null ? snapshot.defaultNodeId : binding?.nodeId;
     final selectedNode =
         _draftNode ?? (savedNode == 'direct' ? null : savedNode);
-    final assessment = policy == null ? null : smart.assessments[policy.id];
-    final recommendationCurrent =
-        assessment != null &&
-        jsonEncode(assessment.policy.toJson()) ==
-            jsonEncode(
-              policy!
-                  .copyWith(selectionMode: SmartSelectionMode.automatic)
-                  .toJson(),
-            );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -574,7 +665,7 @@ class SmartConnectPageState extends ConsumerState<SmartConnectPage> {
                 }
               },
               icon: const Icon(Icons.arrow_back),
-              label: Text(t('All groups', '全部分组')),
+              label: Text(t('All nodes', '全部节点')),
             ),
           ),
         Expanded(
@@ -714,62 +805,13 @@ class SmartConnectPageState extends ConsumerState<SmartConnectPage> {
                 ),
               if (mode == SmartSelectionMode.manual)
                 _nodeList(policy, selectedNode),
-              if (mode == SmartSelectionMode.automatic && policy != null) ...[
+              if (mode == SmartSelectionMode.automatic && policy != null)
                 _notice(
                   t(
-                    'Evaluate candidates for this service, then apply a recommendation. The selected node stays fixed until you apply another choice.',
-                    '检测此服务的候选节点，再应用推荐结果。应用后保持该节点，直到你再次更改。',
+                    'Find and apply a suitable node in one step.',
+                    '应用时自动检测并选择可用节点。',
                   ),
                 ),
-                Text(
-                  '${t('Allowed regions', '允许地区')}: ${policy.allowedRegions.isEmpty ? t('Any', '不限') : policy.allowedRegions.join(', ')} · ${t('Preferred', '偏好')}: ${policy.preferredRegions.isEmpty ? t('None', '无') : policy.preferredRegions.join(', ')}',
-                ),
-                const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: OutlinedButton.icon(
-                    onPressed: _busy
-                        ? null
-                        : () async {
-                            await ref
-                                .read(smartConnectProvider.notifier)
-                                .evaluate(
-                                  policy.copyWith(
-                                    selectionMode: SmartSelectionMode.automatic,
-                                  ),
-                                );
-                            if (mounted) setState(() => _dirty = true);
-                          },
-                    icon: const Icon(Icons.auto_awesome),
-                    label: Text(t('Get recommendation', '获取推荐')),
-                  ),
-                ),
-                if (recommendationCurrent) ...[
-                  _notice(
-                    assessment.selection.node == null
-                        ? t(
-                            'No eligible node. Adjust this group’s constraints and try again.',
-                            '没有符合条件的节点，请调整此分组的候选约束后重试。',
-                          )
-                        : '${t('Recommended', '推荐')}: ${assessment.selection.node!.displayName}\n${assessment.selection.reason}',
-                  ),
-                  Text(
-                    t('Recommendation only · not yet applied', '仅为推荐结果 · 尚未应用'),
-                  ),
-                  if (assessment.selection.excluded.isNotEmpty)
-                    ExpansionTile(
-                      title: Text(t('Excluded candidates', '被排除的候选节点')),
-                      children: [
-                        for (final entry
-                            in assessment.selection.excluded.entries)
-                          ListTile(
-                            title: Text(_nodeName(entry.key)),
-                            subtitle: Text(entry.value),
-                          ),
-                      ],
-                    ),
-                ],
-              ],
               const SizedBox(height: 24),
             ],
           ),
@@ -809,11 +851,7 @@ class SmartConnectPageState extends ConsumerState<SmartConnectPage> {
                             _busy ||
                             (policy?.enabled != false &&
                                 mode == SmartSelectionMode.manual &&
-                                selectedNode == null) ||
-                            (policy?.enabled != false &&
-                                mode == SmartSelectionMode.automatic &&
-                                (!recommendationCurrent ||
-                                    assessment.selection.node == null))
+                                selectedNode == null)
                         ? null
                         : _apply,
                     child: Text(
@@ -833,6 +871,7 @@ class SmartConnectPageState extends ConsumerState<SmartConnectPage> {
 
   Widget _nodeList(SmartPolicy? policy, String? selectedNode) {
     final smart = ref.read(smartConnectProvider);
+    final testing = ref.read(proxiesProvider).testing;
     final latency = {
       for (final group in ref.read(proxiesProvider).groups)
         for (final node in group.nodes) node.id: node,
@@ -970,34 +1009,60 @@ class SmartConnectPageState extends ConsumerState<SmartConnectPage> {
             ),
           ),
         for (final node in visible)
-          ListTile(
-            key: ValueKey('candidate-${node.id}'),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-            selected: selectedNode == node.id,
-            enabled: excluded(node) == null,
-            leading: Icon(
-              selectedNode == node.id
-                  ? Icons.radio_button_checked
-                  : Icons.radio_button_off,
+          Draggable<ProxyNode>(
+            data: node,
+            maxSimultaneousDrags: _busy || excluded(node) != null ? 0 : 1,
+            feedback: Material(
+              elevation: 8,
+              borderRadius: BorderRadius.circular(16),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.dns_outlined),
+                    const SizedBox(width: 10),
+                    Text(node.displayName),
+                  ],
+                ),
+              ),
             ),
-            title: Text(node.displayName),
-            subtitle: Text(
-              '${sources[node.subscriptionId] ?? node.subscriptionId} · ${node.effectiveRegion}\n${excluded(node) ?? t('Service availability unverified', '服务可用性未验证')}',
+            child: ListTile(
+              key: ValueKey('candidate-${node.id}'),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+              selected: selectedNode == node.id,
+              enabled: excluded(node) == null,
+              leading: Icon(
+                selectedNode == node.id
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_off,
+              ),
+              title: Text(node.displayName),
+              subtitle: Text(
+                '${sources[node.subscriptionId] ?? node.subscriptionId} · ${node.effectiveRegion}\n${excluded(node) ?? t('Service availability unverified', '服务可用性未验证')}',
+              ),
+              trailing: testing
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(
+                      latency[node.id]?.latencyTimedOut == true
+                          ? t('Timeout', '超时')
+                          : latency[node.id]?.latencyMs != null
+                          ? '${latency[node.id]!.latencyMs} ms'
+                          : '—',
+                    ),
+              onTap: _busy || excluded(node) != null
+                  ? null
+                  : () => setState(() {
+                      _draftNode = node.id;
+                      _draftMode = SmartSelectionMode.manual;
+                      _detailOpen = true;
+                      _dirty = true;
+                      _error = null;
+                    }),
             ),
-            trailing: Text(
-              latency[node.id]?.latencyTimedOut == true
-                  ? t('Timeout', '超时')
-                  : latency[node.id]?.latencyMs != null
-                  ? '${latency[node.id]!.latencyMs} ms'
-                  : '—',
-            ),
-            onTap: _busy || excluded(node) != null
-                ? null
-                : () => setState(() {
-                    _draftNode = node.id;
-                    _dirty = true;
-                    _error = null;
-                  }),
           ),
       ],
     );

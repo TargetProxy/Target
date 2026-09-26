@@ -28,14 +28,12 @@
   "profile": "Profile",
   "webPage": "Web page",
   "support": "Support",
-  "nodePoolHint": "Explore regions on the map, then select a node from your enabled subscriptions.",
   "allSubscriptions": "All subscriptions",
   "allRegions": "All regions",
   "searchNodes": "Search nodes, protocols or subscriptions",
   "noMatchingNodes": "No matching nodes",
   "emptyPool": "Your node pool is empty",
   "manageSubscriptions": "Manage subscriptions",
-  "noNodeSelected": "Select a node",
   "nodeUnavailable": "Unavailable",
   "unknownSource": "Unknown source",
   "clearFilters": "Clear filters",
@@ -62,20 +60,5 @@
       "nodeCount": {"type": "int"}
     }
   },
-  "outboundPolicy": "Outbound policy",
-  "testLatency": "Test latency",
-  "selectCountry": "Select country",
-  "countryCount": "Countries · {count}",
-  "@countryCount": {
-    "placeholders": {"count": {"type": "int"}}
-  },
-  "selectionSavedForNextCoreStart": "The saved selection will be used the next time the core starts.",
-  "noOutboundGroupsAvailable": "No outbound groups are available.",
-  "groupMembers": "{count, plural, =1{1 member} other{{count} members}} · {type}",
-  "@groupMembers": {
-    "placeholders": {
-      "count": {"type": "int"},
-      "type": {"type": "String"}
-    }
-  }
+  "testLatency": "Test latency"
 }

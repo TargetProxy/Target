@@ -10,12 +10,9 @@ import 'package:targetlib/targetlib.dart';
 import '../../data/models/runtime_settings.dart' as runtime_models;
 import '../../data/models/ip_info.dart';
 import '../../core/widgets/target_page_layout.dart';
-import '../proxies/application/proxies_notifier.dart';
 import 'presentation/widgets/connection_error_banner.dart';
 import 'presentation/widgets/current_profile_card.dart';
 import 'presentation/widgets/ip_info_card.dart';
-import 'presentation/widgets/quick_actions_grid.dart';
-import 'presentation/widgets/traffic_stats_card.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -312,18 +309,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 18),
-                    TrafficStatsCard(
-                      snapshot: core.traffic,
-                      running: core.running,
-                    ),
-                    const SizedBox(height: 18),
-                    QuickActionsGrid(
-                      enabled: core.running && !core.busy,
-                      onTestLatency: _testProxies,
-                      onRefreshRuleSets: _refreshRuleSets,
-                      onCloseConnections: _closeConnections,
-                    ),
                   ],
                 ),
               ),
@@ -384,65 +369,6 @@ class _HomePageState extends ConsumerState<HomePage> {
     if (core.lifecycle == CoreLifecycle.failed) {
       _showMessage(core.message, error: true);
     }
-  }
-
-  Future<void> _testProxies() async {
-    final notifier = ref.read(proxiesProvider.notifier);
-    await notifier.testAllLatency();
-    if (!mounted) return;
-    final error = ref.read(proxiesProvider).lastError;
-    _showMessage(error ?? 'Proxy URLTest completed.', error: error != null);
-  }
-
-  Future<void> _refreshRuleSets() async {
-    final count = await ref.read(coreProvider.notifier).refreshRuleSets();
-    if (!mounted) return;
-    final message = ref.read(coreProvider).message;
-    _showMessage(
-      count == null
-          ? message
-          : count == 0
-          ? 'No remote rule sets are configured.'
-          : 'Requested refresh for $count rule set${count == 1 ? '' : 's'}.',
-      error: count == null,
-    );
-  }
-
-  Future<void> _closeConnections() async {
-    final active = ref.read(coreProvider).traffic.activeConnections;
-    if (active == 0) {
-      _showMessage('There are no active connections.');
-      return;
-    }
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Close all connections?'),
-        content: Text(
-          '$active active connection${active == 1 ? '' : 's'} will be interrupted.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Close all'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    final count = await ref.read(coreProvider.notifier).closeAllConnections();
-    if (!mounted) return;
-    final message = ref.read(coreProvider).message;
-    _showMessage(
-      count == null
-          ? message
-          : 'Closed $count active connection${count == 1 ? '' : 's'}.',
-      error: count == null,
-    );
   }
 
   void _showMessage(String message, {bool error = false}) {

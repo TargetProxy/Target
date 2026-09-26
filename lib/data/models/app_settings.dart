@@ -1,16 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-enum ThemeModeOption {
-  system,
-  light,
-  dark;
-
-  String get label => switch (this) {
-    ThemeModeOption.system => 'System',
-    ThemeModeOption.light => 'Light',
-    ThemeModeOption.dark => 'Dark',
-  };
-}
+enum ThemeModeOption { system, light, dark }
 
 extension ThemeModeOptionParsing on ThemeModeOption {
   static ThemeModeOption fromName(String? name) {

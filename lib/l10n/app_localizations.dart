@@ -254,12 +254,6 @@ abstract class AppLocalizations {
   /// **'Support'**
   String get support;
 
-  /// No description provided for @nodePoolHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Explore regions on the map, then select a node from your enabled subscriptions.'**
-  String get nodePoolHint;
-
   /// No description provided for @allSubscriptions.
   ///
   /// In en, this message translates to:
@@ -295,12 +289,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Manage subscriptions'**
   String get manageSubscriptions;
-
-  /// No description provided for @noNodeSelected.
-  ///
-  /// In en, this message translates to:
-  /// **'Select a node'**
-  String get noNodeSelected;
 
   /// No description provided for @nodeUnavailable.
   ///
@@ -422,47 +410,11 @@ abstract class AppLocalizations {
   /// **'{countryCode} · {nodeCount, plural, =1{1 node} other{{nodeCount} nodes}}'**
   String countryMarkerNodeCount(String countryCode, int nodeCount);
 
-  /// No description provided for @outboundPolicy.
-  ///
-  /// In en, this message translates to:
-  /// **'Outbound policy'**
-  String get outboundPolicy;
-
   /// No description provided for @testLatency.
   ///
   /// In en, this message translates to:
   /// **'Test latency'**
   String get testLatency;
-
-  /// No description provided for @selectCountry.
-  ///
-  /// In en, this message translates to:
-  /// **'Select country'**
-  String get selectCountry;
-
-  /// No description provided for @countryCount.
-  ///
-  /// In en, this message translates to:
-  /// **'Countries · {count}'**
-  String countryCount(int count);
-
-  /// No description provided for @selectionSavedForNextCoreStart.
-  ///
-  /// In en, this message translates to:
-  /// **'The saved selection will be used the next time the core starts.'**
-  String get selectionSavedForNextCoreStart;
-
-  /// No description provided for @noOutboundGroupsAvailable.
-  ///
-  /// In en, this message translates to:
-  /// **'No outbound groups are available.'**
-  String get noOutboundGroupsAvailable;
-
-  /// No description provided for @groupMembers.
-  ///
-  /// In en, this message translates to:
-  /// **'{count, plural, =1{1 member} other{{count} members}} · {type}'**
-  String groupMembers(int count, String type);
 }
 
 class _AppLocalizationsDelegate

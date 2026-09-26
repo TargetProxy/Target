@@ -91,9 +91,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get support => '支持';
 
   @override
-  String get nodePoolHint => '在地图上浏览地区，从已启用订阅的节点中选择连接。';
-
-  @override
   String get allSubscriptions => '全部订阅';
 
   @override
@@ -110,9 +107,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get manageSubscriptions => '管理订阅';
-
-  @override
-  String get noNodeSelected => '请选择节点';
 
   @override
   String get nodeUnavailable => '不可用';
@@ -177,27 +171,5 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get outboundPolicy => '出站策略';
-
-  @override
   String get testLatency => '测试延迟';
-
-  @override
-  String get selectCountry => '选择国家';
-
-  @override
-  String countryCount(int count) {
-    return '国家 · $count';
-  }
-
-  @override
-  String get selectionSavedForNextCoreStart => '下次启动内核时会使用已保存的选择。';
-
-  @override
-  String get noOutboundGroupsAvailable => '暂无可用的出站分组。';
-
-  @override
-  String groupMembers(int count, String type) {
-    return '$count 个成员 · $type';
-  }
 }

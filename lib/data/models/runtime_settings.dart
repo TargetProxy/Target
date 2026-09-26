@@ -10,17 +10,7 @@ enum ProxyMode {
   };
 }
 
-enum RouteMode {
-  all,
-  rule,
-  direct;
-
-  String get label => switch (this) {
-    RouteMode.all => 'All',
-    RouteMode.rule => 'Rule',
-    RouteMode.direct => 'Direct',
-  };
-}
+enum RouteMode { all, rule, direct }
 
 @immutable
 class RuntimeSettings {

@@ -42,7 +42,6 @@ class Subscription {
     this.userAgent = SubscriptionRequestDefaults.userAgent,
     this.lastUpdatedAt,
     this.expiresAt,
-    this.activeProfileId,
     this.profileTitle,
     this.webPageUrl,
     this.supportUrl,
@@ -66,7 +65,6 @@ class Subscription {
   final String userAgent;
   final DateTime? lastUpdatedAt;
   final DateTime? expiresAt;
-  final String? activeProfileId;
   final String? profileTitle;
   final String? webPageUrl;
   final String? supportUrl;
@@ -108,7 +106,6 @@ class Subscription {
     String? userAgent,
     DateTime? lastUpdatedAt,
     DateTime? expiresAt,
-    String? activeProfileId,
     String? profileTitle,
     String? webPageUrl,
     String? supportUrl,
@@ -133,7 +130,6 @@ class Subscription {
       userAgent: userAgent ?? this.userAgent,
       lastUpdatedAt: lastUpdatedAt ?? this.lastUpdatedAt,
       expiresAt: expiresAt ?? this.expiresAt,
-      activeProfileId: activeProfileId ?? this.activeProfileId,
       profileTitle: profileTitle ?? this.profileTitle,
       webPageUrl: webPageUrl ?? this.webPageUrl,
       supportUrl: supportUrl ?? this.supportUrl,
@@ -145,70 +141,6 @@ class Subscription {
       nodeCount: nodeCount ?? this.nodeCount,
       enabled: enabled ?? this.enabled,
     );
-  }
-
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'url': url,
-    'formatHint': formatHint.name,
-    'updateStatus': updateStatus.name,
-    'autoUpdate': autoUpdate,
-    'updateIntervalSeconds': updateIntervalSeconds,
-    'headers': headers,
-    'userAgent': userAgent,
-    'lastUpdatedAt': lastUpdatedAt?.toIso8601String(),
-    'expiresAt': expiresAt?.toIso8601String(),
-    'activeProfileId': activeProfileId,
-    'profileTitle': profileTitle,
-    'webPageUrl': webPageUrl,
-    'supportUrl': supportUrl,
-    'movedPermanentlyTo': movedPermanentlyTo,
-    'lastError': lastError,
-    'uploadBytes': uploadBytes,
-    'downloadBytes': downloadBytes,
-    'totalBytes': totalBytes,
-    'nodeCount': nodeCount,
-    'enabled': enabled,
-  };
-
-  factory Subscription.fromJson(Map<String, dynamic> json) {
-    return Subscription(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      url: json['url'] as String,
-      formatHint: SubscriptionFormat.values.byName(
-        json['formatHint'] as String? ?? SubscriptionFormat.auto.name,
-      ),
-      updateStatus: SubscriptionUpdateStatus.values.byName(
-        json['updateStatus'] as String? ?? SubscriptionUpdateStatus.idle.name,
-      ),
-      autoUpdate: json['autoUpdate'] as bool? ?? true,
-      updateIntervalSeconds: json['updateIntervalSeconds'] as int? ?? 43200,
-      headers: Map<String, String>.from(json['headers'] as Map? ?? const {}),
-      userAgent:
-          json['userAgent'] as String? ?? SubscriptionRequestDefaults.userAgent,
-      lastUpdatedAt: _parseDate(json['lastUpdatedAt'] as String?),
-      expiresAt: _parseDate(json['expiresAt'] as String?),
-      activeProfileId: json['activeProfileId'] as String?,
-      profileTitle: json['profileTitle'] as String?,
-      webPageUrl: json['webPageUrl'] as String?,
-      supportUrl: json['supportUrl'] as String?,
-      movedPermanentlyTo: json['movedPermanentlyTo'] as String?,
-      lastError: json['lastError'] as String?,
-      uploadBytes: json['uploadBytes'] as int? ?? 0,
-      downloadBytes: json['downloadBytes'] as int? ?? 0,
-      totalBytes: json['totalBytes'] as int?,
-      nodeCount: json['nodeCount'] as int? ?? 0,
-      enabled: json['enabled'] as bool? ?? true,
-    );
-  }
-
-  static DateTime? _parseDate(String? value) {
-    if (value == null || value.isEmpty) {
-      return null;
-    }
-    return DateTime.tryParse(value);
   }
 
   static bool _isSensitiveKey(String key) {

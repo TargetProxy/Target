@@ -118,7 +118,6 @@ class SmartConnectRepository {
           countryCode: node.countryCode.isEmpty ? null : node.countryCode,
           server: node.server,
           port: node.port,
-          errorMessage: node.errorMessage,
           isAvailable:
               node.phase != pb.ProfileNodePhase.PROFILE_NODE_PHASE_FAILED,
           enabled:
@@ -147,19 +146,8 @@ class SmartConnectRepository {
           binding.serviceId.substring(prefix.length): SmartBinding(
             serviceId: binding.serviceId.substring(prefix.length),
             nodeId: binding.nodeId,
-            selectedAt: DateTime.fromMillisecondsSinceEpoch(
-              binding.selectedAtUnixMs.toInt(),
-            ),
-            expiresAt: DateTime.fromMillisecondsSinceEpoch(
-              binding.expiresAtUnixMs.toInt(),
-            ),
-            reason: binding.selectionReason,
-            score: binding.selectedScore,
             effective: states[binding.serviceId]?.effective ?? false,
             needsEvaluation: states[binding.serviceId]?.needsEvaluation ?? true,
-            status:
-                states[binding.serviceId]?.evaluationReason ??
-                'Runtime status unavailable',
           ),
     };
   }
@@ -237,13 +225,11 @@ class SmartConnectRepository {
       final pool = await core.getNodePool();
       return SmartAssessment(
         policy: policy,
-        nodes: _nodes(pool, snapshot),
         selection: const SmartSelection(
           direct: true,
           reason: 'Explicit Direct policy',
         ),
         poolRevision: pool.revision,
-        evaluatedAt: DateTime.now(),
       );
     }
     final operation = await _wait(
@@ -268,7 +254,6 @@ class SmartConnectRepository {
     final nodes = _nodes(pool, latest);
     return SmartAssessment(
       policy: policy,
-      nodes: nodes,
       selection: SmartSelection(
         node: nodes.where((n) => n.id == proposal.suggestedNodeId).firstOrNull,
         scores: {
@@ -283,9 +268,6 @@ class SmartConnectRepository {
         reason: proposal.reason,
       ),
       poolRevision: pool.revision,
-      evaluatedAt: DateTime.fromMillisecondsSinceEpoch(
-        proposal.createdAtUnixMs.toInt(),
-      ),
       proposalId: proposal.id,
     );
   }
@@ -517,12 +499,6 @@ class SmartConnectRepository {
         node.copyWith(
           latencyMs: result.latencyMilliseconds,
           observedCountryCode: result.observedCountry,
-          testedAt: DateTime.fromMillisecondsSinceEpoch(
-            result.testedAtUnixMs.toInt(),
-          ),
-          failureReason: result.stage == pb.ProbeStage.PROBE_STAGE_READY
-              ? ''
-              : result.stage.name,
         ),
     ];
   }

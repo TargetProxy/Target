@@ -7,19 +7,11 @@ class SmartBinding {
   const SmartBinding({
     required this.serviceId,
     required this.nodeId,
-    required this.selectedAt,
-    required this.expiresAt,
-    required this.reason,
-    this.score = 0,
     this.effective = false,
     this.needsEvaluation = false,
-    this.status = '',
   });
-  final String serviceId, nodeId, reason, status;
-  final DateTime selectedAt, expiresAt;
-  final double score;
+  final String serviceId, nodeId;
   final bool effective, needsEvaluation;
-  bool get valid => !needsEvaluation && DateTime.now().isBefore(expiresAt);
 }
 
 class SmartRuntimeSnapshot {
@@ -47,17 +39,13 @@ class SmartRuntimeSnapshot {
 class SmartAssessment {
   const SmartAssessment({
     required this.policy,
-    required this.nodes,
     required this.selection,
     required this.poolRevision,
-    required this.evaluatedAt,
     this.proposalId,
   });
   final SmartPolicy policy;
-  final List<ProxyNode> nodes;
   final SmartSelection selection;
   final String poolRevision;
-  final DateTime evaluatedAt;
   final String? proposalId;
 }
 

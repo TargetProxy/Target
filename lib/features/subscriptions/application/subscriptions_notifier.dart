@@ -102,7 +102,6 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
               countryCode: node.countryCode.isEmpty ? null : node.countryCode,
               server: node.server,
               port: node.port,
-              errorMessage: node.errorMessage,
               isAvailable:
                   node.phase !=
                   targetlib.ProfileNodePhase.PROFILE_NODE_PHASE_FAILED,
@@ -315,9 +314,6 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
       userAgent: previous?.userAgent ?? SubscriptionRequestDefaults.userAgent,
       lastUpdatedAt: runtime.updatedAt,
       expiresAt: runtime.expiresAt,
-      activeProfileId: runtime.status == RuntimeSubscriptionStatus.ready
-          ? runtime.id
-          : previous?.activeProfileId,
       profileTitle: runtime.title,
       webPageUrl: runtime.webPageUrl,
       supportUrl: runtime.supportUrl,

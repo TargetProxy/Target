@@ -91,10 +91,6 @@ class ProxyCatalogNotifier extends Notifier<ProxyCatalogState> {
     return group.copyWith(
       selectedNodeId: selected,
       clearSelection: selected == null,
-      nodes: [
-        for (final node in group.nodes)
-          node.copyWith(isSelected: node.id == selected),
-      ],
     );
   }
 

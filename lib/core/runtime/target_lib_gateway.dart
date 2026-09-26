@@ -251,11 +251,13 @@ class TargetLibGateway implements CoreGateway {
     );
     return RuntimeSubscriptionUpdate(
       subscription: _runtimeSubscription(result.subscription),
-      changed: result.changed,
       notModified: result.notModified,
       duration: Duration(milliseconds: result.durationMilliseconds.toInt()),
       originalConfig: utf8.decode(result.originalConfig, allowMalformed: true),
-      generatedConfig: utf8.decode(result.generatedConfig, allowMalformed: true),
+      generatedConfig: utf8.decode(
+        result.generatedConfig,
+        allowMalformed: true,
+      ),
     );
   }
 
@@ -270,7 +272,6 @@ class TargetLibGateway implements CoreGateway {
       countryCode: response.countryCode,
       city: response.city,
       isp: response.isp,
-      org: response.org,
       asName: response.asName,
     );
   }
@@ -601,8 +602,9 @@ class TargetLibGateway implements CoreGateway {
       onData,
       onError: (Object error, StackTrace stackTrace) {
         if (_manager != null && !_disposed) {
-          AppLogger.warning(
+          AppLogger.error(
             'TargetLib gRPC stream failed: $label',
+            source: 'gRPC',
             error: error,
             stackTrace: stackTrace,
           );

@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:syncfusion_flutter_maps/maps.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../../data/models/proxy_node.dart';
 import '../../application/proxy_country_map.dart';
 
 class AbstractWorldMap extends StatefulWidget {
@@ -13,12 +14,14 @@ class AbstractWorldMap extends StatefulWidget {
     this.nodes = const [],
     this.selectedId,
     this.onSelect,
+    this.onDrop,
     this.height = 360,
   });
 
   final List<ProxyCountryMapEntry> nodes;
   final String? selectedId;
   final ValueChanged<String>? onSelect;
+  final void Function(String countryCode, Object data)? onDrop;
   final double height;
 
   @override
@@ -162,6 +165,9 @@ class _AbstractWorldMapState extends State<AbstractWorldMap> {
                             onTap: widget.onSelect == null
                                 ? null
                                 : () => widget.onSelect!(node.countryCode),
+                            onDrop: widget.onDrop == null
+                                ? null
+                                : (data) => widget.onDrop!(node.countryCode, data),
                           ),
                         );
                       },
@@ -289,11 +295,13 @@ class _CountryMarker extends StatelessWidget {
     required this.node,
     required this.selected,
     this.onTap,
+    this.onDrop,
   });
 
   final ProxyCountryMapEntry node;
   final bool selected;
   final VoidCallback? onTap;
+  final ValueChanged<Object>? onDrop;
 
   @override
   Widget build(BuildContext context) {
@@ -302,7 +310,7 @@ class _CountryMarker extends StatelessWidget {
       context,
     ).countryMarkerNodeCount(node.countryCode, node.nodeCount);
 
-    return Semantics(
+    final marker = Semantics(
       button: onTap != null,
       selected: selected,
       label: label,
@@ -402,7 +410,61 @@ class _CountryMarker extends StatelessWidget {
         ),
       ),
     );
+    final nodes = node.nodes;
+    final draggable = nodes.length == 1
+        ? Draggable<ProxyNode>(
+            data: nodes.single,
+            maxSimultaneousDrags: nodes.single.isAvailable ? 1 : 0,
+            feedback: _DragFeedback(label: nodes.single.displayName),
+            child: marker,
+          )
+        : nodes.isEmpty
+        ? marker
+        : Draggable<List<ProxyNode>>(
+            data: nodes,
+            maxSimultaneousDrags: nodes.any((n) => n.isAvailable) ? 1 : 0,
+            feedback: _DragFeedback(label: '${node.countryCode} · ${nodes.length}'),
+            child: marker,
+          );
+    if (onDrop == null) return draggable;
+    return DragTarget<Object>(
+      onWillAcceptWithDetails: (_) => true,
+      onAcceptWithDetails: (details) => onDrop!(details.data),
+      builder: (context, candidates, rejected) => AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        decoration: candidates.isEmpty
+            ? null
+            : BoxDecoration(
+                shape: BoxShape.circle,
+                color: Theme.of(context).colorScheme.primaryContainer,
+              ),
+        child: draggable,
+      ),
+    );
   }
+}
+
+class _DragFeedback extends StatelessWidget {
+  const _DragFeedback({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    elevation: 6,
+    borderRadius: BorderRadius.circular(20),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.dns_outlined, size: 18),
+          const SizedBox(width: 6),
+          Text(label),
+        ],
+      ),
+    ),
+  );
 }
 
 String _signatureFor(List<ProxyCountryMapEntry> nodes) {

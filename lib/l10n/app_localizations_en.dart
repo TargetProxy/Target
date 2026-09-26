@@ -93,10 +93,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get support => 'Support';
 
   @override
-  String get nodePoolHint =>
-      'Explore regions on the map, then select a node from your enabled subscriptions.';
-
-  @override
   String get allSubscriptions => 'All subscriptions';
 
   @override
@@ -113,9 +109,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get manageSubscriptions => 'Manage subscriptions';
-
-  @override
-  String get noNodeSelected => 'Select a node';
 
   @override
   String get nodeUnavailable => 'Unavailable';
@@ -186,34 +179,5 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get outboundPolicy => 'Outbound policy';
-
-  @override
   String get testLatency => 'Test latency';
-
-  @override
-  String get selectCountry => 'Select country';
-
-  @override
-  String countryCount(int count) {
-    return 'Countries · $count';
-  }
-
-  @override
-  String get selectionSavedForNextCoreStart =>
-      'The saved selection will be used the next time the core starts.';
-
-  @override
-  String get noOutboundGroupsAvailable => 'No outbound groups are available.';
-
-  @override
-  String groupMembers(int count, String type) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count members',
-      one: '1 member',
-    );
-    return '$_temp0 · $type';
-  }
 }

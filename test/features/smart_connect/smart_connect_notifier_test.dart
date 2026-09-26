@@ -17,9 +17,6 @@ class RecordingSmartRepository extends SmartConnectRepository {
   final binding = SmartBinding(
     serviceId: 'x',
     nodeId: 'original',
-    selectedAt: DateTime.now(),
-    expiresAt: DateTime.now().add(const Duration(minutes: 30)),
-    reason: 'existing binding',
     effective: true,
   );
   @override
@@ -42,10 +39,8 @@ class RecordingSmartRepository extends SmartConnectRepository {
 
   SmartAssessment assessment(SmartPolicy policy) => SmartAssessment(
     policy: policy,
-    nodes: [],
     selection: const SmartSelection(direct: true, reason: 'direct'),
     poolRevision: 'p1',
-    evaluatedAt: DateTime.now(),
   );
   @override
   Future<void> apply(SmartAssessment assessment, {String? manualNodeId}) async {

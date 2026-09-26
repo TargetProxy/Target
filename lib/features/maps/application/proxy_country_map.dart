@@ -6,12 +6,14 @@ class ProxyCountryMapEntry {
     required this.latitude,
     required this.longitude,
     required this.nodeCount,
+    this.nodes = const [],
   });
 
   final String countryCode;
   final double latitude;
   final double longitude;
   final int nodeCount;
+  final List<ProxyNode> nodes;
 }
 
 const _locations = <String, ({double latitude, double longitude})>{
@@ -128,6 +130,10 @@ List<ProxyCountryMapEntry> proxyCountryMapEntries(Iterable<ProxyNode> nodes) {
         latitude: _locations[entry.key]!.latitude,
         longitude: _locations[entry.key]!.longitude,
         nodeCount: entry.value,
+        nodes: [
+          for (final node in nodes)
+            if (proxyNodeCountryCode(node) == entry.key) node,
+        ],
       ),
   ];
   entries.sort((a, b) => a.longitude.compareTo(b.longitude));
@@ -150,16 +156,6 @@ String? proxyNodeCountryCode(ProxyNode node) {
     if (entry.value.any((alias) => _containsAlias(name, alias))) {
       return entry.key;
     }
-  }
-  return null;
-}
-
-ProxyNode? firstProxyNodeInCountry(
-  Iterable<ProxyNode> nodes,
-  String countryCode,
-) {
-  for (final node in nodes) {
-    if (proxyNodeCountryCode(node) == countryCode) return node;
   }
   return null;
 }
