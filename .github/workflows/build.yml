@@ -20,28 +20,22 @@ jobs:
           - name: Windows
             os: windows-2022
             target: windows
-            args: --release
             targetlib: true
+            stage: true
           - name: Linux
             os: ubuntu-24.04
             target: linux
-            args: --release
             targetlib: true
           - name: Android
             os: ubuntu-24.04
             target: apk
-            args: --debug
             java: true
           - name: macOS
             os: macos-14
             target: macos
-            args: --release
-            generate: macos
           - name: iOS
             os: macos-14
             target: ios
-            args: --release --no-codesign
-            generate: ios
 
     steps:
       - name: Checkout Target
@@ -56,10 +50,9 @@ jobs:
           path: TargetLib
 
       - name: Install Linux build dependencies
-        if: matrix.os == 'ubuntu-24.04' && matrix.target == 'linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libayatana-appindicator3-dev
+        working-directory: Target
+        shell: pwsh
+        run: ./scripts/install-deps.ps1
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -86,22 +79,27 @@ jobs:
         if: matrix.targetlib == true
         working-directory: TargetLib
         shell: pwsh
-        run: |
-          if ("${{ matrix.target }}" -eq "windows") {
-            .\scripts\build.ps1 -SkipTargetSync
-          } else {
-            .\scripts\build.ps1 -OutputPath build/TargetLib -SkipTargetSync
-          }
-
-      - name: Generate Apple project
-        if: matrix.generate != ''
-        working-directory: Target
-        run: flutter create --platforms=${{ matrix.generate }} .
-
-      - name: Get Flutter dependencies
-        working-directory: Target
-        run: flutter pub get
+        run: ./scripts/build.ps1 -SkipTargetSync
 
       - name: Build platform
         working-directory: Target
-        run: flutter build ${{ matrix.target }} ${{ matrix.args }}
+        shell: pwsh
+        run: ./scripts/build.ps1 -Target "${{ matrix.target }}"
+
+      - name: Install Inno Setup
+        if: matrix.stage == true
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Stage installer
+        if: matrix.stage == true
+        working-directory: Target
+        shell: pwsh
+        run: ./scripts/stage.ps1
+
+      - name: Upload installer
+        if: matrix.stage == true
+        uses: actions/upload-artifact@v4
+        with:
+          name: TargetSetup
+          path: Target/build/windows/installer/TargetSetup.exe

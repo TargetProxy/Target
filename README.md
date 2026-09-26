@@ -62,13 +62,13 @@
 Target/
 ├── lib/
 │   ├── app/             # 应用入口、路由、托盘系统和单实例控制
-│   ├── core/            # TargetLib 网关、平台底层能力、日志拦截和主题引擎
-│   ├── data/            # 状态管理：应用配置与运行时数据模型
-│   └── features/        # 业务模块：首页、订阅/代理、连接、流量和日志面板
-├── assets/              # 静态资源：应用图标和世界地图拓扑数据
-├── test/                # 质量保证：单元测试与组件级测试
+│   ├── core/            # TargetLib 网关、平台底层能力、日志、主题、通用组件
+│   ├── data/            # 数据模型：应用配置与运行时数据模型
+│   └── features/        # 10 个业务模块：connections/home/logs/maps/profiles/proxies/settings/smart_connect/subscriptions/traffic
+├── assets/              # 静态资源：应用图标、服务图标和世界地图拓扑数据
+├── test/                # 单元测试与组件级测试
 ├── tool/                # 开发者工具：TargetLib 调试脚本
-├── stage/windows/       # 打包分发：Windows Inno Setup 配置和脚本
+├── scripts/             # 构建打包：CI/本地共用的 PowerShell 脚本与 Inno Setup 配置
 └── .github/workflows/   # 持续集成：多平台自动构建工作流
 
 ```
@@ -80,7 +80,7 @@ Target/
 ```text
 Flutter UI
  └─> Riverpod Notifier (状态管理)
-      └─> CoreGateway / SubscriptionGateway (业务网关)
+      └─> CoreGateway（含订阅操作） (业务网关)
            └─> TargetLibGateway (底层服务抽象)
                 └─> TargetLib Flutter Package (核心 SDK)
                      └─> 本地认证 gRPC 命令服务

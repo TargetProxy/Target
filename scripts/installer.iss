@@ -8,7 +8,7 @@
 #endif
 
 #ifndef TargetLibSource
-  #define TargetLibSource "..\..\..\TargetLib\build\TargetLib.exe"
+  #define TargetLibSource "..\TargetLib\build\TargetLib.exe"
 #endif
 
 [Setup]
@@ -19,9 +19,9 @@ AppPublisher={#AppPublisher}
 DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
-OutputDir=..\..\build\windows\installer
+OutputDir=..\build\windows\installer
 OutputBaseFilename=TargetSetup
-SetupIconFile=..\..\build\windows\installer\TargetAppIcon.ico
+SetupIconFile=..\build\windows\installer\TargetAppIcon.ico
 UninstallDisplayIcon={app}\{#AppExeName}
 Compression=lzma2/max
 SolidCompression=yes
@@ -33,7 +33,7 @@ CloseApplications=yes
 RestartApplications=no
 
 [Files]
-Source: "..\..\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Excludes: "TargetLib.exe,TargetLib.exe.version"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Excludes: "TargetLib.exe,TargetLib.exe.version"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#TargetLibSource}"; DestDir: "{commonappdata}\TargetLib\bin"; DestName: "TargetLib.exe"; Flags: ignoreversion
 
 [Icons]
