@@ -22,20 +22,34 @@ jobs:
             target: windows
             targetlib: true
             stage: true
+            artifactName: TargetSetup
+            artifactPath: Target/build/windows/installer/TargetSetup.exe
           - name: Linux
             os: ubuntu-24.04
             target: linux
             targetlib: true
+            stage: true
+            artifactName: Target-linux-x64
+            artifactPath: Target/build/linux/stage/Target-*.tar.gz
           - name: Android
             os: ubuntu-24.04
             target: apk
             java: true
+            stage: true
+            artifactName: Target-android
+            artifactPath: Target/build/apk/stage/*.apk
           - name: macOS
             os: macos-14
             target: macos
+            stage: true
+            artifactName: Target-macos-arm64
+            artifactPath: Target/build/macos/stage/Target-*.tar.gz
           - name: iOS
             os: macos-14
             target: ios
+            stage: true
+            artifactName: Target-ios
+            artifactPath: Target/build/ios/stage/Target-*.tar.gz
 
     steps:
       - name: Checkout Target
@@ -87,19 +101,19 @@ jobs:
         run: ./scripts/build.ps1 -Target "${{ matrix.target }}"
 
       - name: Install Inno Setup
-        if: matrix.stage == true
+        if: matrix.target == 'windows'
         shell: pwsh
         run: choco install innosetup --no-progress -y
 
-      - name: Stage installer
+      - name: Stage package
         if: matrix.stage == true
         working-directory: Target
         shell: pwsh
-        run: ./scripts/stage.ps1
+        run: ./scripts/stage.ps1 -Target "${{ matrix.target }}"
 
-      - name: Upload installer
+      - name: Upload package
         if: matrix.stage == true
         uses: actions/upload-artifact@v4
         with:
-          name: TargetSetup
-          path: Target/build/windows/installer/TargetSetup.exe
+          name: ${{ matrix.artifactName }}
+          path: ${{ matrix.artifactPath }}
