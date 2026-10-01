@@ -4,7 +4,7 @@ import 'package:target/core/runtime/core_gateway.dart';
 import 'package:target/core/runtime/core_models.dart';
 
 class FakeIntentCore extends UnavailableCoreGateway {
-  pb.SmartConnectSnapshot snapshot = pb.SmartConnectSnapshot(revision: 's1');
+  pb.RuntimeState snapshot = pb.RuntimeState(policyRevision: 's1');
   pb.RuntimeConfig config = pb.RuntimeConfig(revision: 'r1');
   pb.NodePool pool = pb.NodePool(revision: 'pool1');
   final forced = <pb.ForceServiceBindingRequest>[];
@@ -19,37 +19,37 @@ class FakeIntentCore extends UnavailableCoreGateway {
   @override
   Future<pb.CapabilitiesResponse> smartCapabilities() async =>
       pb.CapabilitiesResponse(
-        smartConnectIntentApi: intentApi,
+        policyAutomationApi: intentApi,
         runtimeEvents: true,
       );
-  @override
-  Future<pb.SmartConnectSnapshot> smartSnapshot() async => snapshot.deepCopy();
   @override
   Future<pb.NodePool> getNodePool() async => pool.deepCopy();
   @override
   Future<pb.RuntimeConfig> smartConfig() async => config.deepCopy();
   @override
-  Future<pb.RuntimeState> getSmartConnectRuntimeState() async =>
-      pb.RuntimeState(
-        running: running,
-        selectors: [
-          for (final selector in config.selectors)
-            pb.SelectorState(
-              desired: selector,
-              actualNodeId: running ? selector.selectedNodeId : '',
-              effective: running && effective,
-            ),
-        ],
-        serviceBindings: [
-          for (final binding in config.serviceBindings)
-            pb.ServiceBindingState(
-              desired: binding,
-              effective: running && effective,
-            ),
-        ],
-      );
+  Future<pb.RuntimeState> getSmartConnectRuntimeState() async {
+    final state = snapshot.deepCopy();
+    state
+      ..running = running
+      ..selectors.addAll([
+        for (final selector in config.selectors)
+          pb.SelectorState(
+            desired: selector,
+            actualNodeId: running ? selector.selectedNodeId : '',
+            effective: running && effective,
+          ),
+      ])
+      ..serviceBindings.addAll([
+        for (final binding in config.serviceBindings)
+          pb.ServiceBindingState(
+            desired: binding,
+            effective: running && effective,
+          ),
+      ]);
+    return state;
+  }
   @override
-  Stream<pb.SmartConnectEvent> smartIntentEvents() => const Stream.empty();
+  Stream<pb.RuntimeEvent> smartIntentEvents() => const Stream.empty();
   @override
   Future<pb.Operation> upsertSmartPolicy(
     pb.UpsertServicePolicyRequest request,
@@ -58,7 +58,7 @@ class FakeIntentCore extends UnavailableCoreGateway {
       (p) => p.serviceId == request.policy.serviceId,
     );
     snapshot.policies.add(request.policy..revision = 'policy1');
-    snapshot.revision = 's3';
+    snapshot.policyRevision = 's3';
     return pb.Operation(status: pb.OperationStatus.OPERATION_STATUS_SUCCEEDED);
   }
 

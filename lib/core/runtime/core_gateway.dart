@@ -76,8 +76,6 @@ abstract class CoreGateway {
 
   Future<pb.RuntimeState> getSmartConnectRuntimeState();
 
-  Future<pb.SmartConnectSnapshot> smartSnapshot();
-
   Future<pb.Operation> upsertSmartPolicy(pb.UpsertServicePolicyRequest request);
 
   Future<pb.Operation> deleteSmartPolicy(pb.DeleteServicePolicyRequest request);
@@ -96,7 +94,7 @@ abstract class CoreGateway {
 
   Future<pb.Operation> smartOperation(String id);
 
-  Stream<pb.SmartConnectEvent> smartIntentEvents();
+  Stream<pb.RuntimeEvent> smartIntentEvents();
 
   Future<void> dispose();
 }
@@ -217,9 +215,6 @@ class UnavailableCoreGateway implements CoreGateway {
   Future<pb.RuntimeState> getSmartConnectRuntimeState() => _unavailable();
 
   @override
-  Future<pb.SmartConnectSnapshot> smartSnapshot() => _unavailable();
-
-  @override
   Future<pb.Operation> upsertSmartPolicy(
     pb.UpsertServicePolicyRequest request,
   ) => _unavailable();
@@ -257,7 +252,7 @@ class UnavailableCoreGateway implements CoreGateway {
   Future<pb.Operation> smartOperation(String id) => _unavailable();
 
   @override
-  Stream<pb.SmartConnectEvent> smartIntentEvents() => const Stream.empty();
+  Stream<pb.RuntimeEvent> smartIntentEvents() => const Stream.empty();
 
   @override
   Future<void> dispose() async {}

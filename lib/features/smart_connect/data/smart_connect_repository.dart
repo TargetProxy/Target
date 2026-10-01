@@ -45,11 +45,11 @@ class SmartConnectRepository {
       if (cancellation?.cancelled == true &&
           waitingApproval &&
           operation.proposalId.isNotEmpty) {
-        final snapshot = await core.smartSnapshot();
+        final snapshot = await core.getSmartConnectRuntimeState();
         await core.rejectSmartProposal(
           pb.ProposalCommandRequest(
             proposalId: operation.proposalId,
-            expectedRevision: snapshot.revision,
+            expectedRevision: snapshot.policyRevision,
             idempotencyKey: _key(),
           ),
         );
@@ -74,27 +74,26 @@ class SmartConnectRepository {
 
   Future<SmartRuntimeSnapshot> load() async {
     final capabilities = await core.smartCapabilities();
-    if (!capabilities.smartConnectIntentApi) {
+    if (!capabilities.policyAutomationApi) {
       throw UnsupportedError(
         'TargetLib intent API is unavailable; update the core',
       );
     }
-    final snapshot = await core.smartSnapshot();
+    final snapshot = await core.getSmartConnectRuntimeState();
     final pool = await core.getNodePool();
     final config = await core.smartConfig();
-    final runtime = await core.getSmartConnectRuntimeState();
     final defaultSelector = config.selectors
         .where((selector) => selector.tag == 'proxy')
         .firstOrNull;
-    final actualDefault = runtime.selectors
+    final actualDefault = snapshot.selectors
         .where((selector) => selector.desired.tag == 'proxy')
         .firstOrNull;
     return SmartRuntimeSnapshot(
       nodes: _nodes(pool, snapshot),
-      bindings: _bindings(config, runtime),
+      bindings: _bindings(config, snapshot),
       revision: config.revision,
       poolRevision: pool.revision,
-      running: runtime.running,
+      running: snapshot.running,
       eventsSupported: capabilities.runtimeEvents,
       defaultNodeId: defaultSelector?.selectedNodeId,
       actualDefaultNodeId: actualDefault?.actualNodeId,
@@ -103,7 +102,7 @@ class SmartConnectRepository {
     );
   }
 
-  List<ProxyNode> _nodes(pb.NodePool pool, pb.SmartConnectSnapshot snapshot) {
+  List<ProxyNode> _nodes(pb.NodePool pool, pb.RuntimeState snapshot) {
     final preferences = {
       for (final preference in snapshot.nodePreferences)
         preference.nodeId: preference,
@@ -197,7 +196,8 @@ class SmartConnectRepository {
     SmartPolicy policy, {
     String? expectedRevision,
   }) async {
-    final revision = expectedRevision ?? (await core.smartSnapshot()).revision;
+    final revision =
+        expectedRevision ?? (await core.getSmartConnectRuntimeState()).policyRevision;
     final operation = await _wait(
       await core.upsertSmartPolicy(
         pb.UpsertServicePolicyRequest(
@@ -220,7 +220,7 @@ class SmartConnectRepository {
     if (errors.isNotEmpty) throw FormatException(errors.join('; '));
     await syncPolicy(policy);
     cancellation.check();
-    final snapshot = await core.smartSnapshot();
+    final snapshot = await core.getSmartConnectRuntimeState();
     if (policy.selectionMode == SmartSelectionMode.direct) {
       final pool = await core.getNodePool();
       return SmartAssessment(
@@ -236,14 +236,14 @@ class SmartConnectRepository {
       await core.requestSmartEvaluation(
         pb.RequestServiceEvaluationRequest(
           serviceId: _id(policy.id),
-          expectedRevision: snapshot.revision,
+          expectedRevision: snapshot.policyRevision,
           idempotencyKey: _key(),
         ),
       ),
       cancellation: cancellation,
     );
     cancellation.check();
-    final latest = await core.smartSnapshot();
+    final latest = await core.getSmartConnectRuntimeState();
     final proposal = latest.proposals
         .where((p) => p.id == operation.proposalId)
         .firstOrNull;
@@ -278,9 +278,9 @@ class SmartConnectRepository {
     final errors = policy.validate();
     if (errors.isNotEmpty) throw FormatException(errors.join('; '));
     await syncPolicy(policy);
-    final snapshot = await core.smartSnapshot();
+    final snapshot = await core.getSmartConnectRuntimeState();
     if (policy.selectionMode == SmartSelectionMode.direct) {
-      await _forceBinding(policy.id, 'direct', snapshot.revision);
+      await _forceBinding(policy.id, 'direct', snapshot.policyRevision);
       return;
     }
     final pool = await core.getNodePool();
@@ -313,7 +313,7 @@ class SmartConnectRepository {
     if (nodes.isEmpty) {
       throw StateError('No available node matches this service');
     }
-    await _forceBinding(policy.id, nodes.first.id, snapshot.revision);
+    await _forceBinding(policy.id, nodes.first.id, snapshot.policyRevision);
   }
 
   /// Applies an explicit node choice for one service route. This is the
@@ -324,7 +324,7 @@ class SmartConnectRepository {
     if (policy.selectionMode == SmartSelectionMode.direct) {
       throw StateError('Direct routes do not use a proxy node');
     }
-    final snapshot = await core.smartSnapshot();
+    final snapshot = await core.getSmartConnectRuntimeState();
     final pool = await core.getNodePool();
     final node = _nodes(
       pool,
@@ -333,11 +333,11 @@ class SmartConnectRepository {
     if (node == null || !_eligibleFor(node, policy)) {
       throw StateError('Node is not eligible for this service');
     }
-    await syncPolicy(policy, expectedRevision: snapshot.revision);
+    await syncPolicy(policy, expectedRevision: snapshot.policyRevision);
     await _forceBinding(
       policy.id,
       nodeId,
-      (await core.smartSnapshot()).revision,
+      (await core.getSmartConnectRuntimeState()).policyRevision,
     );
   }
 
@@ -363,7 +363,7 @@ class SmartConnectRepository {
         await _forceBinding(
           policy.id,
           'direct',
-          (await core.smartSnapshot()).revision,
+          (await core.getSmartConnectRuntimeState()).policyRevision,
         );
       case SmartSelectionMode.automatic:
         if (assessment == null) {
@@ -409,7 +409,7 @@ class SmartConnectRepository {
   }
 
   Future<void> apply(SmartAssessment assessment, {String? manualNodeId}) async {
-    final snapshot = await core.smartSnapshot();
+    final snapshot = await core.getSmartConnectRuntimeState();
     if (manualNodeId != null || assessment.selection.direct) {
       final nodeId = manualNodeId ?? 'direct';
       if (!assessment.selection.direct &&
@@ -421,7 +421,7 @@ class SmartConnectRepository {
           pb.ForceServiceBindingRequest(
             serviceId: _id(assessment.policy.id),
             nodeId: nodeId,
-            expectedRevision: snapshot.revision,
+            expectedRevision: snapshot.policyRevision,
             idempotencyKey: _key(),
           ),
         ),
@@ -441,7 +441,7 @@ class SmartConnectRepository {
       await core.approveSmartProposal(
         pb.ProposalCommandRequest(
           proposalId: proposal.id,
-          expectedRevision: snapshot.revision,
+          expectedRevision: snapshot.policyRevision,
           idempotencyKey: _key(),
         ),
       ),
@@ -449,13 +449,13 @@ class SmartConnectRepository {
   }
 
   Future<void> remove(String policyId) async {
-    final snapshot = await core.smartSnapshot();
+    final snapshot = await core.getSmartConnectRuntimeState();
     if (snapshot.policies.any((p) => p.serviceId == _id(policyId))) {
       await _wait(
         await core.deleteSmartPolicy(
           pb.DeleteServicePolicyRequest(
             serviceId: _id(policyId),
-            expectedRevision: snapshot.revision,
+            expectedRevision: snapshot.policyRevision,
             idempotencyKey: _key(),
           ),
         ),
@@ -464,7 +464,7 @@ class SmartConnectRepository {
   }
 
   Future<void> setPreference(String nodeId, NodePreference preference) async {
-    final snapshot = await core.smartSnapshot();
+    final snapshot = await core.getSmartConnectRuntimeState();
     await _wait(
       await core.setSmartPreference(
         pb.SetNodePreferenceRequest(
@@ -476,7 +476,7 @@ class SmartConnectRepository {
             labels: preference.tags.toList(),
             subscriptionPriority: preference.subscriptionPriority,
           ),
-          expectedRevision: snapshot.revision,
+          expectedRevision: snapshot.policyRevision,
           idempotencyKey: _key(),
         ),
       ),
@@ -485,7 +485,7 @@ class SmartConnectRepository {
 
   /// Probe results the core recorded for one node, newest last.
   Future<List<ProxyNode>> history(SmartPolicy policy, String nodeId) async {
-    final snapshot = await core.smartSnapshot();
+    final snapshot = await core.getSmartConnectRuntimeState();
     final pool = await core.getNodePool();
     final node = _nodes(
       pool,
@@ -493,7 +493,7 @@ class SmartConnectRepository {
     ).where((n) => n.id == nodeId).firstOrNull;
     if (node == null) return const [];
     return [
-      for (final result in snapshot.results.where(
+      for (final result in snapshot.qualityHistory.where(
         (r) => r.serviceId == _id(policy.id) && r.nodeId == nodeId,
       ))
         node.copyWith(

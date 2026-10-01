@@ -293,10 +293,6 @@ class TargetLibGateway implements CoreGateway {
       _smartCall(_runtime.getRuntimeConfig);
 
   @override
-  Future<targetlib_pb.SmartConnectSnapshot> smartSnapshot() =>
-      _smartCall(() => _requireRuntimeConnection().getSmartConnectSnapshot());
-
-  @override
   Future<targetlib_pb.Operation> upsertSmartPolicy(
     targetlib_pb.UpsertServicePolicyRequest request,
   ) => _smartCall(
@@ -348,9 +344,9 @@ class TargetLibGateway implements CoreGateway {
       _smartCall(() => _requireRuntimeConnection().getOperation(id));
 
   @override
-  Stream<targetlib_pb.SmartConnectEvent> smartIntentEvents() async* {
+  Stream<targetlib_pb.RuntimeEvent> smartIntentEvents() async* {
     await _ensureConnected();
-    yield* _requireRuntimeConnection().subscribeSmartConnectEvents();
+    yield* _requireRuntimeConnection().subscribeRuntimeEvents();
   }
 
   Future<T> _smartCall<T>(Future<T> Function() operation) async {
