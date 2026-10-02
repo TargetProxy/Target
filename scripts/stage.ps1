@@ -94,7 +94,7 @@ with Image.open(source) as image:
         $tar = Get-Command tar -ErrorAction Stop
         $tarPath = Join-Path $root "build/macos/stage/Target-$appVersion-macos-arm64.tar.gz"
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $tarPath) | Out-Null
-        & $tar.Source -czf $tarPath -C $app.DirectoryName $app.Name
+        & $tar.Source -czf $tarPath -C (Split-Path -Parent $app.FullName) $app.Name
         if ($LASTEXITCODE -ne 0) { throw "tar failed ($LASTEXITCODE)" }
     }
     'ios' {
@@ -103,7 +103,7 @@ with Image.open(source) as image:
         $tar = Get-Command tar -ErrorAction Stop
         $tarPath = Join-Path $root "build/ios/stage/Target-$appVersion-ios.tar.gz"
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $tarPath) | Out-Null
-        & $tar.Source -czf $tarPath -C $app.DirectoryName $app.Name
+        & $tar.Source -czf $tarPath -C (Split-Path -Parent $app.FullName) $app.Name
         if ($LASTEXITCODE -ne 0) { throw "tar failed ($LASTEXITCODE)" }
     }
     'apk' {
