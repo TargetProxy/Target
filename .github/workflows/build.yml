@@ -32,6 +32,11 @@ jobs:
             artifactName: targetlib-linux
             artifactPath: TargetLib/build
             buildCommand: ./scripts/build.ps1 -OutputPath build/TargetLib -SkipTargetSync
+          - target: android
+            os: ubuntu-latest
+            artifactName: targetlib-android
+            artifactPath: TargetLib/flutter/android/src/main/jniLibs
+            buildCommand: ./scripts/build-mobile.ps1
 
     steps:
       - name: Checkout TargetLib
@@ -72,17 +77,19 @@ jobs:
           - target: windows
             os: windows-latest
             libArtifact: targetlib-windows
+            libPath: TargetLib/build
             artifactName: TargetSetup
             artifactPath: Target/build/windows/installer/TargetSetup.exe
           - target: linux
             os: ubuntu-latest
             libArtifact: targetlib-linux
+            libPath: TargetLib/build
             artifactName: Target-linux-x64
             artifactPath: Target/build/linux/stage/Target-*.tar.gz
-          # TargetLib/build-mobile.ps1 is Windows-only, so the Android native libraries are not
-          # built here and this APK ships without libtargetlib*.so.
           - target: apk
             os: ubuntu-latest
+            libArtifact: targetlib-android
+            libPath: TargetLib/flutter/android/src/main/jniLibs
             artifactName: Target-android
             artifactPath: Target/build/apk/stage/*.apk
           - target: macos
@@ -111,7 +118,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: ${{ matrix.libArtifact }}
-          path: TargetLib/build
+          path: ${{ matrix.libPath }}
 
       - name: Install Linux build dependencies
         if: runner.os == 'Linux'
