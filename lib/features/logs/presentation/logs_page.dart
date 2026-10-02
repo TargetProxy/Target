@@ -84,6 +84,9 @@ class _LogsPageState extends ConsumerState<LogsPage> {
                     itemCount: entries.length,
                     itemBuilder: (context, index) {
                       return AnimatedReveal(
+                        delay: Duration(
+                          milliseconds: index.clamp(0, 8).toInt() * 20,
+                        ),
                         key: ValueKey(
                           '${entries[index].time.microsecondsSinceEpoch}-$index',
                         ),

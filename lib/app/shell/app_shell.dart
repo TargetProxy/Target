@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../app_identity.dart';
 import '../router.dart';
 import '../../l10n/app_localizations.dart';
+import '../../core/theme/app_motion.dart';
 
 class AppShell extends StatelessWidget {
   const AppShell({required this.location, required this.child, super.key});
@@ -141,14 +142,36 @@ class _DesktopSidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context);
-    Widget item(int index, String label, IconData icon) => ListTile(
-      dense: true,
-      selected: selectedIndex == index,
-      leading: Icon(icon, size: 20),
-      title: Text(label),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      onTap: () => onSelect(index),
-    );
+    Widget item(int index, String label, IconData icon) {
+      final selected = selectedIndex == index;
+      return AnimatedContainer(
+        duration: AppMotion.duration(context, AppMotion.fast),
+        curve: Curves.easeOutCubic,
+        decoration: BoxDecoration(
+          color: selected ? theme.colorScheme.secondaryContainer : null,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Material(
+          type: MaterialType.transparency,
+          child: ListTile(
+            dense: true,
+            selected: selected,
+            leading: AnimatedSwitcher(
+              duration: AppMotion.duration(context, AppMotion.fast),
+              transitionBuilder: (child, animation) =>
+                  ScaleTransition(scale: animation, child: child),
+              child: Icon(icon, key: ValueKey(selected), size: 20),
+            ),
+            title: Text(label),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            onTap: () => onSelect(index),
+          ),
+        ),
+      );
+    }
+
     return Material(
       color: theme.colorScheme.surface,
       child: SizedBox(

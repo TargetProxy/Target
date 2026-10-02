@@ -68,6 +68,9 @@ class ConnectionsPage extends ConsumerWidget {
                       final connection = connections[index];
                       return AnimatedReveal(
                         key: ValueKey(connection.id),
+                        delay: Duration(
+                          milliseconds: index.clamp(0, 8).toInt() * 28,
+                        ),
                         child: ConnectionTile(
                           connection: connection,
                           closing: state.isClosing(connection.id),

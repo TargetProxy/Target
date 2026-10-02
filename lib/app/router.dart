@@ -8,6 +8,7 @@ import '../features/profiles/presentation/profiles_workspace_page.dart';
 import '../features/traffic/presentation/traffic_page.dart';
 import '../features/proxies/presentation/node_pool_page.dart';
 import '../features/rules/presentation/rules_page.dart';
+import '../core/theme/app_motion.dart';
 import 'shell/app_shell.dart';
 
 class AppRouter {
@@ -63,22 +64,28 @@ class AppRouter {
     return (context, state) => CustomTransitionPage<void>(
       key: state.pageKey,
       child: child,
-      transitionDuration: const Duration(milliseconds: 260),
-      reverseTransitionDuration: const Duration(milliseconds: 180),
+      transitionDuration: AppMotion.standard,
+      reverseTransitionDuration: AppMotion.fast,
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        if (MediaQuery.maybeOf(context)?.disableAnimations == true) {
+          return child;
+        }
         final curved = CurvedAnimation(
           parent: animation,
-          curve: Curves.easeOutCubic,
-          reverseCurve: Curves.easeInCubic,
+          curve: AppMotion.easeOut,
+          reverseCurve: AppMotion.easeIn,
         );
         return FadeTransition(
           opacity: curved,
           child: SlideTransition(
             position: Tween<Offset>(
-              begin: const Offset(0.025, 0),
+              begin: const Offset(0.018, 0),
               end: Offset.zero,
             ).animate(curved),
-            child: child,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.985, end: 1).animate(curved),
+              child: child,
+            ),
           ),
         );
       },

@@ -232,6 +232,9 @@ class _NodePoolPageState extends ConsumerState<NodePoolPage> {
                   itemBuilder: (context, index) {
                     final node = visible[index];
                     return AnimatedReveal(
+                      delay: Duration(
+                        milliseconds: index.clamp(0, 8).toInt() * 24,
+                      ),
                       child: ListTile(
                         key: ValueKey('node-${node.id}'),
                         dense: true,

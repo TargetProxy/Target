@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/runtime/core_notifier.dart';
 import '../../../core/utils/format_bytes.dart';
 import '../../../core/widgets/target_page_layout.dart';
+import '../../../core/theme/app_motion.dart';
 import '../../../l10n/app_localizations.dart';
 
 class TrafficPage extends ConsumerWidget {
@@ -21,9 +22,7 @@ class TrafficPage extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            TargetPageHeader(
-              title: l10n.traffic,
-            ),
+            TargetPageHeader(title: l10n.traffic),
             const SizedBox(height: 22),
             Card(
               child: Padding(
@@ -154,12 +153,28 @@ class _Metric extends StatelessWidget {
               children: [
                 Text(title, style: theme.textTheme.labelMedium),
                 const SizedBox(height: 2),
-                Text(
-                  value,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
+                AnimatedSwitcher(
+                  duration: AppMotion.duration(context, AppMotion.fast),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (child, animation) => FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0, 0.18),
+                        end: Offset.zero,
+                      ).animate(animation),
+                      child: child,
+                    ),
+                  ),
+                  child: Text(
+                    value,
+                    key: ValueKey(value),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ],
@@ -184,17 +199,27 @@ class _StatusLabel extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(
-          running ? Icons.check_circle : Icons.pause_circle_outline,
-          size: 16,
-          color: color,
+        AnimatedSwitcher(
+          duration: AppMotion.duration(context, AppMotion.fast),
+          transitionBuilder: (child, animation) =>
+              ScaleTransition(scale: animation, child: child),
+          child: Icon(
+            running ? Icons.check_circle : Icons.pause_circle_outline,
+            key: ValueKey(running),
+            size: 16,
+            color: color,
+          ),
         ),
         const SizedBox(width: 6),
-        Text(
-          running ? l10n.running : l10n.stopped,
-          style: Theme.of(
-            context,
-          ).textTheme.labelMedium?.copyWith(color: color),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 180),
+          child: Text(
+            running ? l10n.running : l10n.stopped,
+            key: ValueKey(running),
+            style: Theme.of(
+              context,
+            ).textTheme.labelMedium?.copyWith(color: color),
+          ),
         ),
       ],
     );

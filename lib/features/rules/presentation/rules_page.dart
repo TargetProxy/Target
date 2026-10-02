@@ -5,6 +5,7 @@ import 'package:targetlib/targetlib.dart' as pb;
 
 import '../../../core/runtime/core_notifier.dart';
 import '../../../core/widgets/target_page_layout.dart';
+import '../../../core/widgets/animated_reveal.dart';
 import '../../../data/models/runtime_settings.dart' as runtime_models;
 import '../../../data/models/proxy_node.dart';
 import '../../../features/maps/application/proxy_country_map.dart';
@@ -165,35 +166,38 @@ class _RulesPageState extends ConsumerState<RulesPage> {
                   style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
               ),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.public),
-                      title: Text(l10n.defaultNode),
-                      subtitle: Text(
-                        selected?.displayName ?? l10n.nodeNotSelected,
+            AnimatedReveal(
+              delay: const Duration(milliseconds: 40),
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.public),
+                        title: Text(l10n.defaultNode),
+                        subtitle: Text(
+                          selected?.displayName ?? l10n.nodeNotSelected,
+                        ),
                       ),
-                    ),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final node in visible.take(12))
-                          ChoiceChip(
-                            label: Text(node.displayName),
-                            selected: node.id == selected?.id,
-                            onSelected: (_) => ref
-                                .read(proxiesProvider.notifier)
-                                .selectNode(node.id),
-                          ),
-                      ],
-                    ),
-                  ],
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final node in visible.take(12))
+                            ChoiceChip(
+                              label: Text(node.displayName),
+                              selected: node.id == selected?.id,
+                              onSelected: (_) => ref
+                                  .read(proxiesProvider.notifier)
+                                  .selectNode(node.id),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -225,10 +229,20 @@ class _RulesPageState extends ConsumerState<RulesPage> {
               ),
               const SizedBox(height: 16),
             ],
-            _ruleEditor(context, visible),
+            AnimatedReveal(
+              delay: const Duration(milliseconds: 80),
+              child: _ruleEditor(context, visible),
+            ),
             const SizedBox(height: 16),
             if (_loading) const Center(child: CircularProgressIndicator()),
-            for (final route in _routes) _routeTile(route, nodes, l10n),
+            for (var index = 0; index < _routes.length; index++)
+              AnimatedReveal(
+                key: ValueKey(_routes[index].serviceId),
+                delay: Duration(
+                  milliseconds: 120 + index.clamp(0, 8).toInt() * 24,
+                ),
+                child: _routeTile(_routes[index], nodes, l10n),
+              ),
           ],
         ),
       ),

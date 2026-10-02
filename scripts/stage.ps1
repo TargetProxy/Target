@@ -80,7 +80,7 @@ with Image.open(source) as image:
         $packageDir = Join-Path $root 'build/linux/stage/Target-linux-x64'
         Remove-Item -LiteralPath $packageDir -Recurse -Force -ErrorAction SilentlyContinue
         New-Item -ItemType Directory -Force -Path (Join-Path $packageDir 'bundle') | Out-Null
-        Copy-Item -LiteralPath (Join-Path $bundlePath '*') -Destination (Join-Path $packageDir 'bundle') -Recurse -Force
+        Copy-Item -Path (Join-Path $bundlePath '*') -Destination (Join-Path $packageDir 'bundle') -Recurse -Force
         Copy-Item -LiteralPath @($servicePath, $ruleSetPath) -Destination $packageDir -Force
 
         $tar = Get-Command tar -ErrorAction Stop

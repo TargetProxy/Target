@@ -83,6 +83,14 @@ class ProfilesWorkspacePage extends ConsumerWidget {
               for (final subscription in state.subscriptions) ...[
                 AnimatedReveal(
                   key: ValueKey('subscription-${subscription.id}'),
+                  delay: Duration(
+                    milliseconds:
+                        state.subscriptions
+                            .indexOf(subscription)
+                            .clamp(0, 8)
+                            .toInt() *
+                        28,
+                  ),
                   child: Card(
                     child: Column(
                       children: [
