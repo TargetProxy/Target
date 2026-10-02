@@ -6,48 +6,91 @@ on:
   pull_request:
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
-  build:
-    name: Build ${{ matrix.name }}
+  targetlib:
+    name: TargetLib ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: Windows
-            os: windows-2022
-            target: windows
-            targetlib: true
-            stage: true
+          - target: windows
+            os: windows-latest
+            artifactName: targetlib-windows
+            artifactPath: TargetLib/build
+            buildCommand: ./scripts/build.ps1 -OutputPath build/TargetLib.exe -SkipTargetSync
+          - target: linux
+            os: ubuntu-latest
+            artifactName: targetlib-linux
+            artifactPath: TargetLib/build
+            buildCommand: ./scripts/build.ps1 -OutputPath build/TargetLib -SkipTargetSync
+
+    steps:
+      - name: Checkout TargetLib
+        uses: actions/checkout@v4
+        with:
+          repository: TargetProxy/TargetLib
+          path: TargetLib
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.x'
+          cache: true
+          cache-dependency-path: TargetLib/go.sum
+
+      - name: Build TargetLib
+        working-directory: TargetLib
+        shell: pwsh
+        run: ${{ matrix.buildCommand }}
+
+      - name: Upload TargetLib
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifactName }}
+          path: ${{ matrix.artifactPath }}
+          retention-days: 1
+          if-no-files-found: error
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: targetlib
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: windows
+            os: windows-latest
+            libArtifact: targetlib-windows
             artifactName: TargetSetup
             artifactPath: Target/build/windows/installer/TargetSetup.exe
-          - name: Linux
-            os: ubuntu-24.04
-            target: linux
-            targetlib: true
-            stage: true
+          - target: linux
+            os: ubuntu-latest
+            libArtifact: targetlib-linux
             artifactName: Target-linux-x64
             artifactPath: Target/build/linux/stage/Target-*.tar.gz
-          - name: Android
-            os: ubuntu-24.04
-            target: apk
-            java: true
-            stage: true
+          # TargetLib/build-mobile.ps1 is Windows-only, so the Android native libraries are not
+          # built here and this APK ships without libtargetlib*.so.
+          - target: apk
+            os: ubuntu-latest
             artifactName: Target-android
             artifactPath: Target/build/apk/stage/*.apk
-          - name: macOS
-            os: macos-14
-            target: macos
-            stage: true
+          - target: macos
+            os: macos-latest
             artifactName: Target-macos-arm64
             artifactPath: Target/build/macos/stage/Target-*.tar.gz
-          - name: iOS
-            os: macos-14
-            target: ios
-            stage: true
+          - target: ios
+            os: macos-latest
             artifactName: Target-ios
             artifactPath: Target/build/ios/stage/Target-*.tar.gz
 
@@ -63,57 +106,51 @@ jobs:
           repository: TargetProxy/TargetLib
           path: TargetLib
 
+      - name: Download TargetLib
+        if: matrix.libArtifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.libArtifact }}
+          path: TargetLib/build
+
       - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
         working-directory: Target
         shell: pwsh
         run: ./scripts/install-deps.ps1
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-
-      - name: Setup Java
-        if: matrix.java == true
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-          cache: gradle
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: stable
-          cache: true
-          cache-dependency-path: TargetLib/go.sum
-
-      - name: Build TargetLib
-        if: matrix.targetlib == true
-        working-directory: TargetLib
-        shell: pwsh
-        run: ./scripts/build.ps1 -SkipTargetSync
-
-      - name: Build platform
-        working-directory: Target
-        shell: pwsh
-        run: ./scripts/build.ps1 -Target "${{ matrix.target }}"
 
       - name: Install Inno Setup
         if: matrix.target == 'windows'
         shell: pwsh
         run: choco install innosetup --no-progress -y
 
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.5
+          cache: true
+
+      - name: Setup Java
+        if: matrix.target == 'apk'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Build platform
+        working-directory: Target
+        shell: pwsh
+        run: ./scripts/build.ps1 -Target "${{ matrix.target }}"
+
       - name: Stage package
-        if: matrix.stage == true
         working-directory: Target
         shell: pwsh
         run: ./scripts/stage.ps1 -Target "${{ matrix.target }}"
 
       - name: Upload package
-        if: matrix.stage == true
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifactName }}
           path: ${{ matrix.artifactPath }}
+          if-no-files-found: error
