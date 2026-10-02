@@ -1,13 +1,15 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/widgets/target_page_layout.dart';
+import '../../../core/widgets/animated_reveal.dart';
 import '../../../data/models/proxy_node.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../maps/application/proxy_country_map.dart';
 import '../../maps/presentation/widgets/abstract_world_map.dart';
-import '../../smart_connect/application/smart_connect_notifier.dart';
 import '../../subscriptions/application/subscriptions_notifier.dart';
 import '../application/proxies_notifier.dart';
 
@@ -27,28 +29,6 @@ class _NodePoolPageState extends ConsumerState<NodePoolPage> {
   void dispose() {
     _search.dispose();
     super.dispose();
-  }
-
-  Future<void> _editSmartPreference(ProxyNode node) async {
-    final smart = ref.read(smartConnectProvider);
-    final current =
-        smart.snapshot.nodes.where((n) => n.id == node.id).firstOrNull ?? node;
-    final result = await showDialog<NodePreference>(
-      context: context,
-      builder: (_) => _NodePreferenceDialog(node: current),
-    );
-    if (result == null || !mounted) return;
-    try {
-      await ref
-          .read(smartConnectProvider.notifier)
-          .savePreference(node.id, result);
-    } on Object catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error.toString())));
-      }
-    }
   }
 
   Color _latencyColor(BuildContext context, ProxyNode node) {
@@ -114,21 +94,7 @@ class _NodePoolPageState extends ConsumerState<NodePoolPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      TargetPageHeader(
-                        title:
-                            Localizations.localeOf(context).languageCode == 'zh'
-                            ? '节点库与地图'
-                            : 'Node library & map',
-                        subtitle:
-                            Localizations.localeOf(context).languageCode == 'zh'
-                            ? '查看节点、测速与候选偏好。出口请在代理分组中选择。'
-                            : 'Inspect nodes, latency and candidate preferences. Choose routes in Proxy groups.',
-                      ),
-                      TextButton.icon(
-                        onPressed: () => context.go('/smart-connect'),
-                        icon: const Icon(Icons.arrow_back),
-                        label: Text(l10n.nodeSelection),
-                      ),
+                      TargetPageHeader(title: l10n.nodeLibrary),
                       const SizedBox(height: 16),
                       Wrap(
                         spacing: 12,
@@ -265,49 +231,48 @@ class _NodePoolPageState extends ConsumerState<NodePoolPage> {
                   itemCount: visible.length,
                   itemBuilder: (context, index) {
                     final node = visible[index];
-                    return ListTile(
-                      key: ValueKey('node-${node.id}'),
-                      dense: true,
+                    return AnimatedReveal(
+                      child: ListTile(
+                        key: ValueKey('node-${node.id}'),
+                        dense: true,
 
-                      title: Text(
-                        node.name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      subtitle: Text(
-                        '${sourceName(node)} · ${node.typeLabel}${node.isAvailable ? '' : ' · ${l10n.nodeUnavailable}'}',
-                      ),
-                      trailing: proxies.testing
-                          ? const SizedBox.square(
-                              dimension: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Text(
-                              node.latencyTimedOut
-                                  ? 'timeout'
-                                  : (node.latencyMs == null
-                                        ? '—'
-                                        : '${node.latencyMs} ms'),
-                              style: TextStyle(
-                                color: _latencyColor(context, node),
-                                fontWeight: node.latencyTimedOut
-                                    ? FontWeight.bold
-                                    : FontWeight.w600,
+                        title: Text(
+                          node.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(
+                          '${sourceName(node)} · ${node.typeLabel}${node.isAvailable ? '' : ' · ${l10n.nodeUnavailable}'}',
+                        ),
+                        trailing: proxies.testing
+                            ? const SizedBox.square(
+                                dimension: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Text(
+                                node.latencyTimedOut
+                                    ? 'timeout'
+                                    : (node.latencyMs == null
+                                          ? '—'
+                                          : '${node.latencyMs} ms'),
+                                style: TextStyle(
+                                  color: _latencyColor(context, node),
+                                  fontWeight: node.latencyTimedOut
+                                      ? FontWeight.bold
+                                      : FontWeight.w600,
+                                ),
                               ),
-                            ),
-                      leading: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.tune),
-                            tooltip: 'Smart Connect node preferences',
-                            onPressed: busy
-                                ? null
-                                : () => _editSmartPreference(node),
-                          ),
-                        ],
+                        leading: Radio<String>(
+                          value: node.id,
+                          groupValue: proxies.selectedGroup?.selectedNodeId,
+                          onChanged: busy
+                              ? null
+                              : (_) => notifier.selectNode(node.id),
+                        ),
+                        enabled: node.isAvailable,
                       ),
-                      enabled: node.isAvailable,
                     );
                   },
                 ),
@@ -316,105 +281,6 @@ class _NodePoolPageState extends ConsumerState<NodePoolPage> {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _NodePreferenceDialog extends StatefulWidget {
-  const _NodePreferenceDialog({required this.node});
-
-  final ProxyNode node;
-
-  @override
-  State<_NodePreferenceDialog> createState() => _NodePreferenceDialogState();
-}
-
-class _NodePreferenceDialogState extends State<_NodePreferenceDialog> {
-  late bool _enabled = widget.node.enabled;
-  late bool _excluded = widget.node.excluded;
-  late bool _favorite = widget.node.favorite;
-  late final TextEditingController _tags = TextEditingController(
-    text: widget.node.tags.join(', '),
-  );
-  late final TextEditingController _priority = TextEditingController(
-    text: '${widget.node.subscriptionPriority}',
-  );
-
-  @override
-  void dispose() {
-    _tags.dispose();
-    _priority.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final node = widget.node;
-    return AlertDialog(
-      title: Text(node.name.isEmpty ? node.id : node.name),
-      content: SizedBox(
-        width: 450,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SwitchListTile(
-              title: const Text('Enabled for Smart Connect'),
-              value: _enabled,
-              onChanged: (value) => setState(() => _enabled = value),
-            ),
-            SwitchListTile(
-              title: const Text('Exclude from Smart Connect'),
-              value: _excluded,
-              onChanged: (value) => setState(() => _excluded = value),
-            ),
-            SwitchListTile(
-              title: const Text('Favorite'),
-              value: _favorite,
-              onChanged: (value) => setState(() => _favorite = value),
-            ),
-            TextField(
-              controller: _tags,
-              decoration: const InputDecoration(
-                labelText: 'Tags, comma separated',
-              ),
-            ),
-            TextField(
-              controller: _priority,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Subscription priority (higher wins ties)',
-              ),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () {
-            final priority = int.tryParse(_priority.text);
-            if (priority == null) return;
-            Navigator.pop(
-              context,
-              NodePreference(
-                enabled: _enabled,
-                excluded: _excluded,
-                favorite: _favorite,
-                tags: _tags.text
-                    .split(',')
-                    .map((value) => value.trim())
-                    .where((value) => value.isNotEmpty)
-                    .toSet(),
-                subscriptionPriority: priority,
-              ),
-            );
-          },
-          child: const Text('Save'),
-        ),
-      ],
     );
   }
 }

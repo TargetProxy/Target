@@ -24,10 +24,6 @@ Future<void> main(List<String> args) async {
 
   final connection = await _connect(socketPath);
   try {
-    final version = await connection.client.getVersion(
-      Empty(),
-      options: connection.options,
-    );
     final state = await connection.client.getState(
       Empty(),
       options: connection.options,
@@ -38,10 +34,6 @@ Future<void> main(List<String> args) async {
     );
 
     stdout.writeln('transport=${connection.transport}');
-    stdout.writeln(
-      'targetlib=${version.targetlibVersion} '
-      'sing-box=${version.singBoxVersion} protocol=${version.protocolVersion}',
-    );
     stdout.writeln(
       'state=${state.state.name} subscriptions=${list.subscriptions.length}',
     );

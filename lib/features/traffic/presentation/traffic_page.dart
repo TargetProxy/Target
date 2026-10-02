@@ -23,7 +23,6 @@ class TrafficPage extends ConsumerWidget {
           children: [
             TargetPageHeader(
               title: l10n.traffic,
-              subtitle: l10n.trafficSubtitle,
             ),
             const SizedBox(height: 22),
             Card(

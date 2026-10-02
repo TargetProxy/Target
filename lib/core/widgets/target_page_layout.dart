@@ -1,5 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
+import 'animated_reveal.dart';
+
 class TargetPageLayout extends StatelessWidget {
   const TargetPageLayout({required this.child, super.key});
 
@@ -15,7 +17,7 @@ class TargetPageLayout extends StatelessWidget {
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: maxWidth),
-          child: child,
+          child: AnimatedReveal(child: child),
         ),
       ),
     );
@@ -23,14 +25,10 @@ class TargetPageLayout extends StatelessWidget {
 }
 
 class TargetPageHeader extends StatelessWidget {
-  const TargetPageHeader({
-    required this.title,
-    required this.subtitle,
-    super.key,
-  });
+  const TargetPageHeader({required this.title, this.subtitle, super.key});
 
   final String title;
-  final String subtitle;
+  final String? subtitle;
 
   @override
   Widget build(BuildContext context) {
@@ -44,13 +42,15 @@ class TargetPageHeader extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 6),
-        Text(
-          subtitle,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
+        if (subtitle != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            subtitle!,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
-        ),
+        ],
       ],
     );
   }

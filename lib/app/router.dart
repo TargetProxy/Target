@@ -7,13 +7,11 @@ import '../features/logs/presentation/logs_page.dart';
 import '../features/profiles/presentation/profiles_workspace_page.dart';
 import '../features/traffic/presentation/traffic_page.dart';
 import '../features/proxies/presentation/node_pool_page.dart';
-import '../features/smart_connect/presentation/smart_connect_page.dart';
+import '../features/rules/presentation/rules_page.dart';
 import 'shell/app_shell.dart';
 
 class AppRouter {
   AppRouter();
-
-  final _groupsKey = GlobalKey<SmartConnectPageState>();
 
   late final GoRouter router = GoRouter(
     initialLocation: AppRoute.home.path,
@@ -32,17 +30,15 @@ class AppRouter {
           ),
           GoRoute(
             path: AppRoute.nodes.path,
-            redirect: (_, _) => AppRoute.smartConnect.path,
+            pageBuilder: _fadePageBuilder(const NodePoolPage()),
           ),
           GoRoute(
-            path: AppRoute.smartConnect.path,
-            pageBuilder: _fadePageBuilder(SmartConnectPage(key: _groupsKey)),
-            onExit: (_, _) async =>
-                await _groupsKey.currentState?.confirmLeave() ?? true,
+            path: AppRoute.rules.path,
+            pageBuilder: _fadePageBuilder(const RulesPage()),
           ),
           GoRoute(
             path: '/node-library',
-            pageBuilder: _fadePageBuilder(const NodePoolPage()),
+            redirect: (_, _) => AppRoute.nodes.path,
           ),
           GoRoute(
             path: AppRoute.connections.path,
@@ -64,8 +60,29 @@ class AppRouter {
   static Page<void> Function(BuildContext, GoRouterState) _fadePageBuilder(
     Widget child,
   ) {
-    return (context, state) =>
-        NoTransitionPage<void>(key: state.pageKey, child: child);
+    return (context, state) => CustomTransitionPage<void>(
+      key: state.pageKey,
+      child: child,
+      transitionDuration: const Duration(milliseconds: 260),
+      reverseTransitionDuration: const Duration(milliseconds: 180),
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+        return FadeTransition(
+          opacity: curved,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0.025, 0),
+              end: Offset.zero,
+            ).animate(curved),
+            child: child,
+          ),
+        );
+      },
+    );
   }
 }
 
@@ -73,7 +90,7 @@ enum AppRoute {
   home('/'),
   proxies('/proxies'),
   nodes('/nodes'),
-  smartConnect('/smart-connect'),
+  rules('/rules'),
   connections('/connections'),
   traffic('/traffic'),
   logs('/logs');

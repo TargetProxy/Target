@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/target_page_layout.dart';
+import '../../../core/widgets/animated_reveal.dart';
+import '../../../l10n/app_localizations.dart';
 import '../application/connections_notifier.dart';
 import 'widgets/connection_tile.dart';
 
@@ -14,6 +16,7 @@ class ConnectionsPage extends ConsumerWidget {
     final state = ref.watch(connectionsProvider);
     final notifier = ref.read(connectionsProvider.notifier);
     final connections = state.filteredConnections;
+    final l10n = AppLocalizations.of(context);
 
     return SafeArea(
       child: Column(
@@ -26,12 +29,7 @@ class ConnectionsPage extends ConsumerWidget {
               ),
               child: Row(
                 children: [
-                  const Expanded(
-                    child: TargetPageHeader(
-                      title: 'Connections',
-                      subtitle: 'Inspect active network connections.',
-                    ),
-                  ),
+                  Expanded(child: TargetPageHeader(title: l10n.connections)),
                   IconButton(
                     onPressed: state.activeCount == 0 || state.closingAll
                         ? null
@@ -42,13 +40,14 @@ class ConnectionsPage extends ConsumerWidget {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.cancel_presentation_outlined),
-                    tooltip: 'Close all connections',
+                    tooltip: l10n.closeAllConnections,
                   ),
                 ],
               ),
             ),
           ),
           _ConnectionsToolbar(
+            l10n: l10n,
             searchQuery: state.searchQuery,
             sortBy: state.sortBy,
             sortAsc: state.sortAsc,
@@ -57,21 +56,24 @@ class ConnectionsPage extends ConsumerWidget {
           ),
           Expanded(
             child: connections.isEmpty
-                ? const EmptyState(
+                ? EmptyState(
                     icon: Icons.cable_outlined,
-                    title: 'No connections',
-                    description:
-                        'Active connections will appear here when the proxy is running.',
+                    title: state.activeCount == 0
+                        ? l10n.noConnections
+                        : l10n.connectionDetailsUnavailable,
                   )
                 : ListView.builder(
                     itemCount: connections.length,
                     itemBuilder: (context, index) {
                       final connection = connections[index];
-                      return ConnectionTile(
-                        connection: connection,
-                        closing: state.isClosing(connection.id),
-                        onClose: () =>
-                            _closeOne(context, ref, notifier, connection.id),
+                      return AnimatedReveal(
+                        key: ValueKey(connection.id),
+                        child: ConnectionTile(
+                          connection: connection,
+                          closing: state.isClosing(connection.id),
+                          onClose: () =>
+                              _closeOne(context, ref, notifier, connection.id),
+                        ),
                       );
                     },
                   ),
@@ -93,7 +95,7 @@ class ConnectionsPage extends ConsumerWidget {
       SnackBar(
         content: Text(
           ref.read(connectionsProvider).lastError ??
-              'Unable to close connection.',
+              AppLocalizations.of(context).unableToCloseConnection,
         ),
       ),
     );
@@ -104,19 +106,20 @@ class ConnectionsPage extends ConsumerWidget {
     WidgetRef ref,
     ConnectionsNotifier notifier,
   ) async {
+    final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Close all connections?'),
-        content: const Text('Active network connections will be interrupted.'),
+        title: Text(l10n.closeAllConnections),
+        content: Text(l10n.activeConnectionsWillInterrupt),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Close all'),
+            child: Text(l10n.closeAll),
           ),
         ],
       ),
@@ -129,8 +132,8 @@ class ConnectionsPage extends ConsumerWidget {
         content: Text(
           count == null
               ? ref.read(connectionsProvider).lastError ??
-                    'Unable to close connections.'
-              : 'Closed $count active connection${count == 1 ? '' : 's'}.',
+                    l10n.unableToCloseConnections
+              : l10n.closedConnections(count),
         ),
       ),
     );
@@ -142,6 +145,7 @@ class _ConnectionsToolbar extends StatelessWidget {
     required this.searchQuery,
     required this.sortBy,
     required this.sortAsc,
+    required this.l10n,
     required this.onSearchChanged,
     required this.onSortChanged,
   });
@@ -149,6 +153,7 @@ class _ConnectionsToolbar extends StatelessWidget {
   final String searchQuery;
   final ConnectionSortBy sortBy;
   final bool sortAsc;
+  final AppLocalizations l10n;
   final ValueChanged<String> onSearchChanged;
   final ValueChanged<ConnectionSortBy> onSortChanged;
 
@@ -160,8 +165,8 @@ class _ConnectionsToolbar extends StatelessWidget {
         children: [
           Expanded(
             child: TextField(
-              decoration: const InputDecoration(
-                hintText: 'Search connections...',
+              decoration: InputDecoration(
+                hintText: l10n.searchConnections,
                 isDense: true,
                 prefixIcon: Icon(Icons.search, size: 20),
               ),
@@ -181,13 +186,13 @@ class _ConnectionsToolbar extends StatelessWidget {
                 ),
               ],
             ),
-            tooltip: 'Sort by',
+            tooltip: l10n.sortBy,
             onSelected: onSortChanged,
             itemBuilder: (context) => [
-              _sortItem(ConnectionSortBy.traffic, 'Traffic'),
-              _sortItem(ConnectionSortBy.destination, 'Destination'),
-              _sortItem(ConnectionSortBy.outbound, 'Outbound'),
-              _sortItem(ConnectionSortBy.network, 'Network'),
+              _sortItem(ConnectionSortBy.traffic, l10n.trafficSort),
+              _sortItem(ConnectionSortBy.destination, l10n.destinationSort),
+              _sortItem(ConnectionSortBy.outbound, l10n.outboundSort),
+              _sortItem(ConnectionSortBy.network, l10n.networkSort),
             ],
           ),
         ],

@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../data/models/ip_info.dart';
+import '../../../../l10n/app_localizations.dart';
 import 'home_info_row.dart';
 
 class IpInfoCard extends StatelessWidget {
@@ -21,6 +22,7 @@ class IpInfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
 
     return Card(
       child: Padding(
@@ -34,7 +36,7 @@ class IpInfoCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'IP Information',
+                    l10n.ipInformation,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
@@ -43,7 +45,7 @@ class IpInfoCard extends StatelessWidget {
                 IconButton(
                   icon: const Icon(Icons.refresh, size: 20),
                   onPressed: loading ? null : onRefresh,
-                  tooltip: 'Refresh',
+                  tooltip: l10n.refresh,
                 ),
               ],
             ),
@@ -71,6 +73,7 @@ class _IpInfoBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final info = ipInfo;
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
 
     if (loading && info == null) {
       return const Center(
@@ -90,7 +93,7 @@ class _IpInfoBody extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Text(
-            'Failed to load IP info',
+            l10n.failedToLoadIpInfo,
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.error,
             ),
@@ -109,19 +112,19 @@ class _IpInfoBody extends StatelessWidget {
         const SizedBox(height: AppSpacing.smallGap),
         HomeInfoRow(
           icon: Icons.flag_outlined,
-          label: 'Country',
+          label: l10n.country,
           value: '${info.flagEmoji} ${info.country}',
         ),
         const SizedBox(height: AppSpacing.smallGap),
         HomeInfoRow(
           icon: Icons.location_city_outlined,
-          label: 'City',
+          label: l10n.city,
           value: info.city,
         ),
         const SizedBox(height: AppSpacing.smallGap),
         HomeInfoRow(
           icon: Icons.business_outlined,
-          label: 'ISP',
+          label: l10n.isp,
           value: info.isp,
         ),
         const SizedBox(height: AppSpacing.smallGap),

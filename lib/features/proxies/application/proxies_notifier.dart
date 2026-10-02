@@ -140,12 +140,11 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
   }
 
   Future<bool> _selectRuntime(String groupId, String nodeId) async {
-    if (!ref.read(coreProvider).running ||
-        _runtimeSelections[groupId] == nodeId) {
+    if (_runtimeSelections[groupId] == nodeId) {
       return true;
     }
     try {
-      await ref.read(coreProvider.notifier).selectOutbound(groupId, nodeId);
+      await ref.read(coreProvider.notifier).selectNode(nodeId);
       _runtimeSelections[groupId] = nodeId;
       state = state.copyWith(clearError: true);
       return true;

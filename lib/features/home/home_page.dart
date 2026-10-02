@@ -10,6 +10,7 @@ import 'package:targetlib/targetlib.dart';
 import '../../data/models/runtime_settings.dart' as runtime_models;
 import '../../data/models/ip_info.dart';
 import '../../core/widgets/target_page_layout.dart';
+import '../../l10n/app_localizations.dart';
 import 'presentation/widgets/connection_error_banner.dart';
 import 'presentation/widgets/current_profile_card.dart';
 import 'presentation/widgets/ip_info_card.dart';
@@ -110,6 +111,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   Widget build(BuildContext context) {
     final core = ref.watch(coreProvider);
     final capabilities = ref.watch(appCapabilitiesProvider);
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     return SafeArea(
       child: LayoutBuilder(
@@ -123,11 +125,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const TargetPageHeader(
-                      title: 'Dashboard',
-                      subtitle:
-                          'Monitor your local network service and runtime health.',
-                    ),
+                    TargetPageHeader(title: l10n.dashboard),
                     const SizedBox(height: 20),
                     if (capabilities.supportsManagedService &&
                         !_serviceChecking &&
@@ -179,8 +177,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                             const SizedBox(height: 14),
                             Text(
                               core.running
-                                  ? 'Service is running'
-                                  : 'Service is stopped',
+                                  ? l10n.serviceRunning
+                                  : l10n.serviceStopped,
                               style: theme.textTheme.titleLarge?.copyWith(
                                 fontWeight: FontWeight.w600,
                               ),
@@ -189,37 +187,37 @@ class _HomePageState extends ConsumerState<HomePage> {
                             Text(
                               core.available
                                   ? (core.running
-                                        ? 'Traffic is being routed through the active profile.'
-                                        : 'Start the service to begin routing traffic.')
-                                  : 'The local core is unavailable on this platform.',
+                                        ? l10n.trafficRouted
+                                        : l10n.startServicePrompt)
+                                  : l10n.coreUnavailable,
                               style: theme.textTheme.bodyMedium,
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              'Proxy mode',
+                              l10n.proxyMode,
                               style: theme.textTheme.labelLarge,
                             ),
                             const SizedBox(height: 8),
                             if (capabilities.vpnOnly)
-                              const Row(
+                              Row(
                                 children: [
                                   Icon(Icons.vpn_lock_outlined, size: 20),
-                                  SizedBox(width: 8),
-                                  Text('VPN (TUN)'),
+                                  const SizedBox(width: 8),
+                                  Text(l10n.vpnTun),
                                 ],
                               )
                             else
                               SegmentedButton<runtime_models.ProxyMode>(
-                                segments: const [
+                                segments: [
                                   ButtonSegment(
                                     value: runtime_models.ProxyMode.mixed,
                                     icon: Icon(Icons.lan_outlined),
-                                    label: Text('Mixed'),
+                                    label: Text(l10n.mixed),
                                   ),
                                   ButtonSegment(
                                     value: runtime_models.ProxyMode.tun,
                                     icon: Icon(Icons.vpn_lock_outlined),
-                                    label: Text('TUN'),
+                                    label: Text(l10n.tun),
                                   ),
                                 ],
                                 selected: {core.settings.proxyMode},
@@ -233,26 +231,26 @@ class _HomePageState extends ConsumerState<HomePage> {
                               ),
                             const SizedBox(height: 14),
                             Text(
-                              'Routing mode',
+                              l10n.routingMode,
                               style: theme.textTheme.labelLarge,
                             ),
                             const SizedBox(height: 8),
                             SegmentedButton<runtime_models.RouteMode>(
-                              segments: const [
+                              segments: [
                                 ButtonSegment(
                                   value: runtime_models.RouteMode.rule,
                                   icon: Icon(Icons.account_tree_outlined),
-                                  label: Text('Rule'),
+                                  label: Text(l10n.rule),
                                 ),
                                 ButtonSegment(
                                   value: runtime_models.RouteMode.direct,
                                   icon: Icon(Icons.flash_on_outlined),
-                                  label: Text('Direct'),
+                                  label: Text(l10n.direct),
                                 ),
                                 ButtonSegment(
                                   value: runtime_models.RouteMode.all,
                                   icon: Icon(Icons.public),
-                                  label: Text('All'),
+                                  label: Text(l10n.all),
                                 ),
                               ],
                               selected: {core.settings.routeMode},
@@ -273,10 +271,10 @@ class _HomePageState extends ConsumerState<HomePage> {
                                         : _connect(),
                               child: Text(
                                 core.busy
-                                    ? 'Working…'
+                                    ? l10n.working
                                     : core.running
-                                    ? 'Stop'
-                                    : 'Start',
+                                    ? l10n.stop
+                                    : l10n.start,
                               ),
                             ),
                           ],
@@ -336,7 +334,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           duration: const Duration(seconds: 8),
           content: Text(core.message),
           action: SnackBarAction(
-            label: 'View logs',
+            label: AppLocalizations.of(context).viewLogs,
             onPressed: () {
               if (mounted) context.go(AppRoute.logs.path);
             },
@@ -401,6 +399,7 @@ class _ServiceStatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
     return Card(
       color: scheme.secondaryContainer,
@@ -419,12 +418,12 @@ class _ServiceStatusCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     checkFailed
-                        ? 'Unable to check TargetLib service'
+                        ? l10n.serviceCheckFailed
                         : status == TargetLibServiceStatus.stopped
-                        ? 'TargetLib service is stopped'
+                        ? l10n.targetLibStopped
                         : status == TargetLibServiceStatus.notInstalled
-                        ? 'TargetLib service is not installed'
-                        : 'TargetLib service status is unknown',
+                        ? l10n.targetLibNotInstalled
+                        : l10n.targetLibUnknown,
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
@@ -434,8 +433,8 @@ class _ServiceStatusCard extends StatelessWidget {
             Text(
               (checkFailed ? error : null) ??
                   (status == TargetLibServiceStatus.stopped
-                      ? 'Start the registered service to make TargetLib available.'
-                      : 'Install or repair TargetLib using the platform installer, then check again.'),
+                      ? l10n.startRegisteredService
+                      : l10n.repairTargetLib),
               style: TextStyle(color: scheme.onSecondaryContainer),
             ),
             const SizedBox(height: 12),
@@ -456,10 +455,10 @@ class _ServiceStatusCard extends StatelessWidget {
                       ),
                 label: Text(
                   starting
-                      ? 'Starting…'
+                      ? l10n.starting
                       : !checkFailed && status == TargetLibServiceStatus.stopped
-                      ? 'Start service'
-                      : 'Check again',
+                      ? l10n.startService
+                      : l10n.checkAgain,
                 ),
               ),
             ),

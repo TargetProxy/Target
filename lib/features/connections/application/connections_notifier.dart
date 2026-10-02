@@ -11,6 +11,7 @@ enum ConnectionSortBy { destination, outbound, network, traffic }
 class ConnectionsState {
   const ConnectionsState({
     this.connections = const [],
+    this.activeConnectionCount = 0,
     this.searchQuery = '',
     this.sortBy = ConnectionSortBy.traffic,
     this.sortAsc = false,
@@ -20,6 +21,7 @@ class ConnectionsState {
   });
 
   final List<CoreConnection> connections;
+  final int activeConnectionCount;
   final String searchQuery;
   final ConnectionSortBy sortBy;
   final bool sortAsc;
@@ -29,7 +31,8 @@ class ConnectionsState {
 
   bool isClosing(String id) => closing.contains(id);
 
-  int get activeCount => connections.length;
+  int get activeCount =>
+      activeConnectionCount > 0 ? activeConnectionCount : connections.length;
 
   List<CoreConnection> get filteredConnections {
     var list = connections;
@@ -55,6 +58,7 @@ class ConnectionsState {
 
   ConnectionsState copyWith({
     List<CoreConnection>? connections,
+    int? activeConnectionCount,
     String? searchQuery,
     ConnectionSortBy? sortBy,
     bool? sortAsc,
@@ -65,6 +69,8 @@ class ConnectionsState {
   }) {
     return ConnectionsState(
       connections: connections ?? this.connections,
+      activeConnectionCount:
+          activeConnectionCount ?? this.activeConnectionCount,
       searchQuery: searchQuery ?? this.searchQuery,
       sortBy: sortBy ?? this.sortBy,
       sortAsc: sortAsc ?? this.sortAsc,
@@ -91,9 +97,16 @@ class ConnectionsNotifier extends Notifier<ConnectionsState> {
   @override
   ConnectionsState build() {
     ref.listen(coreProvider, (_, next) {
-      state = state.copyWith(connections: next.connections);
+      state = state.copyWith(
+        connections: next.connections,
+        activeConnectionCount: next.traffic.activeConnections,
+      );
     });
-    return ConnectionsState(connections: ref.read(coreProvider).connections);
+    final core = ref.read(coreProvider);
+    return ConnectionsState(
+      connections: core.connections,
+      activeConnectionCount: core.traffic.activeConnections,
+    );
   }
 
   void setSearchQuery(String query) {

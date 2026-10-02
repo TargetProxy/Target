@@ -17,7 +17,7 @@ import 'core_gateway.dart';
 import 'core_models.dart';
 import 'package:targetlib/targetlib.dart' as targetlib_pb;
 import 'package:targetlib/targetlib.dart'
-    hide ProxyMode, RouteMode, RuntimeSettings, LogLevel, NodePreference;
+    hide ProxyMode, RouteMode, RuntimeSettings, LogLevel;
 import 'subscription_gateway.dart';
 
 class TargetLibGateway implements CoreGateway {
@@ -39,7 +39,7 @@ class TargetLibGateway implements CoreGateway {
   final List<StreamSubscription<Object?>> _subscriptions = [];
 
   TargetLibClient? _manager;
-  final TargetLibRuntime _runtime = TargetLibRuntime();
+  ClientChannel? _channel;
   CallOptions? _callOptions;
   Future<void>? _connectionTask;
   CoreSnapshot _current = const CoreSnapshot(
@@ -99,6 +99,12 @@ class TargetLibGateway implements CoreGateway {
       options: _withTimeout(const Duration(seconds: 30)),
     );
     return _runtimeSettings(result);
+  }
+
+  @override
+  Future<void> restart() async {
+    await _ensureConnected();
+    await _manager!.restart(Empty(), options: _callOptions);
   }
 
   targetlib_pb.RuntimeSettings _protoRuntimeSettings(
@@ -181,6 +187,17 @@ class TargetLibGateway implements CoreGateway {
   }
 
   @override
+  Future<RuntimeSubscription> getSubscription(String id) async {
+    await _ensureConnected();
+    return _runtimeSubscription(
+      await _manager!.getSubscription(
+        targetlib_pb.SubscriptionId(id: id),
+        options: _callOptions,
+      ),
+    );
+  }
+
+  @override
   Future<RuntimeSubscription> addSubscription({
     required String id,
     required String name,
@@ -243,6 +260,34 @@ class TargetLibGateway implements CoreGateway {
   }
 
   @override
+  Future<RuntimeSubscription> configureSubscriptionUpdates({
+    required String id,
+    required bool enabled,
+    required int updateIntervalSeconds,
+  }) async {
+    await _ensureConnected();
+    final view = await _manager!.configureSubscriptionUpdates(
+      targetlib_pb.ConfigureSubscriptionUpdatesRequest(
+        id: id,
+        enabled: enabled,
+        updateIntervalSeconds: Int64(updateIntervalSeconds),
+      ),
+      options: _callOptions,
+    );
+    return _runtimeSubscription(view);
+  }
+
+  @override
+  Future<targetlib_pb.ResolvedEndpoints> getResolvedEndpoints({
+    bool enabledOnly = false,
+  }) => _coreCall(
+    () => _manager!.getResolvedEndpoints(
+      targetlib_pb.ResolvedEndpointsRequest(enabledOnly: enabledOnly),
+      options: _callOptions,
+    ),
+  );
+
+  @override
   Future<RuntimeSubscriptionUpdate> updateSubscription(String id) async {
     await _ensureConnected();
     final result = await _manager!.updateSubscription(
@@ -278,90 +323,82 @@ class TargetLibGateway implements CoreGateway {
 
   @override
   Future<targetlib_pb.NodePool> getNodePool() =>
-      _smartCall(() => _runtime.getNodePool());
+      _coreCall(() => _manager!.getNodePool(Empty(), options: _callOptions));
 
   @override
-  Future<targetlib_pb.RuntimeState> getSmartConnectRuntimeState() =>
-      _smartCall(_runtime.getRuntimeState);
+  Future<targetlib_pb.SelectNodeResponse> selectNode(String nodeId) =>
+      _coreCall(
+        () => _manager!.selectNode(
+          targetlib_pb.SelectNodeRequest(nodeId: nodeId),
+          options: _callOptions,
+        ),
+      );
 
   @override
-  Future<targetlib_pb.CapabilitiesResponse> smartCapabilities() =>
-      _smartCall(_runtime.capabilities);
+  Future<targetlib_pb.ProxyStatus> getProxyStatus() =>
+      _coreCall(() => _manager!.getProxyStatus(Empty(), options: _callOptions));
 
   @override
-  Future<targetlib_pb.RuntimeConfig> smartConfig() =>
-      _smartCall(_runtime.getRuntimeConfig);
+  Future<targetlib_pb.RouteInfo> upsertRoute(
+    targetlib_pb.UpsertRouteRequest request,
+  ) => _coreCall(() => _manager!.upsertRoute(request, options: _callOptions));
 
   @override
-  Future<targetlib_pb.Operation> upsertSmartPolicy(
-    targetlib_pb.UpsertServicePolicyRequest request,
-  ) => _smartCall(
-    () => _requireRuntimeConnection().upsertServicePolicy(request),
-  );
-
-  @override
-  Future<targetlib_pb.Operation> deleteSmartPolicy(
-    targetlib_pb.DeleteServicePolicyRequest request,
-  ) => _smartCall(
-    () => _requireRuntimeConnection().deleteServicePolicy(request),
-  );
-
-  @override
-  Future<targetlib_pb.Operation> setSmartPreference(
-    targetlib_pb.SetNodePreferenceRequest request,
-  ) => _smartCall(() => _requireRuntimeConnection().setNodePreference(request));
-
-  @override
-  Future<targetlib_pb.Operation> requestSmartEvaluation(
-    targetlib_pb.RequestServiceEvaluationRequest request,
-  ) => _smartCall(
-    () => _requireRuntimeConnection().requestServiceEvaluation(request),
-  );
-
-  @override
-  Future<targetlib_pb.Operation> approveSmartProposal(
-    targetlib_pb.ProposalCommandRequest request,
-  ) => _smartCall(
-    () => _requireRuntimeConnection().approveSwitchProposal(request),
-  );
-
-  @override
-  Future<targetlib_pb.Operation> rejectSmartProposal(
-    targetlib_pb.ProposalCommandRequest request,
-  ) => _smartCall(
-    () => _requireRuntimeConnection().rejectSwitchProposal(request),
-  );
-
-  @override
-  Future<targetlib_pb.Operation> forceSmartBinding(
-    targetlib_pb.ForceServiceBindingRequest request,
-  ) => _smartCall(
-    () => _requireRuntimeConnection().forceServiceBinding(request),
-  );
-
-  @override
-  Future<targetlib_pb.Operation> smartOperation(String id) =>
-      _smartCall(() => _requireRuntimeConnection().getOperation(id));
-
-  @override
-  Stream<targetlib_pb.RuntimeEvent> smartIntentEvents() async* {
-    await _ensureConnected();
-    yield* _requireRuntimeConnection().subscribeRuntimeEvents();
+  Future<void> deleteRoute(String serviceId) async {
+    await _coreCall(
+      () => _manager!.deleteRoute(
+        targetlib_pb.DeleteRouteRequest(serviceId: serviceId),
+        options: _callOptions,
+      ),
+    );
   }
 
-  Future<T> _smartCall<T>(Future<T> Function() operation) async {
+  @override
+  Future<targetlib_pb.RouteList> listRoutes() =>
+      _coreCall(() => _manager!.listRoutes(Empty(), options: _callOptions));
+
+  @override
+  Future<targetlib_pb.SelectNodeResponse> selectRouteNode(
+    String serviceId,
+    String nodeId,
+  ) => _coreCall(
+    () => _manager!.selectRouteNode(
+      targetlib_pb.SelectRouteNodeRequest(serviceId: serviceId, nodeId: nodeId),
+      options: _callOptions,
+    ),
+  );
+
+  @override
+  Stream<targetlib_pb.ServiceState> subscribeState() {
+    if (_manager == null) return const Stream.empty();
+    return _manager!.subscribeState(Empty(), options: _callOptions);
+  }
+
+  @override
+  Stream<targetlib_pb.TrafficStatus> subscribeTraffic({
+    Duration interval = const Duration(seconds: 1),
+  }) {
+    if (_manager == null) return const Stream.empty();
+    return _manager!.subscribeTraffic(
+      targetlib_pb.TrafficRequest(
+        intervalMilliseconds: interval.inMilliseconds,
+      ),
+      options: _callOptions,
+    );
+  }
+
+  @override
+  Stream<targetlib_pb.SubscriptionEvent> subscribeSubscriptionEvents() {
+    if (_manager == null) return const Stream.empty();
+    return _manager!.subscribeSubscriptionEvents(
+      Empty(),
+      options: _callOptions,
+    );
+  }
+
+  Future<T> _coreCall<T>(Future<T> Function() operation) async {
     await _ensureConnected();
     return operation();
-  }
-
-  targetlib_pb.TargetLibConnection _requireRuntimeConnection() {
-    final connection = _runtime.connection;
-    if (connection == null) {
-      throw const CoreUnavailableException(
-        'TargetLib command connection is not available.',
-      );
-    }
-    return connection;
   }
 
   RuntimeSubscription _runtimeSubscription(targetlib_pb.SubscriptionView view) {
@@ -440,48 +477,21 @@ class TargetLibGateway implements CoreGateway {
 
   @override
   Future<void> selectOutbound(String groupId, String outboundId) async {
-    final manager = _requireManager('selecting an outbound');
-    await manager.selectOutbound(
-      targetlib_pb.SelectOutboundRequest(
-        groupTag: groupId,
-        outboundTag: outboundId,
-      ),
-      options: _withTimeout(const Duration(seconds: 5)),
-    );
+    await selectNode(outboundId);
   }
 
   @override
   Future<int?> testLatency(String outboundId) async {
-    final manager = _requireManager('testing latency');
-    final result = _coreLatencyResult(
-      await manager.testOutbound(
-        targetlib_pb.TestOutboundRequest(
-          outboundTag: outboundId,
-          timeoutMilliseconds: 15000,
-        ),
-        options: _callOptions,
-      ),
+    throw const CoreUnavailableException(
+      'TargetLib does not expose node latency testing in this API version.',
     );
-    if (!result.succeeded) {
-      throw CoreUnavailableException(result.errorMessage);
-    }
-    return result.delayMilliseconds;
   }
 
   @override
   Stream<CoreLatencyResult> testLatencies(Iterable<String> outboundIds) async* {
-    final manager = _requireManager('testing latency');
-    final stream = manager.testOutbounds(
-      targetlib_pb.TestOutboundsRequest(
-        outboundTags: outboundIds,
-        timeoutMilliseconds: 15000,
-        maxConcurrency: 4,
-      ),
-      options: _callOptions,
+    throw const CoreUnavailableException(
+      'TargetLib does not expose node latency testing in this API version.',
     );
-    await for (final result in stream) {
-      yield _coreLatencyResult(result);
-    }
   }
 
   @override
@@ -491,13 +501,17 @@ class TargetLibGateway implements CoreGateway {
       targetlib_pb.CloseConnectionRequest(id: connectionId),
       options: _callOptions,
     );
+    _connections.remove(connectionId);
+    _publish(_copyCurrent(connections: List.of(_connections.values)));
   }
 
   @override
   Future<int> closeAllConnections() async {
     final manager = _requireManager('closing connections');
-    final count = _connections.length;
+    final count = _current.traffic.activeConnections;
     await manager.closeAllConnections(Empty(), options: _callOptions);
+    _connections.clear();
+    _publish(_copyCurrent(connections: const []));
     return count;
   }
 
@@ -531,7 +545,8 @@ class TargetLibGateway implements CoreGateway {
       (_callOptions ?? CallOptions()).mergedWith(CallOptions(timeout: timeout));
 
   Future<Directory> _resolveBaseDirectory() async {
-    final path = await _runtime.resolveBasePath(
+    final runtime = TargetLibRuntime();
+    final path = await runtime.resolveBasePath(
       rootOverride: _workingDirectory?.path,
     );
     return Directory(path);
@@ -559,12 +574,10 @@ class TargetLibGateway implements CoreGateway {
   Future<void> _connectAndSubscribe() async {
     _ensureAvailable();
     final baseDir = await _resolveBaseDirectory();
-    await _runtime.ensureConnected(basePath: baseDir.path);
-    final connection = _runtime.connection;
-    if (connection == null) {
-      throw StateError('TargetLib runtime is not connected.');
-    }
+    final runtime = TargetLibRuntime();
+    final connection = await runtime.ensureConnected(basePath: baseDir.path);
     _manager = connection.client;
+    _channel = connection.channel;
     _callOptions = connection.options;
     _subscribeCommandStreams();
   }
@@ -586,6 +599,14 @@ class TargetLibGateway implements CoreGateway {
       manager.subscribeLogs(Empty(), options: options),
       _applyLogs,
       label: 'SubscribeLogs',
+    );
+    _listen(
+      manager.subscribeTraffic(
+        targetlib_pb.TrafficRequest(intervalMilliseconds: 1000),
+        options: options,
+      ),
+      _applyTraffic,
+      label: 'SubscribeTraffic',
     );
   }
 
@@ -652,6 +673,29 @@ class TargetLibGateway implements CoreGateway {
     }
   }
 
+  void _applyTraffic(targetlib_pb.TrafficStatus status) {
+    _publish(_copyCurrent(traffic: _trafficSnapshot(status)));
+  }
+
+  static TrafficSnapshot _trafficSnapshot(targetlib_pb.TrafficStatus status) {
+    final sampledAt = status.sampledAtUnixMs.toInt();
+    return TrafficSnapshot(
+      uploadBytes: status.uploadBytesPerSecond.toInt(),
+      downloadBytes: status.downloadBytesPerSecond.toInt(),
+      // The app exposes one active count while TargetLib reports both sides.
+      activeConnections: status.inboundConnections + status.outboundConnections,
+      uploadTotalBytes: status.uploadTotalBytes.toInt(),
+      downloadTotalBytes: status.downloadTotalBytes.toInt(),
+      inboundConnections: status.inboundConnections,
+      outboundConnections: status.outboundConnections,
+      available: status.available,
+      sampledAt: sampledAt <= 0
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(sampledAt, isUtc: true),
+      intervalMilliseconds: status.intervalMilliseconds,
+    );
+  }
+
   Future<void> _shutdownTransport() async {
     final subscriptions = List<StreamSubscription<Object?>>.of(_subscriptions);
     _subscriptions.clear();
@@ -659,8 +703,9 @@ class TargetLibGateway implements CoreGateway {
       await subscription.cancel();
     }
     _manager = null;
+    await _channel?.shutdown();
+    _channel = null;
     _callOptions = null;
-    await _runtime.close();
   }
 
   CoreSnapshot _copyCurrent({
@@ -726,32 +771,5 @@ class TargetLibGateway implements CoreGateway {
       default:
         AppLogger.info(message, source: origin);
     }
-  }
-
-  static CoreLatencyResult _coreLatencyResult(
-    targetlib_pb.LatencyTestResult result,
-  ) {
-    final testedAt = result.testedAtUnixMs.toInt();
-    return CoreLatencyResult(
-      outboundId: result.outboundTag,
-      status: switch (result.status) {
-        targetlib_pb.LatencyTestStatus.LATENCY_TEST_STATUS_SUCCESS =>
-          CoreLatencyStatus.success,
-        targetlib_pb.LatencyTestStatus.LATENCY_TEST_STATUS_TIMEOUT =>
-          CoreLatencyStatus.timeout,
-        targetlib_pb.LatencyTestStatus.LATENCY_TEST_STATUS_NOT_FOUND =>
-          CoreLatencyStatus.notFound,
-        _ => CoreLatencyStatus.failed,
-      },
-      delayMilliseconds:
-          result.status ==
-              targetlib_pb.LatencyTestStatus.LATENCY_TEST_STATUS_SUCCESS
-          ? result.delayMilliseconds
-          : null,
-      testedAt: testedAt > 0
-          ? DateTime.fromMillisecondsSinceEpoch(testedAt, isUtc: true)
-          : null,
-      errorMessage: result.errorMessage,
-    );
   }
 }

@@ -1,9 +1,12 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:talker/talker.dart';
 
+import '../../../../l10n/app_localizations.dart';
+
 class LogToolbar extends StatelessWidget {
   const LogToolbar({
     required this.paused,
+    required this.l10n,
     required this.levelFilter,
     required this.onPauseToggle,
     required this.onLevelChanged,
@@ -12,6 +15,7 @@ class LogToolbar extends StatelessWidget {
   });
 
   final bool paused;
+  final AppLocalizations l10n;
   final LogLevel? levelFilter;
   final VoidCallback onPauseToggle;
   final ValueChanged<LogLevel?> onLevelChanged;
@@ -26,13 +30,13 @@ class LogToolbar extends StatelessWidget {
           IconButton(
             onPressed: onPauseToggle,
             icon: Icon(paused ? Icons.play_arrow : Icons.pause),
-            tooltip: paused ? 'Resume' : 'Pause',
+            tooltip: paused ? l10n.resume : l10n.pause,
           ),
           const SizedBox(width: 8),
           Expanded(
             child: TextField(
-              decoration: const InputDecoration(
-                hintText: 'Search logs...',
+              decoration: InputDecoration(
+                hintText: l10n.searchLogs,
                 isDense: true,
                 prefixIcon: Icon(Icons.search, size: 20),
               ),
@@ -41,11 +45,11 @@ class LogToolbar extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           SegmentedButton<LogLevel?>(
-            segments: const [
-              ButtonSegment(value: null, label: Text('All')),
-              ButtonSegment(value: LogLevel.error, label: Text('Err')),
-              ButtonSegment(value: LogLevel.warning, label: Text('Warn')),
-              ButtonSegment(value: LogLevel.info, label: Text('Info')),
+            segments: [
+              ButtonSegment(value: null, label: Text(l10n.all)),
+              ButtonSegment(value: LogLevel.error, label: Text(l10n.err)),
+              ButtonSegment(value: LogLevel.warning, label: Text(l10n.warn)),
+              ButtonSegment(value: LogLevel.info, label: Text(l10n.info)),
             ],
             selected: {levelFilter},
             onSelectionChanged: (selected) {

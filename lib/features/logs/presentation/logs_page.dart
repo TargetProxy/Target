@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/target_page_layout.dart';
+import '../../../core/widgets/animated_reveal.dart';
+import '../../../l10n/app_localizations.dart';
 import '../application/logs_notifier.dart';
 import 'widgets/log_line_tile.dart';
 import 'widgets/log_toolbar.dart';
@@ -29,6 +31,7 @@ class _LogsPageState extends ConsumerState<LogsPage> {
     final state = ref.watch(logsProvider);
     final notifier = ref.read(logsProvider.notifier);
     final entries = state.filteredEntries;
+    final l10n = AppLocalizations.of(context);
 
     return SafeArea(
       child: Column(
@@ -41,32 +44,28 @@ class _LogsPageState extends ConsumerState<LogsPage> {
               ),
               child: Row(
                 children: [
-                  const Expanded(
-                    child: TargetPageHeader(
-                      title: 'Logs',
-                      subtitle: 'Runtime events and diagnostics.',
-                    ),
-                  ),
+                  Expanded(child: TargetPageHeader(title: l10n.logs)),
                   IconButton(
                     onPressed: _copyVisible,
                     icon: const Icon(Icons.copy),
-                    tooltip: 'Copy visible',
+                    tooltip: l10n.copyVisible,
                   ),
                   IconButton(
                     onPressed: _export,
                     icon: const Icon(Icons.share),
-                    tooltip: 'Export',
+                    tooltip: l10n.export,
                   ),
                   IconButton(
                     onPressed: notifier.clear,
                     icon: const Icon(Icons.delete_sweep),
-                    tooltip: 'Clear',
+                    tooltip: l10n.clear,
                   ),
                 ],
               ),
             ),
           ),
           LogToolbar(
+            l10n: l10n,
             paused: state.paused,
             levelFilter: state.levelFilter,
             onPauseToggle: notifier.togglePause,
@@ -75,16 +74,21 @@ class _LogsPageState extends ConsumerState<LogsPage> {
           ),
           Expanded(
             child: entries.isEmpty
-                ? const EmptyState(
+                ? EmptyState(
                     icon: Icons.receipt_long_outlined,
-                    title: 'No logs',
-                    description: 'Logs will appear here in real time.',
+                    title: l10n.noLogs,
+                    description: l10n.logsRealtimeHint,
                   )
                 : ListView.builder(
                     controller: _scrollController,
                     itemCount: entries.length,
                     itemBuilder: (context, index) {
-                      return LogLineTile(entry: entries[index]);
+                      return AnimatedReveal(
+                        key: ValueKey(
+                          '${entries[index].time.microsecondsSinceEpoch}-$index',
+                        ),
+                        child: LogLineTile(entry: entries[index]),
+                      );
                     },
                   ),
           ),
@@ -94,33 +98,35 @@ class _LogsPageState extends ConsumerState<LogsPage> {
   }
 
   void _copyVisible() {
+    final l10n = AppLocalizations.of(context);
     final text = ref.read(logsProvider.notifier).exportLogs();
     Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('Logs copied to clipboard')));
+    ).showSnackBar(SnackBar(content: Text(l10n.logsCopied)));
   }
 
   void _export() {
+    final l10n = AppLocalizations.of(context);
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Export logs'),
-        content: const Text('Sanitize sensitive data (URLs, IPs, tokens)?'),
+        title: Text(l10n.exportLogs),
+        content: Text(l10n.sanitizeLogsPrompt),
         actions: [
           TextButton(
             onPressed: () {
               Navigator.pop(context);
               _doExport(sanitize: false);
             },
-            child: const Text('Raw'),
+            child: Text(l10n.raw),
           ),
           FilledButton(
             onPressed: () {
               Navigator.pop(context);
               _doExport(sanitize: true);
             },
-            child: const Text('Sanitized'),
+            child: Text(l10n.sanitized),
           ),
         ],
       ),
@@ -128,15 +134,12 @@ class _LogsPageState extends ConsumerState<LogsPage> {
   }
 
   void _doExport({required bool sanitize}) {
+    final l10n = AppLocalizations.of(context);
     final text = ref.read(logsProvider.notifier).exportLogs(sanitize: sanitize);
     Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          sanitize
-              ? 'Sanitized logs copied to clipboard'
-              : 'Logs copied to clipboard',
-        ),
+        content: Text(sanitize ? l10n.sanitizedLogsCopied : l10n.logsCopied),
       ),
     );
   }

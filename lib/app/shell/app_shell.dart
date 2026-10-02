@@ -27,14 +27,14 @@ class AppShell extends StatelessWidget {
   static const _navigationRoutes = [
     AppRoute.home,
     AppRoute.proxies,
-    AppRoute.smartConnect,
+    AppRoute.nodes,
+    AppRoute.rules,
     AppRoute.connections,
     AppRoute.traffic,
     AppRoute.logs,
   ];
 
   int _selectedIndexFor(String location) {
-    if (location == '/node-library' || location == '/nodes') return 2;
     final index = _navigationRoutes.indexWhere((route) {
       if (route.path == AppRoute.home.path) {
         return location == route.path;
@@ -73,6 +73,11 @@ class AdaptiveScaffold extends StatelessWidget {
       NavigationDestination(
         icon: const Icon(Icons.alt_route),
         label: l10n.nodeSelection,
+      ),
+      NavigationDestination(
+        icon: const Icon(Icons.rule_folder_outlined),
+        selectedIcon: const Icon(Icons.rule_folder),
+        label: l10n.rules,
       ),
       NavigationDestination(
         icon: Icon(Icons.cable_outlined),
@@ -157,22 +162,13 @@ class _DesktopSidebar extends StatelessWidget {
                 padding: EdgeInsets.only(left: 8, bottom: 20),
                 child: _BrandMark(),
               ),
-              Padding(
-                padding: const EdgeInsets.only(left: 12, bottom: 6),
-                child: Text(
-                  'WORKSPACE',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    letterSpacing: 1.1,
-                  ),
-                ),
-              ),
               item(0, l10n.dashboard, Icons.dashboard_outlined),
               item(1, l10n.profiles, Icons.hub_outlined),
               item(2, l10n.nodeSelection, Icons.alt_route),
-              item(3, l10n.connections, Icons.cable_outlined),
-              item(4, l10n.traffic, Icons.show_chart),
-              item(5, l10n.logs, Icons.receipt_long_outlined),
+              item(3, l10n.rules, Icons.rule_folder_outlined),
+              item(4, l10n.connections, Icons.cable_outlined),
+              item(5, l10n.traffic, Icons.show_chart),
+              item(6, l10n.logs, Icons.receipt_long_outlined),
             ],
           ),
         ),

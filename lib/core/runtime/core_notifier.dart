@@ -187,6 +187,19 @@ class CoreNotifier extends Notifier<CoreState> {
     }
   }
 
+  Future<void> selectNode(String nodeId) async {
+    if (!state.available) return;
+    state = state.copyWith(busy: true);
+    try {
+      await _gateway!.selectNode(nodeId);
+    } on Object catch (error, stackTrace) {
+      _setFailure(error, stackTrace, operationName: 'select node');
+      rethrow;
+    } finally {
+      state = state.copyWith(busy: false);
+    }
+  }
+
   Future<int?> testLatency(String outboundId) async {
     if (!state.available) return null;
     try {

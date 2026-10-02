@@ -1,5 +1,3 @@
-import '../features/smart_connect/application/smart_connect_notifier.dart';
-import '../features/smart_connect/application/smart_policy_notifier.dart';
 import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
@@ -75,14 +73,6 @@ class _TargetAppViewState extends ConsumerState<_TargetAppView> {
   void initState() {
     super.initState();
     ref.read(subscriptionsProvider.notifier).load();
-    Future.microtask(() {
-      unawaited(() async {
-        await ref.read(smartPolicyStoreProvider).ensureDefaultPolicies();
-        if (mounted) {
-          await ref.read(smartConnectProvider.notifier).refresh();
-        }
-      }());
-    });
     if (ref.read(appCapabilitiesProvider).supportsTray) {
       final controller = DesktopTrayController(
         onToggleConnection: _toggleConnection,

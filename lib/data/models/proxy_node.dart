@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-/// The single node model. Runtime pool data, latency results and Smart Connect
-/// preferences all describe the same node, so they share one type.
+/// The single node model shared by the runtime pool, latency results and rules.
 @immutable
 class ProxyNode {
   const ProxyNode({
@@ -90,7 +89,7 @@ class ProxyNode {
   }
 }
 
-/// Smart Connect node preferences, owned by the core.
+/// Optional node metadata retained by the core for future rule filtering.
 @immutable
 class NodePreference {
   const NodePreference({

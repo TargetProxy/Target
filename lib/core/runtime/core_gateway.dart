@@ -7,10 +7,8 @@ import 'subscription_gateway.dart';
 
 /// Stable app-facing boundary for the native proxy core.
 ///
-/// One interface for one implementation: widgets and feature controllers must
-/// not import TargetLib directly, but they also must not have to ask which of
-/// several gateway roles an object happens to satisfy. Capability differences
-/// are runtime facts, reported by [smartCapabilities], not static types.
+/// One interface for one implementation: widgets and feature controllers use
+/// this boundary without importing TargetLib directly.
 abstract class CoreGateway {
   String get name;
 
@@ -26,28 +24,43 @@ abstract class CoreGateway {
 
   Future<void> start();
 
+  Future<void> restart() => Future.error(
+    const CoreUnavailableException('Restart is not supported by this core.'),
+  );
+
   Future<void> stop();
 
-  Future<void> selectOutbound(String groupId, String outboundId);
+  Future<void> selectOutbound(String groupId, String outboundId) =>
+      Future.error(const CoreUnavailableException('Outbound selection is not supported.'));
 
-  Future<int?> testLatency(String outboundId);
+  Future<int?> testLatency(String outboundId) => Future.value();
 
-  Stream<CoreLatencyResult> testLatencies(Iterable<String> outboundIds);
+  Stream<CoreLatencyResult> testLatencies(Iterable<String> outboundIds) async* {}
 
-  Future<void> closeConnection(String connectionId);
+  Future<void> closeConnection(String connectionId) => Future.error(
+    const CoreUnavailableException('Connection control is not supported.'),
+  );
 
-  Future<int> closeAllConnections();
+  Future<int> closeAllConnections() => Future.value(0);
 
-  Future<int> refreshRuleSets();
+  Future<int> refreshRuleSets() => Future.value(0);
 
   Future<void> clearLogs();
 
   /// Queries the egress IP geolocation through the backend.
-  Future<IpInfo> fetchIpInfo();
+  Future<IpInfo> fetchIpInfo() => Future.error(
+    const CoreUnavailableException('IP information is not supported.'),
+  );
 
   Stream<void> get subscriptionChanges;
 
-  Future<RuntimeSubscriptionSnapshot> listSubscriptions();
+  Future<RuntimeSubscriptionSnapshot> listSubscriptions() => Future.error(
+    const CoreUnavailableException('Subscriptions are not supported.'),
+  );
+
+  Future<RuntimeSubscription> getSubscription(String id) => Future.error(
+    const CoreUnavailableException('Subscription lookup is not supported.'),
+  );
 
   Future<RuntimeSubscription> addSubscription({
     required String id,
@@ -58,43 +71,69 @@ abstract class CoreGateway {
     required int updateIntervalSeconds,
     required Map<String, String> headers,
     bool updateNow = false,
-  });
+  }) => Future.error(const CoreUnavailableException('Subscriptions are not supported.'));
 
-  Future<void> removeSubscription(String id);
+  Future<void> removeSubscription(String id) => Future.error(
+    const CoreUnavailableException('Subscriptions are not supported.'),
+  );
 
-  Future<RuntimeSubscription> renameSubscription(String id, String name);
+  Future<RuntimeSubscription> renameSubscription(String id, String name) =>
+      Future.error(const CoreUnavailableException('Subscriptions are not supported.'));
 
-  Future<RuntimeSubscription> setSubscriptionEnabled(String id, bool enabled);
+  Future<RuntimeSubscription> setSubscriptionEnabled(String id, bool enabled) =>
+      Future.error(const CoreUnavailableException('Subscriptions are not supported.'));
 
-  Future<RuntimeSubscriptionUpdate> updateSubscription(String id);
+  Future<RuntimeSubscription> configureSubscriptionUpdates({
+    required String id,
+    required bool enabled,
+    required int updateIntervalSeconds,
+  }) => Future.error(
+    const CoreUnavailableException('Subscription update configuration is not supported.'),
+  );
+
+  Future<RuntimeSubscriptionUpdate> updateSubscription(String id) => Future.error(
+    const CoreUnavailableException('Subscriptions are not supported.'),
+  );
+
+  Future<pb.ResolvedEndpoints> getResolvedEndpoints({bool enabledOnly = false}) =>
+      Future.error(
+        const CoreUnavailableException('Resolved endpoints are not supported.'),
+      );
 
   Future<pb.NodePool> getNodePool();
 
-  Future<pb.CapabilitiesResponse> smartCapabilities();
-
-  Future<pb.RuntimeConfig> smartConfig();
-
-  Future<pb.RuntimeState> getSmartConnectRuntimeState();
-
-  Future<pb.Operation> upsertSmartPolicy(pb.UpsertServicePolicyRequest request);
-
-  Future<pb.Operation> deleteSmartPolicy(pb.DeleteServicePolicyRequest request);
-
-  Future<pb.Operation> setSmartPreference(pb.SetNodePreferenceRequest request);
-
-  Future<pb.Operation> requestSmartEvaluation(
-    pb.RequestServiceEvaluationRequest request,
+  Future<pb.SelectNodeResponse> selectNode(String nodeId) => Future.error(
+    const CoreUnavailableException('Node selection is not supported.'),
   );
 
-  Future<pb.Operation> approveSmartProposal(pb.ProposalCommandRequest request);
+  Future<pb.ProxyStatus> getProxyStatus() => Future.error(
+    const CoreUnavailableException('Proxy status is not supported.'),
+  );
 
-  Future<pb.Operation> rejectSmartProposal(pb.ProposalCommandRequest request);
+  Stream<pb.ServiceState> subscribeState() => const Stream.empty();
 
-  Future<pb.Operation> forceSmartBinding(pb.ForceServiceBindingRequest request);
+  Stream<pb.TrafficStatus> subscribeTraffic({
+    Duration interval = const Duration(seconds: 1),
+  }) => const Stream.empty();
 
-  Future<pb.Operation> smartOperation(String id);
+  Stream<pb.SubscriptionEvent> subscribeSubscriptionEvents() =>
+      const Stream.empty();
 
-  Stream<pb.RuntimeEvent> smartIntentEvents();
+  Future<pb.RouteInfo> upsertRoute(pb.UpsertRouteRequest request) =>
+      Future.error(const CoreUnavailableException('Routes are not supported.'));
+
+  Future<void> deleteRoute(String serviceId) => Future.error(
+    const CoreUnavailableException('Routes are not supported.'),
+  );
+
+  Future<pb.RouteList> listRoutes() => Future.error(
+    const CoreUnavailableException('Routes are not supported.'),
+  );
+
+  Future<pb.SelectNodeResponse> selectRouteNode(
+    String serviceId,
+    String nodeId,
+  ) => Future.error(const CoreUnavailableException('Routes are not supported.'));
 
   Future<void> dispose();
 }
@@ -146,6 +185,9 @@ class UnavailableCoreGateway implements CoreGateway {
   Future<void> stop() => _unavailable();
 
   @override
+  Future<void> restart() => _unavailable();
+
+  @override
   Future<void> selectOutbound(String groupId, String outboundId) =>
       _unavailable();
 
@@ -176,6 +218,9 @@ class UnavailableCoreGateway implements CoreGateway {
   Future<RuntimeSubscriptionSnapshot> listSubscriptions() => _unavailable();
 
   @override
+  Future<RuntimeSubscription> getSubscription(String id) => _unavailable();
+
+  @override
   Future<RuntimeSubscription> addSubscription({
     required String id,
     required String name,
@@ -199,60 +244,56 @@ class UnavailableCoreGateway implements CoreGateway {
       _unavailable();
 
   @override
+  Future<RuntimeSubscription> configureSubscriptionUpdates({
+    required String id,
+    required bool enabled,
+    required int updateIntervalSeconds,
+  }) => _unavailable();
+
+  @override
   Future<RuntimeSubscriptionUpdate> updateSubscription(String id) =>
+      _unavailable();
+
+  @override
+  Future<pb.ResolvedEndpoints> getResolvedEndpoints({bool enabledOnly = false}) =>
       _unavailable();
 
   @override
   Future<pb.NodePool> getNodePool() => _unavailable();
 
   @override
-  Future<pb.CapabilitiesResponse> smartCapabilities() => _unavailable();
+  Future<pb.SelectNodeResponse> selectNode(String nodeId) => _unavailable();
 
   @override
-  Future<pb.RuntimeConfig> smartConfig() => _unavailable();
+  Future<pb.ProxyStatus> getProxyStatus() => _unavailable();
 
   @override
-  Future<pb.RuntimeState> getSmartConnectRuntimeState() => _unavailable();
+  Stream<pb.ServiceState> subscribeState() => const Stream.empty();
 
   @override
-  Future<pb.Operation> upsertSmartPolicy(
-    pb.UpsertServicePolicyRequest request,
-  ) => _unavailable();
+  Stream<pb.TrafficStatus> subscribeTraffic({
+    Duration interval = const Duration(seconds: 1),
+  }) => const Stream.empty();
 
   @override
-  Future<pb.Operation> deleteSmartPolicy(
-    pb.DeleteServicePolicyRequest request,
-  ) => _unavailable();
+  Stream<pb.SubscriptionEvent> subscribeSubscriptionEvents() =>
+      const Stream.empty();
 
   @override
-  Future<pb.Operation> setSmartPreference(
-    pb.SetNodePreferenceRequest request,
-  ) => _unavailable();
-
-  @override
-  Future<pb.Operation> requestSmartEvaluation(
-    pb.RequestServiceEvaluationRequest request,
-  ) => _unavailable();
-
-  @override
-  Future<pb.Operation> approveSmartProposal(
-    pb.ProposalCommandRequest request,
-  ) => _unavailable();
-
-  @override
-  Future<pb.Operation> rejectSmartProposal(pb.ProposalCommandRequest request) =>
+  Future<pb.RouteInfo> upsertRoute(pb.UpsertRouteRequest request) =>
       _unavailable();
 
   @override
-  Future<pb.Operation> forceSmartBinding(
-    pb.ForceServiceBindingRequest request,
+  Future<void> deleteRoute(String serviceId) => _unavailable();
+
+  @override
+  Future<pb.RouteList> listRoutes() => _unavailable();
+
+  @override
+  Future<pb.SelectNodeResponse> selectRouteNode(
+    String serviceId,
+    String nodeId,
   ) => _unavailable();
-
-  @override
-  Future<pb.Operation> smartOperation(String id) => _unavailable();
-
-  @override
-  Stream<pb.RuntimeEvent> smartIntentEvents() => const Stream.empty();
 
   @override
   Future<void> dispose() async {}

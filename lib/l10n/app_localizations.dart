@@ -415,6 +415,570 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Test latency'**
   String get testLatency;
+
+  /// No description provided for @rules.
+  ///
+  /// In en, this message translates to:
+  /// **'Rules'**
+  String get rules;
+
+  /// No description provided for @defaultNode.
+  ///
+  /// In en, this message translates to:
+  /// **'Default node'**
+  String get defaultNode;
+
+  /// No description provided for @selectDefaultNode.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose default node'**
+  String get selectDefaultNode;
+
+  /// No description provided for @nodeNotSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'No node selected'**
+  String get nodeNotSelected;
+
+  /// No description provided for @createDomainRule.
+  ///
+  /// In en, this message translates to:
+  /// **'New domain rule'**
+  String get createDomainRule;
+
+  /// No description provided for @serviceId.
+  ///
+  /// In en, this message translates to:
+  /// **'Service ID'**
+  String get serviceId;
+
+  /// No description provided for @displayName.
+  ///
+  /// In en, this message translates to:
+  /// **'Display name'**
+  String get displayName;
+
+  /// No description provided for @domainsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Domains (comma or space separated)'**
+  String get domainsHint;
+
+  /// No description provided for @dropNodeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Drop a node here as the rule exit'**
+  String get dropNodeHint;
+
+  /// No description provided for @dropNode.
+  ///
+  /// In en, this message translates to:
+  /// **'Drop a node here'**
+  String get dropNode;
+
+  /// No description provided for @selectedNode.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected: {node}'**
+  String selectedNode(Object node);
+
+  /// No description provided for @saveRule.
+  ///
+  /// In en, this message translates to:
+  /// **'Save rule'**
+  String get saveRule;
+
+  /// No description provided for @routeExit.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit: {node} (drop a node to switch)'**
+  String routeExit(Object node);
+
+  /// No description provided for @deleteRule.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete rule'**
+  String get deleteRule;
+
+  /// No description provided for @searchConnections.
+  ///
+  /// In en, this message translates to:
+  /// **'Search connections...'**
+  String get searchConnections;
+
+  /// No description provided for @closeAllConnections.
+  ///
+  /// In en, this message translates to:
+  /// **'Close all connections'**
+  String get closeAllConnections;
+
+  /// No description provided for @noConnections.
+  ///
+  /// In en, this message translates to:
+  /// **'No connections'**
+  String get noConnections;
+
+  /// No description provided for @connectionDetailsUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection details unavailable'**
+  String get connectionDetailsUnavailable;
+
+  /// No description provided for @activeConnectionsWillInterrupt.
+  ///
+  /// In en, this message translates to:
+  /// **'Active network connections will be interrupted.'**
+  String get activeConnectionsWillInterrupt;
+
+  /// No description provided for @cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get cancel;
+
+  /// No description provided for @closeAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Close all'**
+  String get closeAll;
+
+  /// No description provided for @unableToCloseConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to close connection.'**
+  String get unableToCloseConnection;
+
+  /// No description provided for @unableToCloseConnections.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to close connections.'**
+  String get unableToCloseConnections;
+
+  /// No description provided for @closedConnections.
+  ///
+  /// In en, this message translates to:
+  /// **'Closed {count} active connection{count, plural, =1{} other{s}}.'**
+  String closedConnections(num count);
+
+  /// No description provided for @sortBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort by'**
+  String get sortBy;
+
+  /// No description provided for @trafficSort.
+  ///
+  /// In en, this message translates to:
+  /// **'Traffic'**
+  String get trafficSort;
+
+  /// No description provided for @destinationSort.
+  ///
+  /// In en, this message translates to:
+  /// **'Destination'**
+  String get destinationSort;
+
+  /// No description provided for @outboundSort.
+  ///
+  /// In en, this message translates to:
+  /// **'Outbound'**
+  String get outboundSort;
+
+  /// No description provided for @networkSort.
+  ///
+  /// In en, this message translates to:
+  /// **'Network'**
+  String get networkSort;
+
+  /// No description provided for @runtimeDiagnostics.
+  ///
+  /// In en, this message translates to:
+  /// **'Runtime events and diagnostics.'**
+  String get runtimeDiagnostics;
+
+  /// No description provided for @copyVisible.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy visible'**
+  String get copyVisible;
+
+  /// No description provided for @export.
+  ///
+  /// In en, this message translates to:
+  /// **'Export'**
+  String get export;
+
+  /// No description provided for @clear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get clear;
+
+  /// No description provided for @noLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'No logs'**
+  String get noLogs;
+
+  /// No description provided for @logsRealtimeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Logs will appear here in real time.'**
+  String get logsRealtimeHint;
+
+  /// No description provided for @logsCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Logs copied to clipboard'**
+  String get logsCopied;
+
+  /// No description provided for @exportLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'Export logs'**
+  String get exportLogs;
+
+  /// No description provided for @sanitizeLogsPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Sanitize sensitive data (URLs, IPs, tokens)?'**
+  String get sanitizeLogsPrompt;
+
+  /// No description provided for @raw.
+  ///
+  /// In en, this message translates to:
+  /// **'Raw'**
+  String get raw;
+
+  /// No description provided for @sanitized.
+  ///
+  /// In en, this message translates to:
+  /// **'Sanitized'**
+  String get sanitized;
+
+  /// No description provided for @sanitizedLogsCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Sanitized logs copied to clipboard'**
+  String get sanitizedLogsCopied;
+
+  /// No description provided for @pause.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause'**
+  String get pause;
+
+  /// No description provided for @resume.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume'**
+  String get resume;
+
+  /// No description provided for @searchLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'Search logs...'**
+  String get searchLogs;
+
+  /// No description provided for @all.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get all;
+
+  /// No description provided for @err.
+  ///
+  /// In en, this message translates to:
+  /// **'Err'**
+  String get err;
+
+  /// No description provided for @warn.
+  ///
+  /// In en, this message translates to:
+  /// **'Warn'**
+  String get warn;
+
+  /// No description provided for @info.
+  ///
+  /// In en, this message translates to:
+  /// **'Info'**
+  String get info;
+
+  /// No description provided for @addSubscriptionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add subscription'**
+  String get addSubscriptionTitle;
+
+  /// No description provided for @nameOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Name (optional)'**
+  String get nameOptional;
+
+  /// No description provided for @subscriptionUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscription URL'**
+  String get subscriptionUrl;
+
+  /// No description provided for @urlRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'URL is required'**
+  String get urlRequired;
+
+  /// No description provided for @paste.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste'**
+  String get paste;
+
+  /// No description provided for @add.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get add;
+
+  /// No description provided for @ipInformation.
+  ///
+  /// In en, this message translates to:
+  /// **'IP information'**
+  String get ipInformation;
+
+  /// No description provided for @refresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get refresh;
+
+  /// No description provided for @failedToLoadIpInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load IP information'**
+  String get failedToLoadIpInfo;
+
+  /// No description provided for @country.
+  ///
+  /// In en, this message translates to:
+  /// **'Country'**
+  String get country;
+
+  /// No description provided for @city.
+  ///
+  /// In en, this message translates to:
+  /// **'City'**
+  String get city;
+
+  /// No description provided for @isp.
+  ///
+  /// In en, this message translates to:
+  /// **'ISP'**
+  String get isp;
+
+  /// No description provided for @connected.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected'**
+  String get connected;
+
+  /// No description provided for @noActiveProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'No active profile'**
+  String get noActiveProfile;
+
+  /// No description provided for @mode.
+  ///
+  /// In en, this message translates to:
+  /// **'Mode'**
+  String get mode;
+
+  /// No description provided for @node.
+  ///
+  /// In en, this message translates to:
+  /// **'Node'**
+  String get node;
+
+  /// No description provided for @region.
+  ///
+  /// In en, this message translates to:
+  /// **'Region'**
+  String get region;
+
+  /// No description provided for @nodeId.
+  ///
+  /// In en, this message translates to:
+  /// **'Node ID'**
+  String get nodeId;
+
+  /// No description provided for @proxyError.
+  ///
+  /// In en, this message translates to:
+  /// **'Proxy error'**
+  String get proxyError;
+
+  /// No description provided for @serviceRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Service is running'**
+  String get serviceRunning;
+
+  /// No description provided for @serviceStopped.
+  ///
+  /// In en, this message translates to:
+  /// **'Service is stopped'**
+  String get serviceStopped;
+
+  /// No description provided for @proxyMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Proxy mode'**
+  String get proxyMode;
+
+  /// No description provided for @routingMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Routing mode'**
+  String get routingMode;
+
+  /// No description provided for @mixed.
+  ///
+  /// In en, this message translates to:
+  /// **'Mixed'**
+  String get mixed;
+
+  /// No description provided for @tun.
+  ///
+  /// In en, this message translates to:
+  /// **'TUN'**
+  String get tun;
+
+  /// No description provided for @rule.
+  ///
+  /// In en, this message translates to:
+  /// **'Rule'**
+  String get rule;
+
+  /// No description provided for @direct.
+  ///
+  /// In en, this message translates to:
+  /// **'Direct'**
+  String get direct;
+
+  /// No description provided for @start.
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get start;
+
+  /// No description provided for @stop.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get stop;
+
+  /// No description provided for @working.
+  ///
+  /// In en, this message translates to:
+  /// **'Working…'**
+  String get working;
+
+  /// No description provided for @viewLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'View logs'**
+  String get viewLogs;
+
+  /// No description provided for @nodeLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Node library'**
+  String get nodeLibrary;
+
+  /// No description provided for @trafficRouted.
+  ///
+  /// In en, this message translates to:
+  /// **'Traffic is routed through the active profile.'**
+  String get trafficRouted;
+
+  /// No description provided for @startServicePrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Start the service to begin routing traffic.'**
+  String get startServicePrompt;
+
+  /// No description provided for @coreUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The local core is unavailable on this platform.'**
+  String get coreUnavailable;
+
+  /// No description provided for @vpnTun.
+  ///
+  /// In en, this message translates to:
+  /// **'VPN (TUN)'**
+  String get vpnTun;
+
+  /// No description provided for @serviceCheckFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to check TargetLib service'**
+  String get serviceCheckFailed;
+
+  /// No description provided for @targetLibStopped.
+  ///
+  /// In en, this message translates to:
+  /// **'TargetLib service is stopped'**
+  String get targetLibStopped;
+
+  /// No description provided for @targetLibNotInstalled.
+  ///
+  /// In en, this message translates to:
+  /// **'TargetLib service is not installed'**
+  String get targetLibNotInstalled;
+
+  /// No description provided for @targetLibUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'TargetLib service status is unknown'**
+  String get targetLibUnknown;
+
+  /// No description provided for @startRegisteredService.
+  ///
+  /// In en, this message translates to:
+  /// **'Start the registered service to make TargetLib available.'**
+  String get startRegisteredService;
+
+  /// No description provided for @repairTargetLib.
+  ///
+  /// In en, this message translates to:
+  /// **'Install or repair TargetLib using the platform installer, then check again.'**
+  String get repairTargetLib;
+
+  /// No description provided for @starting.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting…'**
+  String get starting;
+
+  /// No description provided for @startService.
+  ///
+  /// In en, this message translates to:
+  /// **'Start service'**
+  String get startService;
+
+  /// No description provided for @checkAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Check again'**
+  String get checkAgain;
+
+  /// No description provided for @ruleInputRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a service ID and domain, then drop in a node.'**
+  String get ruleInputRequired;
 }
 
 class _AppLocalizationsDelegate

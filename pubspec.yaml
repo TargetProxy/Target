@@ -28,7 +28,7 @@ dependencies:
   talker: ^5.1.20
   targetlib:
     path: ../TargetLib/flutter
-  syncfusion_flutter_maps: ^34.2.4
+  syncfusion_flutter_maps: ^35.1.37
   shared_preferences: ^2.5.5
   path_provider: ^2.1.6
   proxy_manager: ^0.0.3

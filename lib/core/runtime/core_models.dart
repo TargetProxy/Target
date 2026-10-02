@@ -10,11 +10,26 @@ class TrafficSnapshot {
     this.uploadBytes = 0,
     this.downloadBytes = 0,
     this.activeConnections = 0,
+    this.uploadTotalBytes = 0,
+    this.downloadTotalBytes = 0,
+    this.inboundConnections = 0,
+    this.outboundConnections = 0,
+    this.available = false,
+    this.sampledAt,
+    this.intervalMilliseconds = 0,
   });
 
+  /// Current throughput in bytes per second.
   final int uploadBytes;
   final int downloadBytes;
   final int activeConnections;
+  final int uploadTotalBytes;
+  final int downloadTotalBytes;
+  final int inboundConnections;
+  final int outboundConnections;
+  final bool available;
+  final DateTime? sampledAt;
+  final int intervalMilliseconds;
 
   static const zero = TrafficSnapshot();
 }

@@ -6,6 +6,7 @@ import '../../../../core/runtime/core_notifier.dart';
 import '../../../maps/application/proxy_country_map.dart';
 import '../../../proxies/application/proxies_notifier.dart';
 import 'home_info_row.dart';
+import '../../../../l10n/app_localizations.dart';
 
 class CurrentProfileCard extends ConsumerWidget {
   const CurrentProfileCard({required this.core, super.key});
@@ -15,6 +16,7 @@ class CurrentProfileCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final proxies = ref.watch(proxiesProvider);
     final isTun = core.settings.proxyMode.name == 'tun';
     final selectedNode = proxies.selectedGroup?.selectedNode;
@@ -22,7 +24,7 @@ class CurrentProfileCard extends ConsumerWidget {
         ? null
         : proxyNodeCountryCode(selectedNode);
     final selectedNodeMeta = selectedNode == null
-        ? 'No node selected'
+        ? l10n.nodeNotSelected
         : [?selectedCountry, selectedNode.typeLabel].join(' / ');
 
     return Card(
@@ -41,7 +43,7 @@ class CurrentProfileCard extends ConsumerWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    core.running ? 'Connected' : 'No active profile',
+                    core.running ? l10n.connected : l10n.noActiveProfile,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
@@ -53,26 +55,26 @@ class CurrentProfileCard extends ConsumerWidget {
             const SizedBox(height: AppSpacing.itemGap),
             HomeInfoRow(
               icon: isTun ? Icons.alt_route : Icons.speed,
-              label: 'Mode',
+              label: l10n.mode,
               value: core.settings.proxyMode.label,
             ),
             const SizedBox(height: AppSpacing.smallGap),
             HomeInfoRow(
               icon: Icons.route_outlined,
-              label: 'Node',
-              value: selectedNode?.displayName ?? 'No node selected',
+              label: l10n.node,
+              value: selectedNode?.displayName ?? l10n.nodeNotSelected,
             ),
             if (selectedNode != null) ...[
               const SizedBox(height: AppSpacing.smallGap),
               HomeInfoRow(
                 icon: Icons.flag_outlined,
-                label: 'Region',
+                label: l10n.region,
                 value: selectedNodeMeta,
               ),
               const SizedBox(height: AppSpacing.smallGap),
               HomeInfoRow(
                 icon: Icons.tag_outlined,
-                label: 'Node ID',
+                label: l10n.nodeId,
                 value: selectedNode.id,
               ),
             ],
@@ -80,7 +82,7 @@ class CurrentProfileCard extends ConsumerWidget {
               const SizedBox(height: AppSpacing.smallGap),
               HomeInfoRow(
                 icon: Icons.error_outline,
-                label: 'Proxy error',
+                label: l10n.proxyError,
                 value: proxies.lastError!,
               ),
             ],

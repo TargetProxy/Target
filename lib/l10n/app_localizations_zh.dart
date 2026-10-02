@@ -172,4 +172,292 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get testLatency => '测试延迟';
+
+  @override
+  String get rules => '规则';
+
+  @override
+  String get defaultNode => '默认节点';
+
+  @override
+  String get selectDefaultNode => '选择默认节点';
+
+  @override
+  String get nodeNotSelected => '尚未选择';
+
+  @override
+  String get createDomainRule => '新建域名规则';
+
+  @override
+  String get serviceId => '服务 ID';
+
+  @override
+  String get displayName => '显示名称';
+
+  @override
+  String get domainsHint => '域名（逗号或空格分隔）';
+
+  @override
+  String get dropNodeHint => '将节点拖到这里作为规则出口';
+
+  @override
+  String get dropNode => '拖入节点';
+
+  @override
+  String selectedNode(Object node) {
+    return '已选择：$node';
+  }
+
+  @override
+  String get saveRule => '保存规则';
+
+  @override
+  String routeExit(Object node) {
+    return '出口：$node（拖入节点可切换）';
+  }
+
+  @override
+  String get deleteRule => '删除规则';
+
+  @override
+  String get searchConnections => '搜索连接...';
+
+  @override
+  String get closeAllConnections => '关闭所有连接';
+
+  @override
+  String get noConnections => '暂无连接';
+
+  @override
+  String get connectionDetailsUnavailable => '连接详情不可用';
+
+  @override
+  String get activeConnectionsWillInterrupt => '活动网络连接将被中断。';
+
+  @override
+  String get cancel => '取消';
+
+  @override
+  String get closeAll => '全部关闭';
+
+  @override
+  String get unableToCloseConnection => '无法关闭连接。';
+
+  @override
+  String get unableToCloseConnections => '无法关闭连接。';
+
+  @override
+  String closedConnections(num count) {
+    return '已关闭 $count 个活动连接。';
+  }
+
+  @override
+  String get sortBy => '排序方式';
+
+  @override
+  String get trafficSort => '流量';
+
+  @override
+  String get destinationSort => '目标地址';
+
+  @override
+  String get outboundSort => '出站';
+
+  @override
+  String get networkSort => '网络';
+
+  @override
+  String get runtimeDiagnostics => '运行事件与诊断信息。';
+
+  @override
+  String get copyVisible => '复制当前内容';
+
+  @override
+  String get export => '导出';
+
+  @override
+  String get clear => '清空';
+
+  @override
+  String get noLogs => '暂无日志';
+
+  @override
+  String get logsRealtimeHint => '日志会实时显示在这里。';
+
+  @override
+  String get logsCopied => '日志已复制到剪贴板';
+
+  @override
+  String get exportLogs => '导出日志';
+
+  @override
+  String get sanitizeLogsPrompt => '清理敏感数据（网址、IP、令牌）？';
+
+  @override
+  String get raw => '原始';
+
+  @override
+  String get sanitized => '已清理';
+
+  @override
+  String get sanitizedLogsCopied => '已清理的日志已复制到剪贴板';
+
+  @override
+  String get pause => '暂停';
+
+  @override
+  String get resume => '继续';
+
+  @override
+  String get searchLogs => '搜索日志...';
+
+  @override
+  String get all => '全部';
+
+  @override
+  String get err => '错误';
+
+  @override
+  String get warn => '警告';
+
+  @override
+  String get info => '信息';
+
+  @override
+  String get addSubscriptionTitle => '添加订阅';
+
+  @override
+  String get nameOptional => '名称（可选）';
+
+  @override
+  String get subscriptionUrl => '订阅地址';
+
+  @override
+  String get urlRequired => '请输入地址';
+
+  @override
+  String get paste => '粘贴';
+
+  @override
+  String get add => '添加';
+
+  @override
+  String get ipInformation => 'IP 信息';
+
+  @override
+  String get refresh => '刷新';
+
+  @override
+  String get failedToLoadIpInfo => 'IP 信息加载失败';
+
+  @override
+  String get country => '国家/地区';
+
+  @override
+  String get city => '城市';
+
+  @override
+  String get isp => '运营商';
+
+  @override
+  String get connected => '已连接';
+
+  @override
+  String get noActiveProfile => '没有活动配置';
+
+  @override
+  String get mode => '模式';
+
+  @override
+  String get node => '节点';
+
+  @override
+  String get region => '地区';
+
+  @override
+  String get nodeId => '节点 ID';
+
+  @override
+  String get proxyError => '代理错误';
+
+  @override
+  String get serviceRunning => '服务正在运行';
+
+  @override
+  String get serviceStopped => '服务已停止';
+
+  @override
+  String get proxyMode => '代理模式';
+
+  @override
+  String get routingMode => '路由模式';
+
+  @override
+  String get mixed => '混合';
+
+  @override
+  String get tun => 'TUN';
+
+  @override
+  String get rule => '规则';
+
+  @override
+  String get direct => '直连';
+
+  @override
+  String get start => '启动';
+
+  @override
+  String get stop => '停止';
+
+  @override
+  String get working => '处理中…';
+
+  @override
+  String get viewLogs => '查看日志';
+
+  @override
+  String get nodeLibrary => '节点库';
+
+  @override
+  String get trafficRouted => '流量将通过当前配置转发。';
+
+  @override
+  String get startServicePrompt => '启动服务后即可开始转发流量。';
+
+  @override
+  String get coreUnavailable => '当前平台无法使用本地内核。';
+
+  @override
+  String get vpnTun => 'VPN（TUN）';
+
+  @override
+  String get serviceCheckFailed => '无法检查 TargetLib 服务';
+
+  @override
+  String get targetLibStopped => 'TargetLib 服务已停止';
+
+  @override
+  String get targetLibNotInstalled => '尚未安装 TargetLib 服务';
+
+  @override
+  String get targetLibUnknown => 'TargetLib 服务状态未知';
+
+  @override
+  String get startRegisteredService => '启动已注册的服务以使用 TargetLib。';
+
+  @override
+  String get repairTargetLib => '请使用平台安装程序安装或修复 TargetLib，然后重新检查。';
+
+  @override
+  String get starting => '启动中…';
+
+  @override
+  String get startService => '启动服务';
+
+  @override
+  String get checkAgain => '再次检查';
+
+  @override
+  String get ruleInputRequired => '请填写服务 ID、域名，并拖入一个节点。';
 }
