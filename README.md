@@ -2,7 +2,7 @@
 
 ![Platform: Cross-platform](https://img.shields.io/badge/Platform-Win%20%7C%20Mac%20%7C%20Linux%20%7C%20iOS%20%7C%20Android-lightgrey.svg)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
-[![Flutter](https://img.shields.io/badge/Flutter-%3E%3D3.44.0-02569B?logo=flutter)](https://flutter.dev/)
+[![Flutter](https://img.shields.io/badge/Flutter-%3E%3D3.47.0-02569B?logo=flutter)](https://flutter.dev/)
 
 **Target** 是一个基于 Flutter 构建的现代化、跨平台代理客户端。
 
@@ -94,7 +94,7 @@ Flutter UI
 
 ### 环境要求
 
-* **Flutter**: `>=3.44.0` (同时要求 Dart `>=3.12.2 <4.0.0`)
+* **Flutter**: `>=3.47.0` (同时要求 Dart `>=3.12.2 <4.0.0`)
 * **Go**: 用于本地构建 TargetLib 核心服务
 * **TargetLib 源码**: 需与本仓库处于**同级目录**（`pubspec.yaml` 强依赖 `../TargetLib/flutter` 路径）
 * 对应目标平台的原生构建工具链 (Visual Studio / Xcode / Android Studio 等)
@@ -131,6 +131,12 @@ flutter build apk --debug
 flutter build macos --debug
 flutter build ios --debug --no-codesign
 
+```
+
+构建脚本会在平台目录缺失时自动执行 `flutter create`，并用 `assets/TargetAppIcon.png` 更新 Android、iOS、macOS 和 Windows 图标。仅需更新图标时运行：
+
+```powershell
+.\scripts\generate-icons.ps1
 ```
 
 ### 🪲 调试 TargetLib 订阅

@@ -9,6 +9,7 @@ import '../../core/platform/app_platform.dart';
 import 'package:targetlib/targetlib.dart';
 import '../../data/models/runtime_settings.dart' as runtime_models;
 import '../../data/models/ip_info.dart';
+import '../../core/widgets/animated_reveal.dart';
 import '../../core/widgets/target_page_layout.dart';
 import '../../l10n/app_localizations.dart';
 import 'presentation/widgets/connection_error_banner.dart';
@@ -125,159 +126,170 @@ class _HomePageState extends ConsumerState<HomePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    TargetPageHeader(title: l10n.dashboard),
+                    AnimatedReveal(
+                      child: TargetPageHeader(title: l10n.dashboard),
+                    ),
                     const SizedBox(height: 20),
                     if (capabilities.supportsManagedService &&
                         !_serviceChecking &&
                         (_serviceCheckFailed ||
                             _serviceStatus !=
                                 TargetLibServiceStatus.running)) ...[
-                      _ServiceStatusCard(
-                        starting: _serviceStarting,
-                        status: _serviceStatus,
-                        checkFailed: _serviceCheckFailed,
-                        error: _serviceError,
-                        onAction:
-                            !_serviceCheckFailed &&
-                                _serviceStatus == TargetLibServiceStatus.stopped
-                            ? _startTargetLibService
-                            : _refreshTargetLibService,
+                      AnimatedReveal(
+                        delay: const Duration(milliseconds: 60),
+                        child: _ServiceStatusCard(
+                          starting: _serviceStarting,
+                          status: _serviceStatus,
+                          checkFailed: _serviceCheckFailed,
+                          error: _serviceError,
+                          onAction:
+                              !_serviceCheckFailed &&
+                                  _serviceStatus ==
+                                      TargetLibServiceStatus.stopped
+                              ? _startTargetLibService
+                              : _refreshTargetLibService,
+                        ),
                       ),
                       const SizedBox(height: 16),
                     ],
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(18),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  core.running
-                                      ? Icons.check_circle
-                                      : Icons.circle,
-                                  size: 18,
-                                  color: core.running
-                                      ? Colors.green
-                                      : theme.colorScheme.onSurfaceVariant,
-                                ),
-                                const SizedBox(width: 7),
-                                Text(
-                                  core.status,
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    fontWeight: FontWeight.w600,
+                    AnimatedReveal(
+                      delay: const Duration(milliseconds: 60),
+                      child: Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(18),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    core.running
+                                        ? Icons.check_circle
+                                        : Icons.circle,
+                                    size: 18,
                                     color: core.running
                                         ? Colors.green
                                         : theme.colorScheme.onSurfaceVariant,
                                   ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 14),
-                            Text(
-                              core.running
-                                  ? l10n.serviceRunning
-                                  : l10n.serviceStopped,
-                              style: theme.textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              core.available
-                                  ? (core.running
-                                        ? l10n.trafficRouted
-                                        : l10n.startServicePrompt)
-                                  : l10n.coreUnavailable,
-                              style: theme.textTheme.bodyMedium,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              l10n.proxyMode,
-                              style: theme.textTheme.labelLarge,
-                            ),
-                            const SizedBox(height: 8),
-                            if (capabilities.vpnOnly)
-                              Row(
-                                children: [
-                                  Icon(Icons.vpn_lock_outlined, size: 20),
-                                  const SizedBox(width: 8),
-                                  Text(l10n.vpnTun),
+                                  const SizedBox(width: 7),
+                                  Text(
+                                    core.status,
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      color: core.running
+                                          ? Colors.green
+                                          : theme.colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
                                 ],
-                              )
-                            else
-                              SegmentedButton<runtime_models.ProxyMode>(
+                              ),
+                              const SizedBox(height: 14),
+                              Text(
+                                core.running
+                                    ? l10n.serviceRunning
+                                    : l10n.serviceStopped,
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                core.available
+                                    ? (core.running
+                                          ? l10n.trafficRouted
+                                          : l10n.startServicePrompt)
+                                    : l10n.coreUnavailable,
+                                style: theme.textTheme.bodyMedium,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                l10n.proxyMode,
+                                style: theme.textTheme.labelLarge,
+                              ),
+                              const SizedBox(height: 8),
+                              if (capabilities.vpnOnly)
+                                Row(
+                                  children: [
+                                    Icon(Icons.vpn_lock_outlined, size: 20),
+                                    const SizedBox(width: 8),
+                                    Text(l10n.vpnTun),
+                                  ],
+                                )
+                              else
+                                SegmentedButton<runtime_models.ProxyMode>(
+                                  segments: [
+                                    ButtonSegment(
+                                      value: runtime_models.ProxyMode.mixed,
+                                      icon: Icon(Icons.lan_outlined),
+                                      label: Text(l10n.mixed),
+                                    ),
+                                    ButtonSegment(
+                                      value: runtime_models.ProxyMode.tun,
+                                      icon: Icon(Icons.vpn_lock_outlined),
+                                      label: Text(l10n.tun),
+                                    ),
+                                  ],
+                                  selected: {core.settings.proxyMode},
+                                  onSelectionChanged: core.busy
+                                      ? null
+                                      : (selected) {
+                                          if (selected.isNotEmpty) {
+                                            _changeProxyMode(selected.first);
+                                          }
+                                        },
+                                ),
+                              const SizedBox(height: 14),
+                              Text(
+                                l10n.routingMode,
+                                style: theme.textTheme.labelLarge,
+                              ),
+                              const SizedBox(height: 8),
+                              SegmentedButton<runtime_models.RouteMode>(
                                 segments: [
                                   ButtonSegment(
-                                    value: runtime_models.ProxyMode.mixed,
-                                    icon: Icon(Icons.lan_outlined),
-                                    label: Text(l10n.mixed),
+                                    value: runtime_models.RouteMode.rule,
+                                    icon: Icon(Icons.account_tree_outlined),
+                                    label: Text(l10n.rule),
                                   ),
                                   ButtonSegment(
-                                    value: runtime_models.ProxyMode.tun,
-                                    icon: Icon(Icons.vpn_lock_outlined),
-                                    label: Text(l10n.tun),
+                                    value: runtime_models.RouteMode.direct,
+                                    icon: Icon(Icons.flash_on_outlined),
+                                    label: Text(l10n.direct),
+                                  ),
+                                  ButtonSegment(
+                                    value: runtime_models.RouteMode.all,
+                                    icon: Icon(Icons.public),
+                                    label: Text(l10n.all),
                                   ),
                                 ],
-                                selected: {core.settings.proxyMode},
+                                selected: {core.settings.routeMode},
                                 onSelectionChanged: core.busy
                                     ? null
                                     : (selected) {
                                         if (selected.isNotEmpty) {
-                                          _changeProxyMode(selected.first);
+                                          _changeRouteMode(selected.first);
                                         }
                                       },
                               ),
-                            const SizedBox(height: 14),
-                            Text(
-                              l10n.routingMode,
-                              style: theme.textTheme.labelLarge,
-                            ),
-                            const SizedBox(height: 8),
-                            SegmentedButton<runtime_models.RouteMode>(
-                              segments: [
-                                ButtonSegment(
-                                  value: runtime_models.RouteMode.rule,
-                                  icon: Icon(Icons.account_tree_outlined),
-                                  label: Text(l10n.rule),
+                              const SizedBox(height: 14),
+                              FilledButton(
+                                onPressed: core.busy || !core.available
+                                    ? null
+                                    : () => core.running
+                                          ? ref
+                                                .read(coreProvider.notifier)
+                                                .stop()
+                                          : _connect(),
+                                child: Text(
+                                  core.busy
+                                      ? l10n.working
+                                      : core.running
+                                      ? l10n.stop
+                                      : l10n.start,
                                 ),
-                                ButtonSegment(
-                                  value: runtime_models.RouteMode.direct,
-                                  icon: Icon(Icons.flash_on_outlined),
-                                  label: Text(l10n.direct),
-                                ),
-                                ButtonSegment(
-                                  value: runtime_models.RouteMode.all,
-                                  icon: Icon(Icons.public),
-                                  label: Text(l10n.all),
-                                ),
-                              ],
-                              selected: {core.settings.routeMode},
-                              onSelectionChanged: core.busy
-                                  ? null
-                                  : (selected) {
-                                      if (selected.isNotEmpty) {
-                                        _changeRouteMode(selected.first);
-                                      }
-                                    },
-                            ),
-                            const SizedBox(height: 14),
-                            FilledButton(
-                              onPressed: core.busy || !core.available
-                                  ? null
-                                  : () => core.running
-                                        ? ref.read(coreProvider.notifier).stop()
-                                        : _connect(),
-                              child: Text(
-                                core.busy
-                                    ? l10n.working
-                                    : core.running
-                                    ? l10n.stop
-                                    : l10n.start,
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -285,7 +297,10 @@ class _HomePageState extends ConsumerState<HomePage> {
                         (!core.available ||
                             core.lifecycle == CoreLifecycle.failed)) ...[
                       const SizedBox(height: 16),
-                      ConnectionErrorBanner(message: core.message),
+                      AnimatedReveal(
+                        delay: const Duration(milliseconds: 120),
+                        child: ConnectionErrorBanner(message: core.message),
+                      ),
                     ],
                     const SizedBox(height: 20),
                     Wrap(
@@ -294,15 +309,23 @@ class _HomePageState extends ConsumerState<HomePage> {
                       children: [
                         SizedBox(
                           width: wide ? 472 : double.infinity,
-                          child: CurrentProfileCard(core: core),
+                          child: AnimatedReveal(
+                            delay: const Duration(milliseconds: 120),
+                            axis: Axis.horizontal,
+                            child: CurrentProfileCard(core: core),
+                          ),
                         ),
                         SizedBox(
                           width: wide ? 472 : double.infinity,
-                          child: IpInfoCard(
-                            ipInfo: _ipInfo,
-                            loading: _ipLoading,
-                            error: _ipError,
-                            onRefresh: _fetchIpInfo,
+                          child: AnimatedReveal(
+                            delay: const Duration(milliseconds: 160),
+                            axis: Axis.horizontal,
+                            child: IpInfoCard(
+                              ipInfo: _ipInfo,
+                              loading: _ipLoading,
+                              error: _ipError,
+                              onRefresh: _fetchIpInfo,
+                            ),
                           ),
                         ),
                       ],

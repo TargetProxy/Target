@@ -1,9 +1,13 @@
-import 'dart:math' as math;
-
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../theme/app_motion.dart';
+import 'app_animate.dart';
 
+/// Entrance transition for page sections and list rows.
+///
+/// The delay is carried by the effects rather than by [Animate.delay] so the
+/// controller starts on the first frame instead of waiting on a timer.
 class AnimatedReveal extends StatelessWidget {
   const AnimatedReveal({
     required this.child,
@@ -26,34 +30,23 @@ class AnimatedReveal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final total = AppMotion.duration(context, duration + delay);
-    final delayFraction = total.inMicroseconds == 0
-        ? 0.0
-        : math.min(1, delay.inMicroseconds / total.inMicroseconds).toDouble();
-    final animationCurve = delayFraction == 0
-        ? curve
-        : Interval(delayFraction, 1, curve: curve);
-
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: 1),
-      duration: total,
-      curve: animationCurve,
-      builder: (context, value, child) {
-        final distance = (1 - value) * offset;
-        final translation = axis == Axis.vertical
-            ? Offset(0, distance)
-            : Offset(distance, 0);
-        return Opacity(
-          opacity: value,
-          child: Transform.translate(
-            offset: translation,
-            child: Transform.scale(
-              scale: beginScale + (1 - beginScale) * value,
-              child: child,
-            ),
-          ),
-        );
-      },
+    final begin = axis == Axis.vertical ? Offset(0, offset) : Offset(offset, 0);
+    return AppAnimate(
+      effects: [
+        FadeEffect(delay: delay, duration: duration, curve: curve),
+        MoveEffect(
+          delay: delay,
+          duration: duration,
+          curve: curve,
+          begin: begin,
+        ),
+        ScaleEffect(
+          delay: delay,
+          duration: duration,
+          curve: curve,
+          begin: Offset(beginScale, beginScale),
+        ),
+      ],
       child: child,
     );
   }

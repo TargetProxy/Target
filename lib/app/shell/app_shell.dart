@@ -1,3 +1,4 @@
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:go_router/go_router.dart';
 
@@ -5,6 +6,7 @@ import '../app_identity.dart';
 import '../router.dart';
 import '../../l10n/app_localizations.dart';
 import '../../core/theme/app_motion.dart';
+import '../../core/widgets/app_animate.dart';
 
 class AppShell extends StatelessWidget {
   const AppShell({required this.location, required this.child, super.key});
@@ -46,6 +48,38 @@ class AppShell extends StatelessWidget {
   }
 }
 
+typedef _Destination = ({String label, IconData icon, IconData selectedIcon});
+
+List<_Destination> _destinations(AppLocalizations l10n) => [
+  (
+    label: l10n.dashboard,
+    icon: Icons.dashboard_outlined,
+    selectedIcon: Icons.dashboard,
+  ),
+  (label: l10n.profiles, icon: Icons.hub_outlined, selectedIcon: Icons.hub),
+  (
+    label: l10n.nodeSelection,
+    icon: Icons.alt_route,
+    selectedIcon: Icons.alt_route,
+  ),
+  (
+    label: l10n.rules,
+    icon: Icons.rule_folder_outlined,
+    selectedIcon: Icons.rule_folder,
+  ),
+  (
+    label: l10n.connections,
+    icon: Icons.cable_outlined,
+    selectedIcon: Icons.cable,
+  ),
+  (label: l10n.traffic, icon: Icons.show_chart, selectedIcon: Icons.show_chart),
+  (
+    label: l10n.logs,
+    icon: Icons.receipt_long_outlined,
+    selectedIcon: Icons.receipt_long,
+  ),
+];
+
 class AdaptiveScaffold extends StatelessWidget {
   const AdaptiveScaffold({
     required this.selectedIndex,
@@ -57,46 +91,6 @@ class AdaptiveScaffold extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onDestinationSelected;
   final Widget child;
-
-  List<NavigationDestination> _destinations(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return [
-      NavigationDestination(
-        icon: Icon(Icons.dashboard_outlined),
-        selectedIcon: Icon(Icons.dashboard),
-        label: l10n.dashboard,
-      ),
-      NavigationDestination(
-        icon: Icon(Icons.hub_outlined),
-        selectedIcon: Icon(Icons.hub),
-        label: l10n.profiles,
-      ),
-      NavigationDestination(
-        icon: const Icon(Icons.alt_route),
-        label: l10n.nodeSelection,
-      ),
-      NavigationDestination(
-        icon: const Icon(Icons.rule_folder_outlined),
-        selectedIcon: const Icon(Icons.rule_folder),
-        label: l10n.rules,
-      ),
-      NavigationDestination(
-        icon: Icon(Icons.cable_outlined),
-        selectedIcon: Icon(Icons.cable),
-        label: l10n.connections,
-      ),
-      NavigationDestination(
-        icon: Icon(Icons.show_chart),
-        selectedIcon: Icon(Icons.show_chart),
-        label: l10n.traffic,
-      ),
-      NavigationDestination(
-        icon: Icon(Icons.receipt_long_outlined),
-        selectedIcon: Icon(Icons.receipt_long),
-        label: l10n.logs,
-      ),
-    ];
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -124,7 +118,16 @@ class AdaptiveScaffold extends StatelessWidget {
           bottomNavigationBar: NavigationBar(
             selectedIndex: selectedIndex,
             onDestinationSelected: onDestinationSelected,
-            destinations: _destinations(context),
+            destinations: [
+              for (final destination in _destinations(
+                AppLocalizations.of(context),
+              ))
+                NavigationDestination(
+                  icon: Icon(destination.icon),
+                  selectedIcon: Icon(destination.selectedIcon),
+                  label: destination.label,
+                ),
+            ],
           ),
         );
       },
@@ -141,39 +144,12 @@ class _DesktopSidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final l10n = AppLocalizations.of(context);
-    Widget item(int index, String label, IconData icon) {
-      final selected = selectedIndex == index;
-      return AnimatedContainer(
-        duration: AppMotion.duration(context, AppMotion.fast),
-        curve: Curves.easeOutCubic,
-        decoration: BoxDecoration(
-          color: selected ? theme.colorScheme.secondaryContainer : null,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Material(
-          type: MaterialType.transparency,
-          child: ListTile(
-            dense: true,
-            selected: selected,
-            leading: AnimatedSwitcher(
-              duration: AppMotion.duration(context, AppMotion.fast),
-              transitionBuilder: (child, animation) =>
-                  ScaleTransition(scale: animation, child: child),
-              child: Icon(icon, key: ValueKey(selected), size: 20),
-            ),
-            title: Text(label),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            onTap: () => onSelect(index),
-          ),
-        ),
-      );
-    }
+    final destinations = _destinations(AppLocalizations.of(context));
 
     return Material(
       color: theme.colorScheme.surface,
+      elevation: 8,
+      shadowColor: theme.colorScheme.shadow.withValues(alpha: 0.3),
       child: SizedBox(
         width: 180,
         child: Padding(
@@ -185,15 +161,105 @@ class _DesktopSidebar extends StatelessWidget {
                 padding: EdgeInsets.only(left: 8, bottom: 20),
                 child: _BrandMark(),
               ),
-              item(0, l10n.dashboard, Icons.dashboard_outlined),
-              item(1, l10n.profiles, Icons.hub_outlined),
-              item(2, l10n.nodeSelection, Icons.alt_route),
-              item(3, l10n.rules, Icons.rule_folder_outlined),
-              item(4, l10n.connections, Icons.cable_outlined),
-              item(5, l10n.traffic, Icons.show_chart),
-              item(6, l10n.logs, Icons.receipt_long_outlined),
+              for (var index = 0; index < destinations.length; index++)
+                _SidebarItem(
+                  index: index,
+                  destination: destinations[index],
+                  selected: selectedIndex == index,
+                  onSelect: onSelect,
+                ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SidebarItem extends StatelessWidget {
+  const _SidebarItem({
+    required this.index,
+    required this.destination,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  final int index;
+  final _Destination destination;
+  final bool selected;
+  final ValueChanged<int> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final radius = BorderRadius.circular(10);
+    final titleStyle = (theme.textTheme.bodyMedium ?? const TextStyle())
+        .copyWith(
+          color: selected
+              ? colorScheme.onSecondaryContainer
+              : colorScheme.onSurface,
+          fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+        );
+
+    return AnimatedContainer(
+      duration: AppMotion.fast,
+      curve: AppMotion.easeOut,
+      decoration: BoxDecoration(
+        color: selected ? colorScheme.secondaryContainer : Colors.transparent,
+        borderRadius: radius,
+      ),
+      child: Material(
+        type: MaterialType.transparency,
+        child: ListTile(
+          dense: true,
+          selected: selected,
+          selectedTileColor: Colors.transparent,
+          leading: _SidebarIcon(destination: destination, selected: selected),
+          title: AnimatedDefaultTextStyle(
+            duration: AppMotion.fast,
+            curve: AppMotion.easeOut,
+            style: titleStyle,
+            child: Text(destination.label),
+          ),
+          shape: RoundedRectangleBorder(borderRadius: radius),
+          onTap: () => onSelect(index),
+        ),
+      ),
+    );
+  }
+}
+
+class _SidebarIcon extends StatelessWidget {
+  const _SidebarIcon({required this.destination, required this.selected});
+
+  final _Destination destination;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final icon = selected ? destination.selectedIcon : destination.icon;
+    final color = selected
+        ? colorScheme.onSecondaryContainer
+        : colorScheme.onSurfaceVariant;
+
+    return SizedBox(
+      width: 24,
+      height: 24,
+      child: Center(
+        child: AnimatedSwitcher(
+          duration: AppMotion.fast,
+          switchInCurve: AppMotion.easeOut,
+          switchOutCurve: AppMotion.easeIn,
+          transitionBuilder: (child, animation) => FadeTransition(
+            opacity: animation,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.86, end: 1).animate(animation),
+              child: child,
+            ),
+          ),
+          child: Icon(icon, key: ValueKey(icon), size: 20, color: color),
         ),
       ),
     );
@@ -209,19 +275,35 @@ class _BrandMark extends StatelessWidget {
 
     return Tooltip(
       message: AppIdentity.displayName,
-      child: Container(
-        width: 44,
-        height: 44,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: colorScheme.primary,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(
-          'T',
-          style: TextStyle(
-            color: colorScheme.onPrimary,
-            fontWeight: FontWeight.w800,
+      child: AppAnimate(
+        effects: [
+          FadeEffect(duration: AppMotion.emphasized, curve: AppMotion.easeOut),
+          ScaleEffect(
+            duration: AppMotion.emphasized,
+            curve: AppMotion.emphasizedCurve,
+            begin: const Offset(0.7, 0.7),
+          ),
+          ShimmerEffect(
+            delay: const Duration(milliseconds: 240),
+            duration: const Duration(milliseconds: 700),
+            color: colorScheme.onPrimary.withValues(alpha: 0.5),
+            padding: 0,
+          ),
+        ],
+        child: Container(
+          width: 44,
+          height: 44,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: colorScheme.primary,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            'T',
+            style: TextStyle(
+              color: colorScheme.onPrimary,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ),
       ),

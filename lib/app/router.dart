@@ -65,25 +65,24 @@ class AppRouter {
       key: state.pageKey,
       child: child,
       transitionDuration: AppMotion.standard,
-      reverseTransitionDuration: AppMotion.fast,
-      transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        if (MediaQuery.maybeOf(context)?.disableAnimations == true) {
+      reverseTransitionDuration: AppMotion.standard,
+      transitionsBuilder: (context, animation, _, child) {
+        if (AppMotion.reduced(context)) {
           return child;
         }
-        final curved = CurvedAnimation(
+        final transition = CurvedAnimation(
           parent: animation,
-          curve: AppMotion.easeOut,
-          reverseCurve: AppMotion.easeIn,
+          curve: const Interval(0.5, 1, curve: AppMotion.easeOut),
         );
         return FadeTransition(
-          opacity: curved,
+          opacity: transition,
           child: SlideTransition(
             position: Tween<Offset>(
               begin: const Offset(0.018, 0),
               end: Offset.zero,
-            ).animate(curved),
+            ).animate(transition),
             child: ScaleTransition(
-              scale: Tween<double>(begin: 0.985, end: 1).animate(curved),
+              scale: Tween<double>(begin: 0.985, end: 1).animate(transition),
               child: child,
             ),
           ),

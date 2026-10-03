@@ -9,8 +9,14 @@ abstract final class AppMotion {
   static const easeIn = Curves.easeInCubic;
   static const emphasizedCurve = Curves.easeOutBack;
 
-  static Duration duration(BuildContext context, Duration value) =>
-      MediaQuery.maybeOf(context)?.disableAnimations == true
-      ? Duration.zero
-      : value;
+  static const staggerStep = Duration(milliseconds: 28);
+  static const staggerLimit = 8;
+
+  /// `flutter_animate` has no notion of the platform's reduced motion flag, so
+  /// every wrapper in this app checks it before handing work to `Animate`.
+  static bool reduced(BuildContext context) =>
+      MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+
+  static Duration stagger(int index, {Duration step = staggerStep}) =>
+      step * index.clamp(0, staggerLimit);
 }

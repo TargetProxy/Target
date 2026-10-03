@@ -31,7 +31,6 @@ class DesktopSingleInstance {
   }
 
   static FlutterAloneConfig _configForCurrentPlatform() {
-    const duplicateCheck = DuplicateCheckConfig(enableInDebugMode: true);
     const window = WindowConfig(windowTitle: AppIdentity.displayName);
     const message = CustomMessageConfig(
       customTitle: AppIdentity.displayName,
@@ -40,7 +39,6 @@ class DesktopSingleInstance {
 
     if (Platform.isWindows) {
       return FlutterAloneConfig.forWindows(
-        duplicateCheckConfig: duplicateCheck,
         windowsConfig: const DefaultWindowsMutexConfig(
           packageId: AppIdentity.bundleIdentifier,
           appName: AppIdentity.displayName,
@@ -51,14 +49,12 @@ class DesktopSingleInstance {
     }
     if (Platform.isMacOS) {
       return FlutterAloneConfig.forMacOS(
-        duplicateCheckConfig: duplicateCheck,
         macOSConfig: MacOSConfig(lockFileName: _lockFileName),
         windowConfig: window,
         messageConfig: message,
       );
     }
     return FlutterAloneConfig.forLinux(
-      duplicateCheckConfig: duplicateCheck,
       linuxConfig: LinuxConfig(lockFileName: _lockFileName),
       windowConfig: window,
       messageConfig: message,

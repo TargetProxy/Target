@@ -1,7 +1,10 @@
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/theme/app_motion.dart';
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/widgets/app_animate.dart';
 import '../../../../l10n/app_localizations.dart';
 
 class AddSubscriptionSheet extends StatefulWidget {
@@ -29,66 +32,76 @@ class _AddSubscriptionSheetState extends State<AddSubscriptionSheet> {
     return AnimatedSize(
       duration: const Duration(milliseconds: 220),
       curve: Curves.easeOutCubic,
-      child: Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.cardPadding),
-            child: Form(
-              key: _formKey,
-              autovalidateMode: AutovalidateMode.onUserInteraction,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    l10n.addSubscriptionTitle,
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: AppSpacing.itemGap),
-                  TextFormField(
-                    controller: _nameController,
-                    decoration: InputDecoration(labelText: l10n.nameOptional),
-                  ),
-                  const SizedBox(height: AppSpacing.itemGap),
-                  TextFormField(
-                    controller: _urlController,
-                    decoration: InputDecoration(
-                      labelText: l10n.subscriptionUrl,
-                      hintText: 'https://example.com/sub',
+      child: AppAnimate(
+        effects: [
+          FadeEffect(duration: AppMotion.standard, curve: AppMotion.easeOut),
+          MoveEffect(
+            duration: AppMotion.standard,
+            curve: AppMotion.easeOut,
+            begin: const Offset(0, 24),
+          ),
+        ],
+        child: Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.cardPadding),
+              child: Form(
+                key: _formKey,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      l10n.addSubscriptionTitle,
+                      style: Theme.of(context).textTheme.titleLarge,
                     ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return l10n.urlRequired;
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: AppSpacing.sectionGap),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _pasteFromClipboard,
-                          icon: const Icon(Icons.paste),
-                          label: Text(l10n.paste),
-                        ),
+                    const SizedBox(height: AppSpacing.itemGap),
+                    TextFormField(
+                      controller: _nameController,
+                      decoration: InputDecoration(labelText: l10n.nameOptional),
+                    ),
+                    const SizedBox(height: AppSpacing.itemGap),
+                    TextFormField(
+                      controller: _urlController,
+                      decoration: InputDecoration(
+                        labelText: l10n.subscriptionUrl,
+                        hintText: 'https://example.com/sub',
                       ),
-                      const SizedBox(width: AppSpacing.itemGap),
-                      Expanded(
-                        child: FilledButton(
-                          onPressed: _submit,
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(vertical: 12),
-                            child: Text(l10n.add),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return l10n.urlRequired;
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: AppSpacing.sectionGap),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _pasteFromClipboard,
+                            icon: const Icon(Icons.paste),
+                            label: Text(l10n.paste),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
+                        const SizedBox(width: AppSpacing.itemGap),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: _submit,
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 12),
+                              child: Text(l10n.add),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
