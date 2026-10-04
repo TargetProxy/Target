@@ -7,6 +7,7 @@ import '../core/logging/app_logger.dart';
 import '../core/theme/app_theme.dart';
 import '../core/platform/app_platform.dart';
 import '../core/platform/desktop_system_proxy.dart';
+import '../core/platform/desktop_tray.dart';
 import '../core/runtime/core_gateway.dart';
 import '../core/runtime/core_notifier.dart';
 import '../data/models/app_settings.dart';
@@ -26,6 +27,7 @@ class TargetApp extends StatelessWidget {
     this.initialSettings,
     this.settingsStore,
     this.systemProxy,
+    this.desktopTray,
   });
 
   final CoreGateway? coreGateway;
@@ -33,6 +35,7 @@ class TargetApp extends StatelessWidget {
   final AppSettings? initialSettings;
   final AppSettingsStore? settingsStore;
   final DesktopSystemProxy? systemProxy;
+  final DesktopTray? desktopTray;
 
   @override
   Widget build(BuildContext context) {
@@ -47,15 +50,16 @@ class TargetApp extends StatelessWidget {
         if (settingsStore != null)
           settingsStoreProvider.overrideWithValue(settingsStore!),
       ],
-      child: _TargetAppView(systemProxy: systemProxy),
+      child: _TargetAppView(systemProxy: systemProxy, desktopTray: desktopTray),
     );
   }
 }
 
 class _TargetAppView extends ConsumerStatefulWidget {
-  const _TargetAppView({this.systemProxy});
+  const _TargetAppView({this.systemProxy, this.desktopTray});
 
   final DesktopSystemProxy? systemProxy;
+  final DesktopTray? desktopTray;
 
   @override
   ConsumerState<_TargetAppView> createState() => _TargetAppViewState();
@@ -65,15 +69,18 @@ class _TargetAppViewState extends ConsumerState<_TargetAppView> {
   late final AppRouter _appRouter = AppRouter();
   late final DesktopSystemProxy _systemProxy =
       widget.systemProxy ?? DesktopSystemProxy();
+  bool _exiting = false;
 
   @override
   void initState() {
     super.initState();
+    widget.desktopTray?.onExit = _quit;
     ref.read(subscriptionsProvider.notifier).load();
   }
 
   @override
   void dispose() {
+    widget.desktopTray?.onExit = null;
     unawaited(_systemProxy.dispose());
     super.dispose();
   }
@@ -127,6 +134,7 @@ class _TargetAppViewState extends ConsumerState<_TargetAppView> {
     required CoreState core,
     AppSettings? settings,
   }) async {
+    if (_exiting) return;
     final capabilities = ref.read(appCapabilitiesProvider);
     final appSettings = settings ?? ref.read(settingsProvider).settings;
     final enabled =
@@ -146,6 +154,24 @@ class _TargetAppViewState extends ConsumerState<_TargetAppView> {
             ? 'Failed to enable the system proxy'
             : 'Failed to disable the system proxy',
         source: 'system-proxy',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  Future<void> _quit() async {
+    if (_exiting) return;
+    _exiting = true;
+    try {
+      await ref.read(coreGatewayProvider).dispose();
+      await _systemProxy.dispose();
+      await widget.desktopTray!.quit();
+    } on Object catch (error, stackTrace) {
+      _exiting = false;
+      AppLogger.error(
+        'Failed to quit Target',
+        source: 'desktop',
         error: error,
         stackTrace: stackTrace,
       );

@@ -6,12 +6,21 @@
 
 #include "generated_plugin_registrant.h"
 
+#include <flutter_alone/flutter_alone_plugin_c_api.h>
 #include <proxy_manager/proxy_manager_plugin.h>
+#include <screen_retriever_windows/screen_retriever_windows_plugin_c_api.h>
 #include <targetlib/targetlib_plugin_c_api.h>
+#include <window_manager/window_manager_plugin.h>
 
 void RegisterPlugins(flutter::PluginRegistry* registry) {
+  FlutterAlonePluginCApiRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("FlutterAlonePluginCApi"));
   ProxyManagerPluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("ProxyManagerPlugin"));
+  ScreenRetrieverWindowsPluginCApiRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("ScreenRetrieverWindowsPluginCApi"));
   TargetlibPluginCApiRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("TargetlibPluginCApi"));
+  WindowManagerPluginRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("WindowManagerPlugin"));
 }

@@ -2,11 +2,12 @@ import 'package:flutter/foundation.dart';
 
 import '../core/logging/app_logger.dart';
 import '../core/platform/app_platform.dart';
+import '../core/platform/desktop_tray.dart';
 import '../core/platform/platform_settings_policy.dart';
 import '../features/settings/data/settings_store.dart';
 import 'target_app.dart';
 
-Future<TargetApp> bootstrap() async {
+Future<TargetApp> bootstrap({DesktopTray? desktopTray}) async {
   _installErrorHandlers();
 
   final capabilities = AppCapabilities.current();
@@ -24,6 +25,7 @@ Future<TargetApp> bootstrap() async {
 
   AppLogger.info('Target initialization completed');
   return TargetApp(
+    desktopTray: desktopTray,
     capabilities: capabilities,
     initialSettings: settings,
     settingsStore: settingsStore,
