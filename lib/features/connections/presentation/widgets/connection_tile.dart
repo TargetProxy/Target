@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/format_bytes.dart';
 import '../../../../core/runtime/core_models.dart';
+import '../../../../l10n/app_localizations.dart';
 
 class ConnectionTile extends StatelessWidget {
   const ConnectionTile({
@@ -19,6 +20,7 @@ class ConnectionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final total = connection.uplinkTotal + connection.downlinkTotal;
     final duration = _formatDuration(connection.createdAt, connection.closedAt);
     final networkLabel = connection.network.toUpperCase();
@@ -65,7 +67,7 @@ class ConnectionTile extends StatelessWidget {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Icon(Icons.close, size: 18),
-                      tooltip: 'Close connection',
+                      tooltip: l10n.closeConnection,
                       visualDensity: VisualDensity.compact,
                     ),
                   ],

@@ -101,12 +101,6 @@ class TargetLibGateway implements CoreGateway {
     return _runtimeSettings(result);
   }
 
-  @override
-  Future<void> restart() async {
-    await _ensureConnected();
-    await _manager!.restart(Empty(), options: _callOptions);
-  }
-
   targetlib_pb.RuntimeSettings _protoRuntimeSettings(
     RuntimeSettings settings,
   ) => targetlib_pb.RuntimeSettings(
@@ -187,17 +181,6 @@ class TargetLibGateway implements CoreGateway {
   }
 
   @override
-  Future<RuntimeSubscription> getSubscription(String id) async {
-    await _ensureConnected();
-    return _runtimeSubscription(
-      await _manager!.getSubscription(
-        targetlib_pb.SubscriptionId(id: id),
-        options: _callOptions,
-      ),
-    );
-  }
-
-  @override
   Future<RuntimeSubscription> addSubscription({
     required String id,
     required String name,
@@ -228,25 +211,6 @@ class TargetLibGateway implements CoreGateway {
   }
 
   @override
-  Future<void> removeSubscription(String id) async {
-    await _ensureConnected();
-    await _manager!.removeSubscription(
-      targetlib_pb.SubscriptionId(id: id),
-      options: _callOptions,
-    );
-  }
-
-  @override
-  Future<RuntimeSubscription> renameSubscription(String id, String name) async {
-    await _ensureConnected();
-    final view = await _manager!.renameSubscription(
-      targetlib_pb.RenameSubscriptionRequest(id: id, name: name),
-      options: _callOptions,
-    );
-    return _runtimeSubscription(view);
-  }
-
-  @override
   Future<RuntimeSubscription> setSubscriptionEnabled(
     String id,
     bool enabled,
@@ -258,34 +222,6 @@ class TargetLibGateway implements CoreGateway {
     );
     return _runtimeSubscription(view);
   }
-
-  @override
-  Future<RuntimeSubscription> configureSubscriptionUpdates({
-    required String id,
-    required bool enabled,
-    required int updateIntervalSeconds,
-  }) async {
-    await _ensureConnected();
-    final view = await _manager!.configureSubscriptionUpdates(
-      targetlib_pb.ConfigureSubscriptionUpdatesRequest(
-        id: id,
-        enabled: enabled,
-        updateIntervalSeconds: Int64(updateIntervalSeconds),
-      ),
-      options: _callOptions,
-    );
-    return _runtimeSubscription(view);
-  }
-
-  @override
-  Future<targetlib_pb.ResolvedEndpoints> getResolvedEndpoints({
-    bool enabledOnly = false,
-  }) => _coreCall(
-    () => _manager!.getResolvedEndpoints(
-      targetlib_pb.ResolvedEndpointsRequest(enabledOnly: enabledOnly),
-      options: _callOptions,
-    ),
-  );
 
   @override
   Future<RuntimeSubscriptionUpdate> updateSubscription(String id) async {
@@ -335,10 +271,6 @@ class TargetLibGateway implements CoreGateway {
       );
 
   @override
-  Future<targetlib_pb.ProxyStatus> getProxyStatus() =>
-      _coreCall(() => _manager!.getProxyStatus(Empty(), options: _callOptions));
-
-  @override
   Future<targetlib_pb.RouteInfo> upsertRoute(
     targetlib_pb.UpsertRouteRequest request,
   ) => _coreCall(() => _manager!.upsertRoute(request, options: _callOptions));
@@ -367,34 +299,6 @@ class TargetLibGateway implements CoreGateway {
       options: _callOptions,
     ),
   );
-
-  @override
-  Stream<targetlib_pb.ServiceState> subscribeState() {
-    if (_manager == null) return const Stream.empty();
-    return _manager!.subscribeState(Empty(), options: _callOptions);
-  }
-
-  @override
-  Stream<targetlib_pb.TrafficStatus> subscribeTraffic({
-    Duration interval = const Duration(seconds: 1),
-  }) {
-    if (_manager == null) return const Stream.empty();
-    return _manager!.subscribeTraffic(
-      targetlib_pb.TrafficRequest(
-        intervalMilliseconds: interval.inMilliseconds,
-      ),
-      options: _callOptions,
-    );
-  }
-
-  @override
-  Stream<targetlib_pb.SubscriptionEvent> subscribeSubscriptionEvents() {
-    if (_manager == null) return const Stream.empty();
-    return _manager!.subscribeSubscriptionEvents(
-      Empty(),
-      options: _callOptions,
-    );
-  }
 
   Future<T> _coreCall<T>(Future<T> Function() operation) async {
     await _ensureConnected();
@@ -473,11 +377,6 @@ class TargetLibGateway implements CoreGateway {
         message: 'TargetLib is stopped.',
       ),
     );
-  }
-
-  @override
-  Future<void> selectOutbound(String groupId, String outboundId) async {
-    await selectNode(outboundId);
   }
 
   @override

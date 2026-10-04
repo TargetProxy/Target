@@ -481,4 +481,17 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get ruleInputRequired =>
       'Enter a service ID and domain, then drop in a node.';
+
+  @override
+  String get disconnected => 'Offline';
+
+  @override
+  String get connectionError => 'Connection error';
+
+  @override
+  String get connectionErrorMessage =>
+      'TargetLib could not connect. See the logs for details.';
+
+  @override
+  String get closeConnection => 'Close connection';
 }

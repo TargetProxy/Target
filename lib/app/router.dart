@@ -8,7 +8,6 @@ import '../features/profiles/presentation/profiles_workspace_page.dart';
 import '../features/traffic/presentation/traffic_page.dart';
 import '../features/proxies/presentation/node_pool_page.dart';
 import '../features/rules/presentation/rules_page.dart';
-import '../core/theme/app_motion.dart';
 import 'shell/app_shell.dart';
 
 class AppRouter {
@@ -23,19 +22,19 @@ class AppRouter {
         routes: [
           GoRoute(
             path: AppRoute.home.path,
-            pageBuilder: _fadePageBuilder(const HomePage()),
+            pageBuilder: _pageBuilder(const HomePage()),
           ),
           GoRoute(
             path: AppRoute.proxies.path,
-            pageBuilder: _fadePageBuilder(const ProfilesWorkspacePage()),
+            pageBuilder: _pageBuilder(const ProfilesWorkspacePage()),
           ),
           GoRoute(
             path: AppRoute.nodes.path,
-            pageBuilder: _fadePageBuilder(const NodePoolPage()),
+            pageBuilder: _pageBuilder(const NodePoolPage()),
           ),
           GoRoute(
             path: AppRoute.rules.path,
-            pageBuilder: _fadePageBuilder(const RulesPage()),
+            pageBuilder: _pageBuilder(const RulesPage()),
           ),
           GoRoute(
             path: '/node-library',
@@ -43,52 +42,26 @@ class AppRouter {
           ),
           GoRoute(
             path: AppRoute.connections.path,
-            pageBuilder: _fadePageBuilder(const ConnectionsPage()),
+            pageBuilder: _pageBuilder(const ConnectionsPage()),
           ),
           GoRoute(
             path: AppRoute.traffic.path,
-            pageBuilder: _fadePageBuilder(const TrafficPage()),
+            pageBuilder: _pageBuilder(const TrafficPage()),
           ),
           GoRoute(
             path: AppRoute.logs.path,
-            pageBuilder: _fadePageBuilder(const LogsPage()),
+            pageBuilder: _pageBuilder(const LogsPage()),
           ),
         ],
       ),
     ],
   );
 
-  static Page<void> Function(BuildContext, GoRouterState) _fadePageBuilder(
+  static Page<void> Function(BuildContext, GoRouterState) _pageBuilder(
     Widget child,
   ) {
-    return (context, state) => CustomTransitionPage<void>(
-      key: state.pageKey,
-      child: child,
-      transitionDuration: AppMotion.standard,
-      reverseTransitionDuration: AppMotion.standard,
-      transitionsBuilder: (context, animation, _, child) {
-        if (AppMotion.reduced(context)) {
-          return child;
-        }
-        final transition = CurvedAnimation(
-          parent: animation,
-          curve: const Interval(0.5, 1, curve: AppMotion.easeOut),
-        );
-        return FadeTransition(
-          opacity: transition,
-          child: SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0.018, 0),
-              end: Offset.zero,
-            ).animate(transition),
-            child: ScaleTransition(
-              scale: Tween<double>(begin: 0.985, end: 1).animate(transition),
-              child: child,
-            ),
-          ),
-        );
-      },
-    );
+    return (context, state) =>
+        NoTransitionPage<void>(key: state.pageKey, child: child);
   }
 }
 

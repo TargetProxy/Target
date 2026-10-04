@@ -10,6 +10,7 @@ import 'package:target/data/models/proxy_node.dart';
 import 'package:target/data/models/runtime_settings.dart';
 import 'package:target/features/proxies/application/proxies_notifier.dart';
 import 'package:target/features/proxies/application/proxy_catalog.dart';
+import 'package:targetlib/targetlib.dart' as targetlib;
 
 void main() {
   test('syncs a saved selection only while the core is running', () async {
@@ -37,7 +38,7 @@ void main() {
 
     gateway.emit(const CoreSnapshot(lifecycle: CoreLifecycle.running));
     await Future<void>.delayed(Duration.zero);
-    expect(gateway.selections, [('regional-auto', 'node-1')]);
+    expect(gateway.selections, ['node-1']);
 
     await container.read(proxiesProvider.notifier).selectNode('node-1');
     expect(gateway.selections, hasLength(1));
@@ -107,7 +108,7 @@ void main() {
       container.read(proxiesProvider);
       gateway.emit(const CoreSnapshot(lifecycle: CoreLifecycle.running));
       await Future<void>.delayed(Duration.zero);
-      expect(gateway.selections, [('proxy', 'node-1')]);
+      expect(gateway.selections, ['node-1']);
 
       gateway.throwOnSelect = true;
       await container.read(proxiesProvider.notifier).selectNode('node-2');
@@ -121,7 +122,7 @@ void main() {
 
 class _RecordingCoreGateway extends UnavailableCoreGateway {
   final _snapshots = StreamController<CoreSnapshot>.broadcast(sync: true);
-  final List<(String, String)> selections = [];
+  final List<String> selections = [];
   final List<RuntimeSettings> configurations = [];
   RuntimeSettings runtimeSettings = const RuntimeSettings();
   CoreSnapshot currentSnapshot = const CoreSnapshot();
@@ -152,11 +153,12 @@ class _RecordingCoreGateway extends UnavailableCoreGateway {
   }
 
   @override
-  Future<void> selectOutbound(String groupId, String outboundId) async {
+  Future<targetlib.SelectNodeResponse> selectNode(String nodeId) async {
     if (throwOnSelect) {
       throw StateError('select failed');
     }
-    selections.add((groupId, outboundId));
+    selections.add(nodeId);
+    return targetlib.SelectNodeResponse();
   }
 
   @override

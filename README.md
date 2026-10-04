@@ -25,7 +25,6 @@
 *   🔍 **网络与日志洞察**：
     *   **IP 探测**：直观显示当前出口 IP，以及国家、城市、ISP、组织机构和 ASN 数据（由 TargetLib 强力驱动）。
     *   **日志系统**：支持应用与 TargetLib 双端日志的查看、筛选、暂停与清空；导出时贴心提供 **URL、IP 和 Token 隐私打码** 功能。
-*   💻 **桌面端深度融合**：原生级系统托盘支持、关闭窗口自动隐藏、托盘快捷控制（连接/断开），以及严格的单实例运行保障。
 *   🎨 **跨平台自适应 UI**：内置中英双语（i18n），持久化存储（`SharedPreferences`）个性化主题与代理设置，自适应桌面端宽屏侧栏与移动端底部导航。
 
 ---
@@ -45,8 +44,8 @@
 
 | 平台 | 运行模式 | 当前进度与现状 |
 | :--- | :--- | :--- |
-| **Windows** | 桌面服务 | ✅ 已接入服务安装、检测/启动、托盘、单实例及 Inno Setup 脚本。**支持最完善**。 |
-| **Linux** | 桌面服务 | 🚧 Flutter runner、托盘与服务能力已就绪。发布需补充 TargetLib 产物。 |
+| **Windows** | 桌面服务 | ✅ 已接入服务安装、检测/启动及 Inno Setup 脚本。**支持最完善**。 |
+| **Linux** | 桌面服务 | 🚧 Flutter runner 与服务能力已就绪。发布需补充 TargetLib 产物。 |
 | **macOS** | 桌面服务 | 🚧 基础能力已配置（可生成项目）。正式分发亟需解决苹果签名与公证。 |
 | **Android** | 移动 VPN | 🚧 启动时主动请求 VPN 权限并以 VPN 模式运行。Release 签名待配置。 |
 | **iOS**     | 移动 VPN | 🚧 采用网络扩展模型。CI 仅验证无签名构建，暂无直接发布配置。 |
@@ -61,7 +60,7 @@
 ```text
 Target/
 ├── lib/
-│   ├── app/             # 应用入口、路由、托盘系统和单实例控制
+│   ├── app/             # 应用入口和路由
 │   ├── core/            # TargetLib 网关、平台底层能力、日志、主题、通用组件
 │   ├── data/            # 数据模型：应用配置与运行时数据模型
 │   └── features/        # 10 个业务模块：connections/home/logs/maps/profiles/proxies/settings/smart_connect/subscriptions/traffic

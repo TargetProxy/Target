@@ -44,8 +44,6 @@ final class AppCapabilities {
   bool get vpnOnly => runtimeHost == RuntimeHost.mobileVpn;
   bool get supportsMixedProxy => runtimeHost == RuntimeHost.desktopService;
   bool get supportsManagedService => runtimeHost == RuntimeHost.desktopService;
-  bool get supportsTray => runtimeHost == RuntimeHost.desktopService;
-  bool get supportsSingleInstance => runtimeHost == RuntimeHost.desktopService;
 }
 
 final appCapabilitiesProvider = Provider<AppCapabilities>(

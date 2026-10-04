@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/target_page_layout.dart';
-import '../../../core/widgets/animated_reveal.dart';
 import '../../../l10n/app_localizations.dart';
 import '../application/logs_notifier.dart';
 import 'widgets/log_line_tile.dart';
@@ -33,37 +32,28 @@ class _LogsPageState extends ConsumerState<LogsPage> {
     final entries = state.filteredEntries;
     final l10n = AppLocalizations.of(context);
 
-    return SafeArea(
-      child: Column(
+    return TargetPageScaffold(
+      title: l10n.logs,
+      subtitle: l10n.runtimeDiagnostics,
+      actions: [
+        IconButton(
+          onPressed: _copyVisible,
+          icon: const Icon(Icons.copy),
+          tooltip: l10n.copyVisible,
+        ),
+        IconButton(
+          onPressed: _export,
+          icon: const Icon(Icons.share),
+          tooltip: l10n.export,
+        ),
+        IconButton(
+          onPressed: notifier.clear,
+          icon: const Icon(Icons.delete_sweep),
+          tooltip: l10n.clear,
+        ),
+      ],
+      body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                maxWidth: TargetPageLayout.maxWidth,
-              ),
-              child: Row(
-                children: [
-                  Expanded(child: TargetPageHeader(title: l10n.logs)),
-                  IconButton(
-                    onPressed: _copyVisible,
-                    icon: const Icon(Icons.copy),
-                    tooltip: l10n.copyVisible,
-                  ),
-                  IconButton(
-                    onPressed: _export,
-                    icon: const Icon(Icons.share),
-                    tooltip: l10n.export,
-                  ),
-                  IconButton(
-                    onPressed: notifier.clear,
-                    icon: const Icon(Icons.delete_sweep),
-                    tooltip: l10n.clear,
-                  ),
-                ],
-              ),
-            ),
-          ),
           LogToolbar(
             l10n: l10n,
             paused: state.paused,
@@ -83,14 +73,11 @@ class _LogsPageState extends ConsumerState<LogsPage> {
                     controller: _scrollController,
                     itemCount: entries.length,
                     itemBuilder: (context, index) {
-                      return AnimatedReveal(
-                        delay: Duration(
-                          milliseconds: index.clamp(0, 8).toInt() * 20,
-                        ),
+                      return LogLineTile(
                         key: ValueKey(
                           '${entries[index].time.microsecondsSinceEpoch}-$index',
                         ),
-                        child: LogLineTile(entry: entries[index]),
+                        entry: entries[index],
                       );
                     },
                   ),

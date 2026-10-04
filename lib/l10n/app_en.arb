@@ -155,4 +155,8 @@
   ,"startService": "Start service"
   ,"checkAgain": "Check again"
   ,"ruleInputRequired": "Enter a service ID and domain, then drop in a node."
+  ,"disconnected": "Offline"
+  ,"connectionError": "Connection error"
+  ,"connectionErrorMessage": "TargetLib could not connect. See the logs for details."
+  ,"closeConnection": "Close connection"
 }

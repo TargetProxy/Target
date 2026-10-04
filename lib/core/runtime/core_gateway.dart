@@ -24,14 +24,7 @@ abstract class CoreGateway {
 
   Future<void> start();
 
-  Future<void> restart() => Future.error(
-    const CoreUnavailableException('Restart is not supported by this core.'),
-  );
-
   Future<void> stop();
-
-  Future<void> selectOutbound(String groupId, String outboundId) =>
-      Future.error(const CoreUnavailableException('Outbound selection is not supported.'));
 
   Future<int?> testLatency(String outboundId) => Future.value();
 
@@ -58,10 +51,6 @@ abstract class CoreGateway {
     const CoreUnavailableException('Subscriptions are not supported.'),
   );
 
-  Future<RuntimeSubscription> getSubscription(String id) => Future.error(
-    const CoreUnavailableException('Subscription lookup is not supported.'),
-  );
-
   Future<RuntimeSubscription> addSubscription({
     required String id,
     required String name,
@@ -73,51 +62,18 @@ abstract class CoreGateway {
     bool updateNow = false,
   }) => Future.error(const CoreUnavailableException('Subscriptions are not supported.'));
 
-  Future<void> removeSubscription(String id) => Future.error(
-    const CoreUnavailableException('Subscriptions are not supported.'),
-  );
-
-  Future<RuntimeSubscription> renameSubscription(String id, String name) =>
-      Future.error(const CoreUnavailableException('Subscriptions are not supported.'));
-
   Future<RuntimeSubscription> setSubscriptionEnabled(String id, bool enabled) =>
       Future.error(const CoreUnavailableException('Subscriptions are not supported.'));
-
-  Future<RuntimeSubscription> configureSubscriptionUpdates({
-    required String id,
-    required bool enabled,
-    required int updateIntervalSeconds,
-  }) => Future.error(
-    const CoreUnavailableException('Subscription update configuration is not supported.'),
-  );
 
   Future<RuntimeSubscriptionUpdate> updateSubscription(String id) => Future.error(
     const CoreUnavailableException('Subscriptions are not supported.'),
   );
-
-  Future<pb.ResolvedEndpoints> getResolvedEndpoints({bool enabledOnly = false}) =>
-      Future.error(
-        const CoreUnavailableException('Resolved endpoints are not supported.'),
-      );
 
   Future<pb.NodePool> getNodePool();
 
   Future<pb.SelectNodeResponse> selectNode(String nodeId) => Future.error(
     const CoreUnavailableException('Node selection is not supported.'),
   );
-
-  Future<pb.ProxyStatus> getProxyStatus() => Future.error(
-    const CoreUnavailableException('Proxy status is not supported.'),
-  );
-
-  Stream<pb.ServiceState> subscribeState() => const Stream.empty();
-
-  Stream<pb.TrafficStatus> subscribeTraffic({
-    Duration interval = const Duration(seconds: 1),
-  }) => const Stream.empty();
-
-  Stream<pb.SubscriptionEvent> subscribeSubscriptionEvents() =>
-      const Stream.empty();
 
   Future<pb.RouteInfo> upsertRoute(pb.UpsertRouteRequest request) =>
       Future.error(const CoreUnavailableException('Routes are not supported.'));
@@ -185,13 +141,6 @@ class UnavailableCoreGateway implements CoreGateway {
   Future<void> stop() => _unavailable();
 
   @override
-  Future<void> restart() => _unavailable();
-
-  @override
-  Future<void> selectOutbound(String groupId, String outboundId) =>
-      _unavailable();
-
-  @override
   Future<int?> testLatency(String outboundId) => _unavailable();
 
   @override
@@ -218,9 +167,6 @@ class UnavailableCoreGateway implements CoreGateway {
   Future<RuntimeSubscriptionSnapshot> listSubscriptions() => _unavailable();
 
   @override
-  Future<RuntimeSubscription> getSubscription(String id) => _unavailable();
-
-  @override
   Future<RuntimeSubscription> addSubscription({
     required String id,
     required String name,
@@ -233,29 +179,11 @@ class UnavailableCoreGateway implements CoreGateway {
   }) => _unavailable();
 
   @override
-  Future<void> removeSubscription(String id) => _unavailable();
-
-  @override
-  Future<RuntimeSubscription> renameSubscription(String id, String name) =>
-      _unavailable();
-
-  @override
   Future<RuntimeSubscription> setSubscriptionEnabled(String id, bool enabled) =>
       _unavailable();
 
   @override
-  Future<RuntimeSubscription> configureSubscriptionUpdates({
-    required String id,
-    required bool enabled,
-    required int updateIntervalSeconds,
-  }) => _unavailable();
-
-  @override
   Future<RuntimeSubscriptionUpdate> updateSubscription(String id) =>
-      _unavailable();
-
-  @override
-  Future<pb.ResolvedEndpoints> getResolvedEndpoints({bool enabledOnly = false}) =>
       _unavailable();
 
   @override
@@ -263,21 +191,6 @@ class UnavailableCoreGateway implements CoreGateway {
 
   @override
   Future<pb.SelectNodeResponse> selectNode(String nodeId) => _unavailable();
-
-  @override
-  Future<pb.ProxyStatus> getProxyStatus() => _unavailable();
-
-  @override
-  Stream<pb.ServiceState> subscribeState() => const Stream.empty();
-
-  @override
-  Stream<pb.TrafficStatus> subscribeTraffic({
-    Duration interval = const Duration(seconds: 1),
-  }) => const Stream.empty();
-
-  @override
-  Stream<pb.SubscriptionEvent> subscribeSubscriptionEvents() =>
-      const Stream.empty();
 
   @override
   Future<pb.RouteInfo> upsertRoute(pb.UpsertRouteRequest request) =>

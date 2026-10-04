@@ -102,7 +102,9 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
 
   ProxiesState _fromCatalog(ProxiesState current, ProxyCatalogState next) {
     final selectedGroupId = current.selectedGroup?.id;
-    final index = next.groups.indexWhere((group) => group.id == selectedGroupId);
+    final index = next.groups.indexWhere(
+      (group) => group.id == selectedGroupId,
+    );
     return current.copyWith(
       groups: next.groups,
       selectedGroupIndex: index >= 0 ? index : 0,
@@ -127,7 +129,9 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
       state = state.copyWith(clearError: true);
       return;
     }
-    await _selectRuntime(group.id, nodeId);
+    if (ref.read(coreProvider).running) {
+      await _selectRuntime(group.id, nodeId);
+    }
   }
 
   Future<void> _syncAllSelectionsToRuntime() async {

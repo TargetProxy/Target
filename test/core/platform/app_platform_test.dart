@@ -11,8 +11,6 @@ void main() {
         expect(capabilities.vpnOnly, isTrue);
         expect(capabilities.supportsMixedProxy, isFalse);
         expect(capabilities.supportsManagedService, isFalse);
-        expect(capabilities.supportsTray, isFalse);
-        expect(capabilities.supportsSingleInstance, isFalse);
       });
     }
 
@@ -28,8 +26,6 @@ void main() {
         expect(capabilities.vpnOnly, isFalse);
         expect(capabilities.supportsMixedProxy, isTrue);
         expect(capabilities.supportsManagedService, isTrue);
-        expect(capabilities.supportsTray, isTrue);
-        expect(capabilities.supportsSingleInstance, isTrue);
       });
     }
   });

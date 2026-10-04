@@ -459,5 +459,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get checkAgain => '再次检查';
 
   @override
-  String get ruleInputRequired => '请填写服务 ID、域名，并拖入一个节点。';
+  String get ruleInputRequired => '填写服务 ID、域名，并拖入一个节点。';
+
+  @override
+  String get disconnected => '离线';
+
+  @override
+  String get connectionError => '连接错误';
+
+  @override
+  String get connectionErrorMessage => 'TargetLib 无法连接，请查看日志了解详情。';
+
+  @override
+  String get closeConnection => '关闭连接';
 }

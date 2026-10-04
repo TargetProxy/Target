@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/target_page_layout.dart';
-import '../../../core/widgets/animated_reveal.dart';
 import '../../../l10n/app_localizations.dart';
 import '../application/connections_notifier.dart';
 import 'widgets/connection_tile.dart';
@@ -18,34 +17,24 @@ class ConnectionsPage extends ConsumerWidget {
     final connections = state.filteredConnections;
     final l10n = AppLocalizations.of(context);
 
-    return SafeArea(
-      child: Column(
+    return TargetPageScaffold(
+      title: l10n.connections,
+      actions: [
+        IconButton(
+          onPressed: state.activeCount == 0 || state.closingAll
+              ? null
+              : () => _closeAll(context, ref, notifier),
+          icon: state.closingAll
+              ? const SizedBox.square(
+                  dimension: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.cancel_presentation_outlined),
+          tooltip: l10n.closeAllConnections,
+        ),
+      ],
+      body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                maxWidth: TargetPageLayout.maxWidth,
-              ),
-              child: Row(
-                children: [
-                  Expanded(child: TargetPageHeader(title: l10n.connections)),
-                  IconButton(
-                    onPressed: state.activeCount == 0 || state.closingAll
-                        ? null
-                        : () => _closeAll(context, ref, notifier),
-                    icon: state.closingAll
-                        ? const SizedBox.square(
-                            dimension: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.cancel_presentation_outlined),
-                    tooltip: l10n.closeAllConnections,
-                  ),
-                ],
-              ),
-            ),
-          ),
           _ConnectionsToolbar(
             l10n: l10n,
             searchQuery: state.searchQuery,
@@ -66,17 +55,12 @@ class ConnectionsPage extends ConsumerWidget {
                     itemCount: connections.length,
                     itemBuilder: (context, index) {
                       final connection = connections[index];
-                      return AnimatedReveal(
+                      return ConnectionTile(
                         key: ValueKey(connection.id),
-                        delay: Duration(
-                          milliseconds: index.clamp(0, 8).toInt() * 28,
-                        ),
-                        child: ConnectionTile(
-                          connection: connection,
-                          closing: state.isClosing(connection.id),
-                          onClose: () =>
-                              _closeOne(context, ref, notifier, connection.id),
-                        ),
+                        connection: connection,
+                        closing: state.isClosing(connection.id),
+                        onClose: () =>
+                            _closeOne(context, ref, notifier, connection.id),
                       );
                     },
                   ),

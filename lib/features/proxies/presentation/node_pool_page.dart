@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/widgets/target_page_layout.dart';
-import '../../../core/widgets/animated_reveal.dart';
 import '../../../data/models/proxy_node.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../maps/application/proxy_country_map.dart';
@@ -231,51 +230,44 @@ class _NodePoolPageState extends ConsumerState<NodePoolPage> {
                   itemCount: visible.length,
                   itemBuilder: (context, index) {
                     final node = visible[index];
-                    return AnimatedReveal(
-                      delay: Duration(
-                        milliseconds: index.clamp(0, 8).toInt() * 24,
-                      ),
-                      child: ListTile(
-                        key: ValueKey('node-${node.id}'),
-                        dense: true,
+                    return ListTile(
+                      key: ValueKey('node-${node.id}'),
+                      dense: true,
 
-                        title: Text(
-                          node.name,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        subtitle: Text(
-                          '${sourceName(node)} · ${node.typeLabel}${node.isAvailable ? '' : ' · ${l10n.nodeUnavailable}'}',
-                        ),
-                        trailing: proxies.testing
-                            ? const SizedBox.square(
-                                dimension: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : Text(
-                                node.latencyTimedOut
-                                    ? 'timeout'
-                                    : (node.latencyMs == null
-                                          ? '—'
-                                          : '${node.latencyMs} ms'),
-                                style: TextStyle(
-                                  color: _latencyColor(context, node),
-                                  fontWeight: node.latencyTimedOut
-                                      ? FontWeight.bold
-                                      : FontWeight.w600,
-                                ),
-                              ),
-                        leading: Radio<String>(
-                          value: node.id,
-                          groupValue: proxies.selectedGroup?.selectedNodeId,
-                          onChanged: busy
-                              ? null
-                              : (_) => notifier.selectNode(node.id),
-                        ),
-                        enabled: node.isAvailable,
+                      title: Text(
+                        node.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
+                      subtitle: Text(
+                        '${sourceName(node)} · ${node.typeLabel}${node.isAvailable ? '' : ' · ${l10n.nodeUnavailable}'}',
+                      ),
+                      trailing: proxies.testing
+                          ? const SizedBox.square(
+                              dimension: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Text(
+                              node.latencyTimedOut
+                                  ? 'timeout'
+                                  : (node.latencyMs == null
+                                        ? '—'
+                                        : '${node.latencyMs} ms'),
+                              style: TextStyle(
+                                color: _latencyColor(context, node),
+                                fontWeight: node.latencyTimedOut
+                                    ? FontWeight.bold
+                                    : FontWeight.w600,
+                              ),
+                            ),
+                      leading: Radio<String>(
+                        value: node.id,
+                        groupValue: proxies.selectedGroup?.selectedNodeId,
+                        onChanged: busy
+                            ? null
+                            : (_) => notifier.selectNode(node.id),
+                      ),
+                      enabled: node.isAvailable,
                     );
                   },
                 ),

@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:target/core/runtime/core_gateway.dart';
 import 'package:target/core/runtime/core_models.dart';
 import 'package:target/core/theme/app_theme.dart';
+import 'package:target/app/router.dart';
 import 'package:target/app/shell/app_shell.dart';
 import 'package:target/core/runtime/core_notifier.dart';
 import 'package:target/core/runtime/subscription_gateway.dart';
@@ -50,9 +51,10 @@ void main() {
             ...GlobalMaterialLocalizations.delegates,
           ],
           supportedLocales: AppLocalizations.supportedLocales,
-          home: AdaptiveScaffold(
-            selectedIndex: page is NodePoolPage ? 2 : 1,
-            onDestinationSelected: (_) {},
+          home: AppShell(
+            location: page is NodePoolPage
+                ? AppRoute.nodes.path
+                : AppRoute.proxies.path,
             child: page,
           ),
         ),
@@ -87,9 +89,10 @@ void main() {
       expect(find.byType(TextFormField), findsNWidgets(2));
       final fieldContext = tester.element(find.byType(TextFormField).first);
       expect(Theme.of(fieldContext).colorScheme, expected.colorScheme);
-      await tester.tap(find.text('Add'));
+      final l10n = AppLocalizations.of(fieldContext);
+      await tester.tap(find.text(l10n.add));
       await tester.pumpAndSettle();
-      expect(find.text('URL is required'), findsOneWidget);
+      expect(find.text(l10n.urlRequired), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   }
@@ -371,11 +374,6 @@ class _ProfilesGateway extends UnavailableCoreGateway {
     required Map<String, String> headers,
     bool updateNow = false,
   }) => throw UnimplementedError();
-  @override
-  Future<void> removeSubscription(String id) => throw UnimplementedError();
-  @override
-  Future<RuntimeSubscription> renameSubscription(String id, String name) =>
-      throw UnimplementedError();
   @override
   Future<RuntimeSubscriptionUpdate> updateSubscription(String id) =>
       throw UnimplementedError();

@@ -1,10 +1,7 @@
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_spacing.dart';
-import '../../../../core/theme/app_motion.dart';
-import '../../../../core/widgets/app_animate.dart';
 import '../../../../core/runtime/core_notifier.dart';
 import '../../../maps/application/proxy_country_map.dart';
 import '../../../proxies/application/proxies_notifier.dart';
@@ -52,7 +49,6 @@ class CurrentProfileCard extends ConsumerWidget {
                     ),
                   ),
                 ),
-                _StatusPill(core: core),
               ],
             ),
             const SizedBox(height: AppSpacing.itemGap),
@@ -90,46 +86,6 @@ class CurrentProfileCard extends ConsumerWidget {
               ),
             ],
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StatusPill extends StatelessWidget {
-  const _StatusPill({required this.core});
-
-  final CoreState core;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final running = core.running;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: running
-            ? Colors.green.withValues(alpha: 0.12)
-            : Colors.grey.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: AppAnimate(
-        key: ValueKey(core.status),
-        effects: [
-          FadeEffect(duration: AppMotion.fast, curve: AppMotion.easeOut),
-          ScaleEffect(
-            duration: AppMotion.fast,
-            curve: AppMotion.easeOut,
-            begin: const Offset(0.92, 0.92),
-          ),
-        ],
-        child: Text(
-          core.status,
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: running ? Colors.green.shade700 : Colors.grey.shade700,
-            fontWeight: FontWeight.w600,
-          ),
         ),
       ),
     );

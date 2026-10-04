@@ -173,20 +173,6 @@ class CoreNotifier extends Notifier<CoreState> {
     await _run(_gateway!.stop, operationName: 'disconnect');
   }
 
-  Future<void> selectOutbound(String groupId, String outboundId) async {
-    if (!state.running) return;
-    state = state.copyWith(busy: true);
-    try {
-      await _gateway!.selectOutbound(groupId, outboundId);
-      AppLogger.info('Core select outbound completed');
-    } on Object catch (error, stackTrace) {
-      _setFailure(error, stackTrace, operationName: 'select outbound');
-      rethrow;
-    } finally {
-      state = state.copyWith(busy: false);
-    }
-  }
-
   Future<void> selectNode(String nodeId) async {
     if (!state.available) return;
     state = state.copyWith(busy: true);

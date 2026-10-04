@@ -1,7 +1,5 @@
 import 'package:material_ui/material_ui.dart';
 
-import 'animated_reveal.dart';
-
 class TargetPageLayout extends StatelessWidget {
   const TargetPageLayout({required this.child, super.key});
 
@@ -17,8 +15,71 @@ class TargetPageLayout extends StatelessWidget {
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: maxWidth),
-          child: AnimatedReveal(child: child),
+          child: child,
         ),
+      ),
+    );
+  }
+}
+
+/// A page shell: an optional fixed header row (title, subtitle, trailing
+/// actions) above a scrolling body.
+///
+/// Use this for pages whose body needs its own scrolling, or that host a custom
+/// header. Use [TargetPageLayout] when the page is a single plain column.
+class TargetPageScaffold extends StatelessWidget {
+  const TargetPageScaffold({
+    required this.body,
+    this.title,
+    this.subtitle,
+    this.actions = const [],
+    super.key,
+  });
+
+  final Widget body;
+
+  /// Omit to render a page without the standard header row.
+  final String? title;
+  final String? subtitle;
+  final List<Widget> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = this.title;
+    return SafeArea(
+      child: Column(
+        children: [
+          if (title != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: TargetPageLayout.maxWidth,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TargetPageHeader(title: title, subtitle: subtitle),
+                    ),
+                    ...actions,
+                  ],
+                ),
+              ),
+            ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: TargetPageLayout.maxWidth,
+                  ),
+                  child: body,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

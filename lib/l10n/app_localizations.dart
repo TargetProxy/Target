@@ -979,6 +979,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Enter a service ID and domain, then drop in a node.'**
   String get ruleInputRequired;
+
+  /// No description provided for @disconnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline'**
+  String get disconnected;
+
+  /// No description provided for @connectionError.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection error'**
+  String get connectionError;
+
+  /// No description provided for @connectionErrorMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'TargetLib could not connect. See the logs for details.'**
+  String get connectionErrorMessage;
+
+  /// No description provided for @closeConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Close connection'**
+  String get closeConnection;
 }
 
 class _AppLocalizationsDelegate

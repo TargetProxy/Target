@@ -167,7 +167,8 @@ class _AbstractWorldMapState extends State<AbstractWorldMap> {
                                 : () => widget.onSelect!(node.countryCode),
                             onDrop: widget.onDrop == null
                                 ? null
-                                : (data) => widget.onDrop!(node.countryCode, data),
+                                : (data) =>
+                                      widget.onDrop!(node.countryCode, data),
                           ),
                         );
                       },
@@ -328,8 +329,7 @@ class _CountryMarker extends StatelessWidget {
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 160),
+                  Container(
                     width: selected ? 42 : 34,
                     height: selected ? 42 : 34,
                     decoration: BoxDecoration(
@@ -343,15 +343,6 @@ class _CountryMarker extends StatelessWidget {
                             : colorScheme.outlineVariant,
                         width: selected ? 2 : 1,
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: selected
-                              ? colorScheme.primary.withValues(alpha: 0.25)
-                              : Colors.black.withValues(alpha: 0.10),
-                          blurRadius: selected ? 8 : 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
                     ),
                   ),
                   DecoratedBox(
@@ -423,15 +414,16 @@ class _CountryMarker extends StatelessWidget {
         : Draggable<List<ProxyNode>>(
             data: nodes,
             maxSimultaneousDrags: nodes.any((n) => n.isAvailable) ? 1 : 0,
-            feedback: _DragFeedback(label: '${node.countryCode} · ${nodes.length}'),
+            feedback: _DragFeedback(
+              label: '${node.countryCode} · ${nodes.length}',
+            ),
             child: marker,
           );
     if (onDrop == null) return draggable;
     return DragTarget<Object>(
       onWillAcceptWithDetails: (_) => true,
       onAcceptWithDetails: (details) => onDrop!(details.data),
-      builder: (context, candidates, rejected) => AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
+      builder: (context, candidates, rejected) => Container(
         decoration: candidates.isEmpty
             ? null
             : BoxDecoration(
