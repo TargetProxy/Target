@@ -29,10 +29,14 @@ final class DesktopTray with WindowListener {
     _menu = Menu.create()!
       ..addItem(_showItem)
       ..addItem(_exitItem);
-    _menu.addListener((event) {
-      if (event is! MenuItemClickedEvent) return;
-      if (event.itemId == _showItem.id) unawaited(show());
-      if (event.itemId == _exitItem.id) unawaited(onExit?.call());
+    _showItem.addListener((event) {
+      if (event is MenuItemClickedEvent) unawaited(show());
+    });
+    _exitItem.addListener((event) {
+      if (event is MenuItemClickedEvent) {
+        // Release menu handles after native click dispatch returns.
+        Timer.run(() => unawaited(onExit?.call()));
+      }
     });
     _icon
       ..icon = _image
@@ -53,14 +57,20 @@ final class DesktopTray with WindowListener {
   @override
   void onWindowClose() => unawaited(windowManager.hide());
 
+  Future<void> closeWindow() async {
+    windowManager.removeListener(this);
+    await windowManager.setPreventClose(false);
+    await windowManager.close();
+  }
+
   Future<void> show() async {
     if (await windowManager.isMinimized()) await windowManager.restore();
     await windowManager.show();
     await windowManager.focus();
   }
 
-  Future<void> quit() async {
-    windowManager.removeListener(this);
+  Future<void> quit({bool closeWindow = true}) async {
+    if (closeWindow) await this.closeWindow();
     _icon.setVisible(false);
     _icon.dispose();
     _menu.dispose();

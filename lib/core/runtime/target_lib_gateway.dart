@@ -42,6 +42,7 @@ class TargetLibGateway implements CoreGateway {
   ClientChannel? _channel;
   CallOptions? _callOptions;
   Future<void>? _connectionTask;
+  bool _transportClosing = false;
   CoreSnapshot _current = const CoreSnapshot(
     lifecycle: CoreLifecycle.stopped,
     message: 'TargetLib is ready.',
@@ -363,13 +364,19 @@ class TargetLibGateway implements CoreGateway {
         message: 'Stopping TargetLib...',
       ),
     );
-    await manager.stop(Empty(), options: _callOptions);
-    _connections.clear();
-    if (_capabilities.platform == AppPlatform.android) {
-      // The Android daemon lives inside TargetlibVpnService, which hands the
-      // core a one-shot TUN fd per session. Tear the service down with the
-      // core so the next start re-establishes a fresh tunnel.
-      await _shutdownTransport();
+    // Stopping TargetLib closes its server-side subscription streams. Mark
+    // the expected cancellation before stopping, then close the client
+    // transport so the next start creates fresh streams.
+    _transportClosing = true;
+    try {
+      try {
+        await manager.stop(Empty(), options: _callOptions);
+      } finally {
+        _connections.clear();
+        await _shutdownTransportBody();
+      }
+    } finally {
+      _transportClosing = false;
     }
     _publish(
       const CoreSnapshot(
@@ -517,7 +524,7 @@ class TargetLibGateway implements CoreGateway {
     final subscription = stream.listen(
       onData,
       onError: (Object error, StackTrace stackTrace) {
-        if (_manager != null && !_disposed) {
+        if (_manager != null && !_disposed && !_transportClosing) {
           AppLogger.error(
             'TargetLib gRPC stream failed: $label',
             source: 'gRPC',
@@ -596,6 +603,16 @@ class TargetLibGateway implements CoreGateway {
   }
 
   Future<void> _shutdownTransport() async {
+    if (_transportClosing) return;
+    _transportClosing = true;
+    try {
+      await _shutdownTransportBody();
+    } finally {
+      _transportClosing = false;
+    }
+  }
+
+  Future<void> _shutdownTransportBody() async {
     final subscriptions = List<StreamSubscription<Object?>>.of(_subscriptions);
     _subscriptions.clear();
     for (final subscription in subscriptions) {

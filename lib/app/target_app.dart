@@ -164,9 +164,10 @@ class _TargetAppViewState extends ConsumerState<_TargetAppView> {
     if (_exiting) return;
     _exiting = true;
     try {
+      await widget.desktopTray!.closeWindow();
       await ref.read(coreGatewayProvider).dispose();
       await _systemProxy.dispose();
-      await widget.desktopTray!.quit();
+      await widget.desktopTray!.quit(closeWindow: false);
     } on Object catch (error, stackTrace) {
       _exiting = false;
       AppLogger.error(

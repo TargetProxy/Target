@@ -33,6 +33,7 @@ class TargetPageScaffold extends StatelessWidget {
     this.title,
     this.subtitle,
     this.actions = const [],
+    this.scrollableBody = true,
     super.key,
   });
 
@@ -42,6 +43,7 @@ class TargetPageScaffold extends StatelessWidget {
   final String? title;
   final String? subtitle;
   final List<Widget> actions;
+  final bool scrollableBody;
 
   @override
   Widget build(BuildContext context) {
@@ -66,21 +68,28 @@ class TargetPageScaffold extends StatelessWidget {
                 ),
               ),
             ),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    maxWidth: TargetPageLayout.maxWidth,
-                  ),
-                  child: body,
-                ),
-              ),
-            ),
-          ),
+          Expanded(child: _buildBody()),
         ],
       ),
+    );
+  }
+
+  Widget _buildBody() {
+    final content = Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: TargetPageLayout.maxWidth),
+        child: body,
+      ),
+    );
+    if (!scrollableBody) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+        child: content,
+      );
+    }
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+      child: content,
     );
   }
 }

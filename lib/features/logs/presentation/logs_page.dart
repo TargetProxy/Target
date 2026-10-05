@@ -35,6 +35,7 @@ class _LogsPageState extends ConsumerState<LogsPage> {
     return TargetPageScaffold(
       title: l10n.logs,
       subtitle: l10n.runtimeDiagnostics,
+      scrollableBody: false,
       actions: [
         IconButton(
           onPressed: _copyVisible,

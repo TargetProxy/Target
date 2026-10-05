@@ -24,6 +24,7 @@ dependencies:
   targetlib:
     path: ../TargetLib/flutter
   syncfusion_flutter_maps: ^35.1.37
+  syncfusion_flutter_charts: ^35.1.37
   shared_preferences: ^2.5.5
   proxy_manager: ^0.0.3
   country_flags: ^4.1.2

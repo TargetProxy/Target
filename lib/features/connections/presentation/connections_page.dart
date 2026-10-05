@@ -19,6 +19,7 @@ class ConnectionsPage extends ConsumerWidget {
 
     return TargetPageScaffold(
       title: l10n.connections,
+      scrollableBody: false,
       actions: [
         IconButton(
           onPressed: state.activeCount == 0 || state.closingAll
