@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../app_identity.dart';
 import '../router.dart';
+import '../../features/connections/presentation/widgets/connections_sidebar.dart';
 import '../../l10n/app_localizations.dart';
 
 class AppShell extends StatelessWidget {
@@ -114,11 +115,25 @@ class _NavigationScaffold extends StatelessWidget {
 
         if (useDesktop) {
           return Scaffold(
-            body: Row(
+            body: Column(
               children: [
-                _buildDesktopSidebar(context, selectedIndex),
-                const VerticalDivider(width: 1),
-                Expanded(child: child),
+                _TopToolbar(
+                  selectedIndex: selectedIndex,
+                  items: items,
+                  onDestinationSelected: onDestinationSelected,
+                ),
+                Expanded(
+                  child: Row(
+                    children: [
+                      ConnectionsSidebar(
+                        onOpenConnections: () =>
+                            context.go(AppRoute.connections.path),
+                      ),
+                      const VerticalDivider(width: 1),
+                      Expanded(child: child),
+                    ],
+                  ),
+                ),
               ],
             ),
           );
@@ -142,65 +157,66 @@ class _NavigationScaffold extends StatelessWidget {
       },
     );
   }
+}
 
-  Widget _buildDesktopSidebar(BuildContext context, int selectedIndex) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
+class _TopToolbar extends StatelessWidget {
+  const _TopToolbar({
+    required this.selectedIndex,
+    required this.items,
+    required this.onDestinationSelected,
+  });
 
-    return Material(
-      color: colors.surface,
-      child: SizedBox(
-        width: 180,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 16, 12, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(left: 8, bottom: 20),
-                child: Text(
-                  AppIdentity.displayName,
-                  style: theme.textTheme.titleMedium,
-                ),
+  final int selectedIndex;
+  final List<_NavigationItem> items;
+  final ValueChanged<int> onDestinationSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleCount = items.length < 4 ? items.length : 4;
+    final selected = selectedIndex < visibleCount ? {selectedIndex} : <int>{};
+    return AppBar(
+      automaticallyImplyLeading: false,
+      titleSpacing: 20,
+      title: Text(AppIdentity.displayName),
+      actions: [
+        SegmentedButton<int>(
+          segments: [
+            for (var i = 0; i < visibleCount; i++)
+              ButtonSegment<int>(
+                value: i,
+                icon: Icon(items[i].icon, size: 18),
+                label: Text(items[i].label),
               ),
-              for (var i = 0; i < items.length; i++)
-                Builder(
-                  builder: (context) {
-                    final item = items[i];
-                    final selected = selectedIndex == i;
-                    return ListTile(
-                      dense: true,
-                      selected: selected,
-                      selectedTileColor: colors.secondaryContainer,
-                      leading: Icon(
-                        selected ? item.selectedIcon : item.icon,
-                        size: 20,
-                        color: selected
-                            ? colors.onSecondaryContainer
-                            : colors.onSurfaceVariant,
-                      ),
-                      title: Text(
-                        item.label,
-                        style: TextStyle(
-                          color: selected
-                              ? colors.onSecondaryContainer
-                              : colors.onSurface,
-                          fontWeight: selected
-                              ? FontWeight.w600
-                              : FontWeight.w400,
-                        ),
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      onTap: () => onDestinationSelected(i),
-                    );
-                  },
+          ],
+          selected: selected,
+          emptySelectionAllowed: true,
+          showSelectedIcon: false,
+          onSelectionChanged: (values) {
+            if (values.isNotEmpty) onDestinationSelected(values.first);
+          },
+        ),
+        if (items.length > visibleCount)
+          PopupMenuButton<int>(
+            tooltip: Localizations.localeOf(context).languageCode == 'zh'
+                ? '更多'
+                : 'More',
+            onSelected: onDestinationSelected,
+            itemBuilder: (context) => [
+              for (var i = visibleCount; i < items.length; i++)
+                PopupMenuItem<int>(
+                  value: i,
+                  child: Row(
+                    children: [
+                      Icon(items[i].icon),
+                      const SizedBox(width: 12),
+                      Text(items[i].label),
+                    ],
+                  ),
                 ),
             ],
           ),
-        ),
-      ),
+        const SizedBox(width: 12),
+      ],
     );
   }
 }

@@ -43,6 +43,9 @@ class TargetLibGateway implements CoreGateway {
   CallOptions? _callOptions;
   Future<void>? _connectionTask;
   bool _transportClosing = false;
+  bool _connectionReconnectScheduled = false;
+  bool _connectionsListening = false;
+  bool _connectionTrackingAvailable = true;
   CoreSnapshot _current = const CoreSnapshot(
     lifecycle: CoreLifecycle.stopped,
     message: 'TargetLib is ready.',
@@ -72,6 +75,8 @@ class TargetLibGateway implements CoreGateway {
         lifecycle: lifecycle,
         message: state.errorMessage.isNotEmpty
             ? state.errorMessage
+            : !_connectionTrackingAvailable
+            ? 'Connection tracking is unavailable.'
             : lifecycle == CoreLifecycle.running
             ? 'TargetLib is running.'
             : 'TargetLib is stopped.',
@@ -158,6 +163,13 @@ class TargetLibGateway implements CoreGateway {
     final manager = _manager!;
     final state = await manager.getState(Empty(), options: _callOptions);
     if (state.state == targetlib_pb.ServiceStateType.SERVICE_STATE_RUNNING) {
+      _publish(
+        _copyCurrent(
+          lifecycle: CoreLifecycle.running,
+          message: 'TargetLib is running.',
+        ),
+      );
+      _listenConnections();
       return;
     }
     await manager.start(Empty(), options: _callOptions);
@@ -167,6 +179,7 @@ class TargetLibGateway implements CoreGateway {
         message: 'TargetLib is running.',
       ),
     );
+    _listenConnections();
   }
 
   @override
@@ -350,6 +363,7 @@ class TargetLibGateway implements CoreGateway {
   Future<void> _stopLocked() async {
     final manager = _manager;
     if (manager == null) {
+      _connections.clear();
       _publish(
         _copyCurrent(
           lifecycle: CoreLifecycle.stopped,
@@ -485,6 +499,7 @@ class TargetLibGateway implements CoreGateway {
     _manager = connection.client;
     _channel = connection.channel;
     _callOptions = connection.options;
+    _connectionTrackingAvailable = true;
     _subscribeCommandStreams();
   }
 
@@ -514,6 +529,67 @@ class TargetLibGateway implements CoreGateway {
       _applyTraffic,
       label: 'SubscribeTraffic',
     );
+  }
+
+  void _listenConnections() {
+    final manager = _manager;
+    if (manager == null ||
+        _disposed ||
+        _transportClosing ||
+        !_connectionTrackingAvailable ||
+        _current.lifecycle != CoreLifecycle.running ||
+        _connectionsListening) {
+      return;
+    }
+    _connectionReconnectScheduled = false;
+    _connectionsListening = true;
+    final stream = manager.subscribeConnections(
+      targetlib_pb.SubscribeConnectionsRequest(intervalMilliseconds: 1000),
+      options: _callOptions,
+    );
+    final subscription = stream.listen(
+      _applyConnections,
+      onError: (Object error, StackTrace stackTrace) {
+        _connectionsListening = false;
+        if (_manager != null && !_disposed && !_transportClosing) {
+          AppLogger.error(
+            'TargetLib gRPC stream failed: SubscribeConnections',
+            source: 'gRPC',
+            error: error,
+            stackTrace: stackTrace,
+          );
+          if (error is GrpcError && error.code == StatusCode.unimplemented) {
+            _connectionTrackingAvailable = false;
+            _publish(
+              _copyCurrent(message: 'Connection tracking is unavailable.'),
+            );
+          }
+          _scheduleConnectionReconnect();
+        }
+      },
+      onDone: () {
+        _connectionsListening = false;
+        _scheduleConnectionReconnect();
+      },
+    );
+    _subscriptions.add(subscription as StreamSubscription<Object?>);
+  }
+
+  void _scheduleConnectionReconnect() {
+    if (_connectionReconnectScheduled ||
+        !_connectionTrackingAvailable ||
+        _disposed ||
+        _transportClosing) {
+      return;
+    }
+    _connectionReconnectScheduled = true;
+    Future<void>.delayed(const Duration(seconds: 1), () {
+      if (_manager != null && !_disposed && !_transportClosing) {
+        _listenConnections();
+      } else {
+        _connectionReconnectScheduled = false;
+      }
+    });
   }
 
   void _listen<T>(
@@ -557,11 +633,16 @@ class TargetLibGateway implements CoreGateway {
         lifecycle: lifecycle,
         message: status.errorMessage.isNotEmpty
             ? status.errorMessage
+            : !_connectionTrackingAvailable
+            ? 'Connection tracking is unavailable.'
             : lifecycle == CoreLifecycle.running
             ? 'TargetLib is running.'
             : _current.message,
       ),
     );
+    if (lifecycle == CoreLifecycle.running) {
+      _listenConnections();
+    }
   }
 
   void _applyLogs(targetlib_pb.LogBatch batch) {
@@ -582,6 +663,59 @@ class TargetLibGateway implements CoreGateway {
   void _applyTraffic(targetlib_pb.TrafficStatus status) {
     _publish(_copyCurrent(traffic: _trafficSnapshot(status)));
   }
+
+  void _applyConnections(targetlib_pb.ConnectionEvents batch) {
+    _connectionTrackingAvailable = true;
+    if (batch.reset) _connections.clear();
+    for (final event in batch.events) {
+      final id = event.id.isEmpty && event.hasConnection()
+          ? event.connection.id
+          : event.id;
+      if (id.isEmpty) continue;
+      switch (event.type) {
+        case targetlib_pb.ConnectionEventType.CONNECTION_EVENT_TYPE_NEW:
+          if (event.hasConnection()) {
+            _connections[id] = _coreConnection(event.connection);
+          }
+        case targetlib_pb.ConnectionEventType.CONNECTION_EVENT_TYPE_UPDATE:
+          final current = _connections[id];
+          if (current != null) {
+            _connections[id] = CoreConnection(
+              id: current.id,
+              destination: current.destination,
+              domain: current.domain,
+              outbound: current.outbound,
+              network: current.network,
+              protocol: current.protocol,
+              uplinkTotal: current.uplinkTotal + event.uplinkDelta.toInt(),
+              downlinkTotal:
+                  current.downlinkTotal + event.downlinkDelta.toInt(),
+              createdAt: current.createdAt,
+              closedAt: current.closedAt,
+            );
+          }
+        case targetlib_pb.ConnectionEventType.CONNECTION_EVENT_TYPE_CLOSED:
+          _connections.remove(id);
+        default:
+          break;
+      }
+    }
+    _publish(_copyCurrent(connections: List.of(_connections.values)));
+  }
+
+  static CoreConnection _coreConnection(targetlib_pb.Connection source) =>
+      CoreConnection(
+        id: source.id,
+        destination: source.destination,
+        domain: source.domain,
+        outbound: source.outbound,
+        network: source.network,
+        protocol: source.protocol,
+        uplinkTotal: source.uplinkTotal.toInt(),
+        downlinkTotal: source.downlinkTotal.toInt(),
+        createdAt: source.createdAtUnixMs.toInt() ~/ 1000,
+        closedAt: source.closedAtUnixMs.toInt() ~/ 1000,
+      );
 
   static TrafficSnapshot _trafficSnapshot(targetlib_pb.TrafficStatus status) {
     final sampledAt = status.sampledAtUnixMs.toInt();
@@ -615,6 +749,7 @@ class TargetLibGateway implements CoreGateway {
   Future<void> _shutdownTransportBody() async {
     final subscriptions = List<StreamSubscription<Object?>>.of(_subscriptions);
     _subscriptions.clear();
+    _connectionsListening = false;
     for (final subscription in subscriptions) {
       await subscription.cancel();
     }

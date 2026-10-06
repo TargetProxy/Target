@@ -31,12 +31,12 @@
 
 ## 🚧 当前限制与已知问题
 
-*   **流量与连接看板**：UI 页面已就绪，但 `TargetLibGateway` 尚未正式订阅实时数据流，当前无法展示真实的实时网络快照。
+*   **流量与连接看板**：已通过 `TargetLibGateway` 订阅实时流量与连接数据；TargetLib 不可用或未运行时，页面会显示暂无实时快照。
 *   **规则集刷新**：`refreshRuleSets()` 当前为空实现（固定返回 `0`）。
 *   **构建与打包**：
     *   **Windows**：安装包暂无签名；Inno Setup 负责应用文件、TargetLib 服务注册、启动与卸载。
     *   **Android / iOS**：Android 仅使用 debug 签名；iOS CI 依赖 `--no-codesign`，无法直接作为正式 Release。
-*   **CI 工作流**：`.github/workflows/build.yml` 中定义的多平台构建，由于 TargetLib 仓库移除了 `scripts/build.ps1` 而存在断链。在修复前，CI 无法作为五端构建的可靠验证。
+*   **CI 工作流**：`.github/workflows/build.yml` 定义了 TargetLib 与 Target 的多平台构建，并依赖 TargetLib 仓库提供的构建脚本和产物；任一外部依赖构建失败都会使对应平台任务失败。
 
 ---
 
@@ -44,11 +44,11 @@
 
 | 平台 | 运行模式 | 当前进度与现状 |
 | :--- | :--- | :--- |
-| **Windows** | 桌面服务 | ✅ 已接入服务安装、检测/启动及 Inno Setup 脚本。**支持最完善**。 |
-| **Linux** | 桌面服务 | 🚧 Flutter runner 与服务能力已就绪。发布需补充 TargetLib 产物。 |
-| **macOS** | 桌面服务 | 🚧 基础能力已配置（可生成项目）。正式分发亟需解决苹果签名与公证。 |
-| **Android** | 移动 VPN | 🚧 启动时主动请求 VPN 权限并以 VPN 模式运行。Release 签名待配置。 |
-| **iOS**     | 移动 VPN | 🚧 采用网络扩展模型。CI 仅验证无签名构建，暂无直接发布配置。 |
+| **Windows** | 桌面服务 | ✅ 已接入服务安装、检测/启动及 Inno Setup 打包脚本。**支持最完善**，正式安装包仍未签名。 |
+| **Linux** | 桌面服务 | 🚧 Flutter runner、TargetLib 服务打包与启动能力已接入；正式发布仍需在目标环境验证依赖。 |
+| **macOS** | 桌面服务 | 🚧 已接入 macOS runner 与 Release 打包流程；正式分发仍需解决苹果签名、公证及 TargetLib 运行时交付。 |
+| **Android** | 移动 VPN | 🚧 已接入移动 VPN/TUN 运行路径并在启动时请求 VPN 权限；当前 CI 产物为 debug APK，Release 签名待配置。 |
+| **iOS**     | 移动 VPN | 🚧 已配置 iOS 应用与移动 VPN 运行路径；CI 使用 `--no-codesign`，尚无可直接发布的签名配置。 |
 
 > *注：上述状态仅代表当前代码库进度，并不意味着所有平台均已通过严苛的端到端测试。*
 
@@ -63,7 +63,7 @@ Target/
 │   ├── app/             # 应用入口和路由
 │   ├── core/            # TargetLib 网关、平台底层能力、日志、主题、通用组件
 │   ├── data/            # 数据模型：应用配置与运行时数据模型
-│   └── features/        # 10 个业务模块：connections/home/logs/maps/profiles/proxies/settings/smart_connect/subscriptions/traffic
+│   └── features/        # 10 个业务模块：connections/home/logs/maps/profiles/proxies/rules/settings/subscriptions/traffic
 ├── assets/              # 静态资源：应用图标、服务图标和世界地图拓扑数据
 ├── test/                # 单元测试与组件级测试
 ├── tool/                # 开发者工具：TargetLib 调试脚本

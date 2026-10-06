@@ -50,11 +50,6 @@ class ProfilesWorkspacePage extends ConsumerWidget {
                     icon: const Icon(Icons.add),
                     label: Text(l10n.addSubscription),
                   ),
-                  IconButton(
-                    onPressed: busy ? null : notifier.load,
-                    tooltip: l10n.refreshPool,
-                    icon: const Icon(Icons.refresh),
-                  ),
                   Text(
                     l10n.poolSummary(
                       state.subscriptions.where((sub) => sub.enabled).length,
@@ -120,8 +115,9 @@ class ProfilesWorkspacePage extends ConsumerWidget {
                                       ),
                                 tooltip: l10n.updateSubscription,
                                 icon: const Icon(Icons.refresh),
-                              ),
+                            ),
                       ),
+                      _UsageProgress(subscription: subscription),
                       ExpansionTile(
                         key: PageStorageKey('details-${subscription.id}'),
                         title: Text(
@@ -254,6 +250,38 @@ class ProfilesWorkspacePage extends ConsumerWidget {
       return '$minutes min';
     }
     return '$seconds s';
+  }
+}
+
+class _UsageProgress extends StatelessWidget {
+  const _UsageProgress({required this.subscription});
+
+  final Subscription subscription;
+
+  @override
+  Widget build(BuildContext context) {
+    final total = subscription.totalBytes;
+    if (total == null || total <= 0) return const SizedBox.shrink();
+
+    final used = subscription.uploadBytes + subscription.downloadBytes;
+    final progress = (used / total).clamp(0.0, 1.0).toDouble();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(AppLocalizations.of(context).trafficUsed),
+              Text('${formatBytes(used)} / ${formatBytes(total)}'),
+            ],
+          ),
+          const SizedBox(height: 6),
+          LinearProgressIndicator(value: progress),
+        ],
+      ),
+    );
   }
 }
 
