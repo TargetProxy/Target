@@ -35,7 +35,7 @@ class ConnectionsSidebar extends ConsumerWidget {
               Row(
                 children: [
                   Icon(
-                    Icons.ssid_chart,
+                    Icons.ssid_chart_rounded,
                     size: 18,
                     color: theme.colorScheme.primary,
                   ),
@@ -65,7 +65,7 @@ class ConnectionsSidebar extends ConsumerWidget {
                             dimension: 16,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Icon(Icons.cancel_presentation_outlined),
+                        : const Icon(Icons.clear_all_rounded),
                     tooltip: l10n.closeAllConnections,
                     visualDensity: VisualDensity.compact,
                   ),
@@ -81,7 +81,7 @@ class ConnectionsSidebar extends ConsumerWidget {
                 child: Row(
                   children: [
                     Icon(
-                      Icons.dns_outlined,
+                      Icons.dns_rounded,
                       size: 16,
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -112,9 +112,7 @@ class ConnectionsSidebar extends ConsumerWidget {
                 child: connections.isEmpty
                     ? Center(
                         child: Text(
-                          connectionsState.activeCount == 0
-                              ? l10n.noConnections
-                              : l10n.connectionDetailsUnavailable,
+                          l10n.noConnections,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
@@ -141,7 +139,7 @@ class ConnectionsSidebar extends ConsumerWidget {
               const SizedBox(height: 8),
               OutlinedButton.icon(
                 onPressed: onOpenConnections,
-                icon: const Icon(Icons.open_in_new, size: 16),
+                icon: const Icon(Icons.open_in_new_rounded, size: 16),
                 label: Text(l10n.connections),
               ),
             ],
@@ -181,8 +179,8 @@ class _ConnectionSummary extends StatelessWidget {
         children: [
           Icon(
             connection.network.toUpperCase() == 'UDP'
-                ? Icons.bolt_outlined
-                : Icons.public,
+                ? Icons.bolt_rounded
+                : Icons.public_rounded,
             size: 16,
             color: theme.colorScheme.primary,
           ),
@@ -218,7 +216,7 @@ class _ConnectionSummary extends StatelessWidget {
                     dimension: 16,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Icon(Icons.close, size: 16),
+                : const Icon(Icons.link_off_rounded, size: 16),
             tooltip: AppLocalizations.of(context).closeConnection,
             visualDensity: VisualDensity.compact,
           ),

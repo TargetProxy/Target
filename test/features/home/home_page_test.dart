@@ -35,7 +35,6 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Dashboard'), findsOneWidget);
-      expect(find.text('No active profile'), findsOneWidget);
       expect(find.text('IP information'), findsOneWidget);
       final start = tester.widget<FilledButton>(
         find.widgetWithText(FilledButton, 'Start'),

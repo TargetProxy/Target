@@ -18,7 +18,6 @@ class AppShell extends StatelessWidget {
     AppRoute.nodes,
     AppRoute.rules,
     AppRoute.connections,
-    AppRoute.traffic,
     AppRoute.logs,
   ];
 
@@ -80,11 +79,6 @@ _NavigationItem _destinationItem(AppRoute route, AppLocalizations l10n) {
       label: l10n.connections,
       icon: Icons.cable_outlined,
       selectedIcon: Icons.cable,
-    ),
-    AppRoute.traffic => (
-      label: l10n.traffic,
-      icon: Icons.show_chart,
-      selectedIcon: Icons.show_chart,
     ),
     AppRoute.logs => (
       label: l10n.logs,

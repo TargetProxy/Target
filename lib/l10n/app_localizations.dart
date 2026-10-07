@@ -518,12 +518,6 @@ abstract class AppLocalizations {
   /// **'No connections'**
   String get noConnections;
 
-  /// No description provided for @connectionDetailsUnavailable.
-  ///
-  /// In en, this message translates to:
-  /// **'Connection details unavailable'**
-  String get connectionDetailsUnavailable;
-
   /// No description provided for @activeConnectionsWillInterrupt.
   ///
   /// In en, this message translates to:

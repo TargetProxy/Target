@@ -66,7 +66,7 @@ class ConnectionTile extends StatelessWidget {
                               dimension: 18,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Icon(Icons.close, size: 18),
+                          : const Icon(Icons.link_off_rounded, size: 18),
                       tooltip: l10n.closeConnection,
                       visualDensity: VisualDensity.compact,
                     ),
@@ -77,23 +77,26 @@ class ConnectionTile extends StatelessWidget {
               Row(
                 children: [
                   _TrafficArrow(
-                    icon: Icons.arrow_upward,
+                    icon: Icons.arrow_upward_rounded,
                     value: formatBytes(connection.uplinkTotal),
                     color: AppColors.upload,
                   ),
                   const SizedBox(width: 12),
                   _TrafficArrow(
-                    icon: Icons.arrow_downward,
+                    icon: Icons.arrow_downward_rounded,
                     value: formatBytes(connection.downlinkTotal),
                     color: AppColors.download,
                   ),
                   const Spacer(),
-                  _MetaChip(icon: Icons.route, label: connection.outbound),
+                  _MetaChip(
+                    icon: Icons.route_rounded,
+                    label: connection.outbound,
+                  ),
                   const SizedBox(width: 6),
-                  _MetaChip(icon: Icons.policy_outlined, label: protocolLabel),
+                  _MetaChip(icon: Icons.policy_rounded, label: protocolLabel),
                   if (duration.isNotEmpty) ...[
                     const SizedBox(width: 6),
-                    _MetaChip(icon: Icons.timer_outlined, label: duration),
+                    _MetaChip(icon: Icons.timer_rounded, label: duration),
                   ],
                 ],
               ),

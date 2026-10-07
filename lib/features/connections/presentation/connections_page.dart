@@ -31,7 +31,7 @@ class ConnectionsPage extends ConsumerWidget {
                   dimension: 20,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Icon(Icons.cancel_presentation_outlined),
+              : const Icon(Icons.clear_all_rounded),
           tooltip: l10n.closeAllConnections,
         ),
       ],
@@ -48,10 +48,8 @@ class ConnectionsPage extends ConsumerWidget {
           Expanded(
             child: connections.isEmpty
                 ? EmptyState(
-                    icon: Icons.cable_outlined,
-                    title: state.activeCount == 0
-                        ? l10n.noConnections
-                        : l10n.connectionDetailsUnavailable,
+                    icon: Icons.cable_rounded,
+                    title: l10n.noConnections,
                   )
                 : ListView.builder(
                     itemCount: connections.length,
@@ -105,7 +103,7 @@ class _ConnectionsToolbar extends StatelessWidget {
               decoration: InputDecoration(
                 hintText: l10n.searchConnections,
                 isDense: true,
-                prefixIcon: Icon(Icons.search, size: 20),
+                prefixIcon: Icon(Icons.search_rounded, size: 20),
               ),
               onChanged: onSearchChanged,
             ),
@@ -115,10 +113,12 @@ class _ConnectionsToolbar extends StatelessWidget {
             icon: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.sort, size: 20),
+                const Icon(Icons.sort_rounded, size: 20),
                 const SizedBox(width: 2),
                 Icon(
-                  sortAsc ? Icons.arrow_upward : Icons.arrow_downward,
+                  sortAsc
+                      ? Icons.arrow_upward_rounded
+                      : Icons.arrow_downward_rounded,
                   size: 14,
                 ),
               ],
@@ -148,7 +148,12 @@ class _ConnectionsToolbar extends StatelessWidget {
           Text(label),
           const Spacer(),
           if (sortBy == value)
-            Icon(sortAsc ? Icons.arrow_upward : Icons.arrow_downward, size: 14),
+            Icon(
+              sortAsc
+                  ? Icons.arrow_upward_rounded
+                  : Icons.arrow_downward_rounded,
+              size: 14,
+            ),
         ],
       ),
     );

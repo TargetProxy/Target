@@ -237,9 +237,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noConnections => 'No connections';
 
   @override
-  String get connectionDetailsUnavailable => 'Connection details unavailable';
-
-  @override
   String get activeConnectionsWillInterrupt =>
       'Active network connections will be interrupted.';
 

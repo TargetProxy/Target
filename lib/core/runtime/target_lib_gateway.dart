@@ -45,7 +45,6 @@ class TargetLibGateway implements CoreGateway {
   bool _transportClosing = false;
   bool _connectionReconnectScheduled = false;
   bool _connectionsListening = false;
-  bool _connectionTrackingAvailable = true;
   CoreSnapshot _current = const CoreSnapshot(
     lifecycle: CoreLifecycle.stopped,
     message: 'TargetLib is ready.',
@@ -75,8 +74,6 @@ class TargetLibGateway implements CoreGateway {
         lifecycle: lifecycle,
         message: state.errorMessage.isNotEmpty
             ? state.errorMessage
-            : !_connectionTrackingAvailable
-            ? 'Connection tracking is unavailable.'
             : lifecycle == CoreLifecycle.running
             ? 'TargetLib is running.'
             : 'TargetLib is stopped.',
@@ -500,7 +497,6 @@ class TargetLibGateway implements CoreGateway {
     _manager = connection.client;
     _channel = connection.channel;
     _callOptions = connection.options;
-    _connectionTrackingAvailable = true;
     _subscribeCommandStreams();
   }
 
@@ -537,7 +533,6 @@ class TargetLibGateway implements CoreGateway {
     if (manager == null ||
         _disposed ||
         _transportClosing ||
-        !_connectionTrackingAvailable ||
         _current.lifecycle != CoreLifecycle.running ||
         _connectionsListening) {
       return;
@@ -555,7 +550,10 @@ class TargetLibGateway implements CoreGateway {
         if (_manager != null && !_disposed && !_transportClosing) {
           if (error is GrpcError &&
               error.code == StatusCode.failedPrecondition) {
-            _connectionReconnectScheduled = false;
+            // The daemon can still be transitioning to running after Start
+            // succeeds. Retry once it has finished instead of abandoning the
+            // connection stream and leaving the UI without details.
+            _scheduleConnectionReconnect();
             return;
           }
           AppLogger.error(
@@ -564,12 +562,6 @@ class TargetLibGateway implements CoreGateway {
             error: error,
             stackTrace: stackTrace,
           );
-          if (error is GrpcError && error.code == StatusCode.unimplemented) {
-            _connectionTrackingAvailable = false;
-            _publish(
-              _copyCurrent(message: 'Connection tracking is unavailable.'),
-            );
-          }
           _scheduleConnectionReconnect();
         }
       },
@@ -583,7 +575,6 @@ class TargetLibGateway implements CoreGateway {
 
   void _scheduleConnectionReconnect() {
     if (_connectionReconnectScheduled ||
-        !_connectionTrackingAvailable ||
         _current.lifecycle != CoreLifecycle.running ||
         _disposed ||
         _transportClosing) {
@@ -640,8 +631,6 @@ class TargetLibGateway implements CoreGateway {
         lifecycle: lifecycle,
         message: status.errorMessage.isNotEmpty
             ? status.errorMessage
-            : !_connectionTrackingAvailable
-            ? 'Connection tracking is unavailable.'
             : lifecycle == CoreLifecycle.running
             ? 'TargetLib is running.'
             : _current.message,
@@ -672,7 +661,6 @@ class TargetLibGateway implements CoreGateway {
   }
 
   void _applyConnections(targetlib_pb.ConnectionEvents batch) {
-    _connectionTrackingAvailable = true;
     if (batch.reset) _connections.clear();
     for (final event in batch.events) {
       final id = event.id.isEmpty && event.hasConnection()

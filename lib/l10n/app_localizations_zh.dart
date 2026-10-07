@@ -229,9 +229,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get noConnections => '暂无连接';
 
   @override
-  String get connectionDetailsUnavailable => '连接详情不可用';
-
-  @override
   String get activeConnectionsWillInterrupt => '活动网络连接将被中断。';
 
   @override

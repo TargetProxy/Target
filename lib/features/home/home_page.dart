@@ -7,7 +7,6 @@ import '../../core/runtime/core_notifier.dart';
 import '../../core/runtime/core_models.dart';
 import '../../core/logging/app_logger.dart';
 import '../../core/platform/app_platform.dart';
-import '../../core/utils/format_bytes.dart';
 import 'package:targetlib/targetlib.dart';
 import '../../data/models/app_settings.dart';
 import '../../data/models/runtime_settings.dart' as runtime_models;
@@ -15,11 +14,10 @@ import '../../data/models/ip_info.dart';
 import '../../core/widgets/target_page_layout.dart';
 import '../../l10n/app_localizations.dart';
 import '../../l10n/core_status_l10n.dart';
-import '../proxies/application/proxies_notifier.dart';
 import '../settings/application/settings_notifier.dart';
 import 'presentation/widgets/connection_error_banner.dart';
-import 'presentation/widgets/current_profile_card.dart';
 import 'presentation/widgets/ip_info_card.dart';
+import '../traffic/presentation/widgets/live_traffic_card.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -115,7 +113,6 @@ class _HomePageState extends ConsumerState<HomePage> {
     final capabilities = ref.watch(appCapabilitiesProvider);
     final appSettings = ref.watch(settingsProvider).settings;
     final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
     return TargetPageScaffold(
       title: l10n.dashboard,
       body: LayoutBuilder(
@@ -156,6 +153,10 @@ class _HomePageState extends ConsumerState<HomePage> {
                 onServiceAction: () => core.running
                     ? ref.read(coreProvider.notifier).stop()
                     : _connect(),
+                ipInfo: _ipInfo,
+                ipLoading: _ipLoading,
+                ipError: _ipError,
+                onRefreshIp: _fetchIpInfo,
               ),
               if (core.message.isNotEmpty &&
                   (!core.available ||
@@ -163,59 +164,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                 const SizedBox(height: 16),
                 ConnectionErrorBanner(message: core.message),
               ],
-              const SizedBox(height: 20),
-              Wrap(
-                spacing: 8,
-                runSpacing: 2,
-                alignment: WrapAlignment.spaceBetween,
-                children: [
-                  Text(
-                    l10n.nodeSelection,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  TextButton.icon(
-                    onPressed: () => context.go(AppRoute.nodes.path),
-                    icon: const Icon(Icons.open_in_new, size: 16),
-                    label: Text(l10n.nodeLibrary),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              const _ProxyWorkspaceCard(),
-              const SizedBox(height: 20),
-              if (wide)
-                IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(child: CurrentProfileCard(core: core)),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: IpInfoCard(
-                          ipInfo: _ipInfo,
-                          loading: _ipLoading,
-                          error: _ipError,
-                          onRefresh: _fetchIpInfo,
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              else
-                Column(
-                  children: [
-                    CurrentProfileCard(core: core),
-                    const SizedBox(height: 16),
-                    IpInfoCard(
-                      ipInfo: _ipInfo,
-                      loading: _ipLoading,
-                      error: _ipError,
-                      onRefresh: _fetchIpInfo,
-                    ),
-                  ],
-                ),
             ],
           );
         },
@@ -305,6 +253,10 @@ class _DashboardCards extends StatelessWidget {
     required this.onRouteModeChanged,
     required this.onSystemProxyChanged,
     required this.onServiceAction,
+    required this.ipInfo,
+    required this.ipLoading,
+    required this.ipError,
+    required this.onRefreshIp,
   });
 
   final CoreState core;
@@ -315,17 +267,23 @@ class _DashboardCards extends StatelessWidget {
   final ValueChanged<runtime_models.RouteMode> onRouteModeChanged;
   final ValueChanged<bool> onSystemProxyChanged;
   final VoidCallback onServiceAction;
+  final IpInfo? ipInfo;
+  final bool ipLoading;
+  final String? ipError;
+  final VoidCallback onRefreshIp;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final cardWidth = wide ? (constraints.maxWidth - 16) / 2 : null;
+        final cardWidth = wide
+            ? (constraints.maxWidth - 16) / 2
+            : constraints.maxWidth;
         final serviceCard = _ServiceOverviewCard(
           core: core,
           onAction: onServiceAction,
         );
-        final trafficCard = _TrafficSummaryCard(core: core);
+        final trafficCard = const LiveTrafficCard(compact: true);
         final settingsCard = _RoutingSettingsCard(
           core: core,
           capabilities: capabilities,
@@ -333,6 +291,12 @@ class _DashboardCards extends StatelessWidget {
           onProxyModeChanged: onProxyModeChanged,
           onRouteModeChanged: onRouteModeChanged,
           onSystemProxyChanged: onSystemProxyChanged,
+        );
+        final ipCard = IpInfoCard(
+          ipInfo: ipInfo,
+          loading: ipLoading,
+          error: ipError,
+          onRefresh: onRefreshIp,
         );
 
         if (!wide) {
@@ -343,22 +307,34 @@ class _DashboardCards extends StatelessWidget {
               trafficCard,
               const SizedBox(height: 16),
               settingsCard,
+              const SizedBox(height: 16),
+              ipCard,
             ],
           );
         }
 
-        return Column(
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(width: cardWidth, child: serviceCard),
-                const SizedBox(width: 16),
-                SizedBox(width: cardWidth, child: trafficCard),
-              ],
+            Expanded(
+              child: Column(
+                children: [
+                  SizedBox(width: cardWidth, child: serviceCard),
+                  const SizedBox(height: 16),
+                  SizedBox(width: cardWidth, child: settingsCard),
+                ],
+              ),
             ),
-            const SizedBox(height: 16),
-            settingsCard,
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                children: [
+                  SizedBox(width: cardWidth, child: trafficCard),
+                  const SizedBox(height: 16),
+                  SizedBox(width: cardWidth, child: ipCard),
+                ],
+              ),
+            ),
           ],
         );
       },
@@ -458,124 +434,6 @@ class _ServiceOverviewCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _TrafficSummaryCard extends StatelessWidget {
-  const _TrafficSummaryCard({required this.core});
-
-  final CoreState core;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final traffic = core.traffic;
-    final available = core.running && traffic.available;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.monitor_heart_outlined, color: colors.primary),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    l10n.liveTraffic,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-                TextButton(
-                  onPressed: () => context.go(AppRoute.traffic.path),
-                  child: Text(l10n.traffic),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _TrafficMetric(
-                    label: l10n.uploadRate,
-                    value: available ? formatSpeed(traffic.uploadBytes) : '--',
-                    color: colors.tertiary,
-                    icon: Icons.arrow_upward,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _TrafficMetric(
-                    label: l10n.downloadRate,
-                    value: available
-                        ? formatSpeed(traffic.downloadBytes)
-                        : '--',
-                    color: colors.primary,
-                    icon: Icons.arrow_downward,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            _TrafficMetric(
-              label: l10n.activeConnections,
-              value: available ? '${traffic.activeConnections}' : '--',
-              color: colors.secondary,
-              icon: Icons.hub_outlined,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TrafficMetric extends StatelessWidget {
-  const _TrafficMetric({
-    required this.label,
-    required this.value,
-    required this.color,
-    required this.icon,
-  });
-
-  final String label;
-  final String value;
-  final Color color;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: color),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: theme.textTheme.labelMedium),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w700,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }
@@ -780,115 +638,6 @@ class _RoutingSettingsCard extends StatelessWidget {
               ],
             );
           },
-        ),
-      ),
-    );
-  }
-}
-
-class _ProxyWorkspaceCard extends ConsumerWidget {
-  const _ProxyWorkspaceCard();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(proxiesProvider);
-    final theme = Theme.of(context);
-    final group = state.selectedGroup;
-    final nodes = group?.nodes ?? const [];
-    final selected = group?.selectedNode;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.hub_outlined, color: theme.colorScheme.primary),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    group?.name ?? AppLocalizations.of(context).emptyPool,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                Text(
-                  '${nodes.length}',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: theme.colorScheme.primary,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            if (nodes.isEmpty)
-              Text(
-                AppLocalizations.of(context).noSubscriptionsHint,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              )
-            else ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer.withValues(
-                    alpha: 0.45,
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.route_outlined,
-                      size: 18,
-                      color: theme.colorScheme.primary,
-                    ),
-                    const SizedBox(width: 9),
-                    Expanded(
-                      child: Text(
-                        selected?.displayName ??
-                            AppLocalizations.of(context).nodeNotSelected,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    if (selected?.latencyMs != null)
-                      Text(
-                        '${selected!.latencyMs} ms',
-                        style: theme.textTheme.labelMedium,
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 40,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: nodes.take(6).length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 6),
-                  itemBuilder: (context, index) {
-                    final node = nodes[index];
-                    final active = node.id == group?.selectedNodeId;
-                    return ChoiceChip(
-                      label: Text(node.displayName),
-                      selected: active,
-                      onSelected: (_) => ref
-                          .read(proxiesProvider.notifier)
-                          .selectNode(node.id),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ],
         ),
       ),
     );
