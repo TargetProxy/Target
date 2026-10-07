@@ -82,6 +82,7 @@ class TargetLibGateway implements CoreGateway {
             : 'TargetLib is stopped.',
       ),
     );
+    if (lifecycle == CoreLifecycle.running) _listenConnections();
     return _current;
   }
 
@@ -552,6 +553,11 @@ class TargetLibGateway implements CoreGateway {
       onError: (Object error, StackTrace stackTrace) {
         _connectionsListening = false;
         if (_manager != null && !_disposed && !_transportClosing) {
+          if (error is GrpcError &&
+              error.code == StatusCode.failedPrecondition) {
+            _connectionReconnectScheduled = false;
+            return;
+          }
           AppLogger.error(
             'TargetLib gRPC stream failed: SubscribeConnections',
             source: 'gRPC',
@@ -578,6 +584,7 @@ class TargetLibGateway implements CoreGateway {
   void _scheduleConnectionReconnect() {
     if (_connectionReconnectScheduled ||
         !_connectionTrackingAvailable ||
+        _current.lifecycle != CoreLifecycle.running ||
         _disposed ||
         _transportClosing) {
       return;

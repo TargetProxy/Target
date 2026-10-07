@@ -1003,6 +1003,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Close connection'**
   String get closeConnection;
+
+  /// No description provided for @more.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get more;
+
+  /// No description provided for @showWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Show window'**
+  String get showWindow;
+
+  /// No description provided for @quit.
+  ///
+  /// In en, this message translates to:
+  /// **'Quit'**
+  String get quit;
+
+  /// No description provided for @systemProxy.
+  ///
+  /// In en, this message translates to:
+  /// **'System proxy'**
+  String get systemProxy;
+
+  /// No description provided for @systemProxyDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply mixed proxy to system network settings'**
+  String get systemProxyDescription;
+
+  /// No description provided for @timeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Timeout'**
+  String get timeout;
 }
 
 class _AppLocalizationsDelegate

@@ -159,4 +159,10 @@
   ,"connectionError": "连接错误"
   ,"connectionErrorMessage": "TargetLib 无法连接，请查看日志了解详情。"
   ,"closeConnection": "关闭连接"
+  ,"more": "更多"
+  ,"showWindow": "显示窗口"
+  ,"quit": "退出"
+  ,"systemProxy": "系统代理"
+  ,"systemProxyDescription": "将混合代理应用到系统网络设置"
+  ,"timeout": "超时"
 }

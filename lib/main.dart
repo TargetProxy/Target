@@ -7,6 +7,7 @@ import 'app/app_identity.dart';
 import 'app/bootstrap.dart';
 import 'core/platform/desktop_instance.dart';
 import 'core/platform/desktop_tray.dart';
+import 'l10n/app_localizations.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,9 +15,16 @@ Future<void> main() async {
   DesktopTray? desktopTray;
   if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
     desktopTray = DesktopTray();
+    final locale = PlatformDispatcher.instance.locale;
     await desktopTray.initialize(
       AppIdentity.displayName,
-      chinese: PlatformDispatcher.instance.locale.languageCode == 'zh',
+      l10n: lookupAppLocalizations(
+        AppLocalizations.supportedLocales.any(
+              (supported) => supported.languageCode == locale.languageCode,
+            )
+            ? locale
+            : const Locale('en'),
+      ),
     );
   }
   runApp(await bootstrap(desktopTray: desktopTray));

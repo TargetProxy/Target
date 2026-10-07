@@ -73,10 +73,6 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
-  Future<void> _refreshTargetLibService() async {
-    await _checkTargetLibService();
-  }
-
   Future<void> _startTargetLibService() async {
     setState(() {
       _serviceStarting = true;
@@ -141,7 +137,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                       !_serviceCheckFailed &&
                           _serviceStatus == TargetLibServiceStatus.stopped
                       ? _startTargetLibService
-                      : _refreshTargetLibService,
+                      : _checkTargetLibService,
                 ),
                 const SizedBox(height: 16),
               ],
@@ -259,26 +255,23 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   Future<void> _changeProxyMode(runtime_models.ProxyMode mode) async {
     final current = ref.read(coreProvider).settings;
-    if (current.proxyMode == mode) return;
-    await ref
-        .read(coreProvider.notifier)
-        .updateRuntimeConfig(current.copyWith(proxyMode: mode));
-    if (!mounted) return;
-    final core = ref.read(coreProvider);
-    if (core.lifecycle == CoreLifecycle.failed) {
-      _showMessage(
-        AppLocalizations.of(context).connectionErrorMessage,
-        error: true,
-      );
-    }
+    await _updateRuntimeConfig(
+      current.proxyMode == mode ? null : current.copyWith(proxyMode: mode),
+    );
   }
 
   Future<void> _changeRouteMode(runtime_models.RouteMode mode) async {
     final current = ref.read(coreProvider).settings;
-    if (current.routeMode == mode) return;
-    await ref
-        .read(coreProvider.notifier)
-        .updateRuntimeConfig(current.copyWith(routeMode: mode));
+    await _updateRuntimeConfig(
+      current.routeMode == mode ? null : current.copyWith(routeMode: mode),
+    );
+  }
+
+  Future<void> _updateRuntimeConfig(
+    runtime_models.RuntimeSettings? settings,
+  ) async {
+    if (settings == null) return;
+    await ref.read(coreProvider.notifier).updateRuntimeConfig(settings);
     if (!mounted) return;
     final core = ref.read(coreProvider);
     if (core.lifecycle == CoreLifecycle.failed) {
@@ -587,6 +580,52 @@ class _TrafficMetric extends StatelessWidget {
   }
 }
 
+class _ResponsiveModeSelector<T> extends StatelessWidget {
+  const _ResponsiveModeSelector({
+    required this.value,
+    required this.items,
+    required this.segments,
+    required this.busy,
+    required this.onChanged,
+  });
+
+  final T value;
+  final List<DropdownMenuItem<T>> items;
+  final List<ButtonSegment<T>> segments;
+  final bool busy;
+  final ValueChanged<T> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 520) {
+          return DropdownButton<T>(
+            isExpanded: true,
+            value: value,
+            items: items,
+            onChanged: busy
+                ? null
+                : (selected) {
+                    if (selected != null) onChanged(selected);
+                  },
+          );
+        }
+        return SegmentedButton<T>(
+          expandedInsets: EdgeInsets.zero,
+          segments: segments,
+          selected: {value},
+          onSelectionChanged: busy
+              ? null
+              : (selected) {
+                  if (selected.isNotEmpty) onChanged(selected.first);
+                },
+        );
+      },
+    );
+  }
+}
+
 class _RoutingSettingsCard extends StatelessWidget {
   const _RoutingSettingsCard({
     required this.core,
@@ -628,70 +667,39 @@ class _RoutingSettingsCard extends StatelessWidget {
                     ],
                   )
                 else
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      if (constraints.maxWidth < 520) {
-                        return DropdownButton<runtime_models.ProxyMode>(
-                          isExpanded: true,
-                          value: core.settings.proxyMode,
-                          items: [
-                            DropdownMenuItem(
-                              value: runtime_models.ProxyMode.mixed,
-                              child: Text(l10n.mixed),
-                            ),
-                            DropdownMenuItem(
-                              value: runtime_models.ProxyMode.tun,
-                              child: Text(l10n.tun),
-                            ),
-                          ],
-                          onChanged: core.busy
-                              ? null
-                              : (selected) {
-                                  if (selected != null) {
-                                    onProxyModeChanged(selected);
-                                  }
-                                },
-                        );
-                      }
-                      return SegmentedButton<runtime_models.ProxyMode>(
-                        expandedInsets: EdgeInsets.zero,
-                        segments: [
-                          ButtonSegment(
-                            value: runtime_models.ProxyMode.mixed,
-                            icon: const Icon(Icons.lan_outlined),
-                            label: Text(l10n.mixed),
-                          ),
-                          ButtonSegment(
-                            value: runtime_models.ProxyMode.tun,
-                            icon: const Icon(Icons.vpn_lock_outlined),
-                            label: Text(l10n.tun),
-                          ),
-                        ],
-                        selected: {core.settings.proxyMode},
-                        onSelectionChanged: core.busy
-                            ? null
-                            : (selected) {
-                                if (selected.isNotEmpty) {
-                                  onProxyModeChanged(selected.first);
-                                }
-                              },
-                      );
-                    },
+                  _ResponsiveModeSelector<runtime_models.ProxyMode>(
+                    value: core.settings.proxyMode,
+                    busy: core.busy,
+                    items: [
+                      DropdownMenuItem(
+                        value: runtime_models.ProxyMode.mixed,
+                        child: Text(l10n.mixed),
+                      ),
+                      DropdownMenuItem(
+                        value: runtime_models.ProxyMode.tun,
+                        child: Text(l10n.tun),
+                      ),
+                    ],
+                    segments: [
+                      ButtonSegment(
+                        value: runtime_models.ProxyMode.mixed,
+                        icon: const Icon(Icons.lan_outlined),
+                        label: Text(l10n.mixed),
+                      ),
+                      ButtonSegment(
+                        value: runtime_models.ProxyMode.tun,
+                        icon: const Icon(Icons.vpn_lock_outlined),
+                        label: Text(l10n.tun),
+                      ),
+                    ],
+                    onChanged: onProxyModeChanged,
                   ),
                 if (capabilities.supportsMixedProxy) ...[
                   const SizedBox(height: 8),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: Text(
-                      Localizations.localeOf(context).languageCode == 'zh'
-                          ? '系统代理'
-                          : 'System proxy',
-                    ),
-                    subtitle: Text(
-                      Localizations.localeOf(context).languageCode == 'zh'
-                          ? '将混合代理应用到系统网络设置'
-                          : 'Apply mixed proxy to system network settings',
-                    ),
+                    title: Text(l10n.systemProxy),
+                    subtitle: Text(l10n.systemProxyDescription),
                     value: appSettings.systemProxy,
                     onChanged: onSystemProxyChanged,
                   ),
@@ -703,61 +711,38 @@ class _RoutingSettingsCard extends StatelessWidget {
               children: [
                 Text(l10n.routingMode, style: theme.textTheme.labelLarge),
                 const SizedBox(height: 8),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    if (constraints.maxWidth < 520) {
-                      return DropdownButton<runtime_models.RouteMode>(
-                        isExpanded: true,
-                        value: core.settings.routeMode,
-                        items: [
-                          for (final mode in runtime_models.RouteMode.values)
-                            DropdownMenuItem(
-                              value: mode,
-                              child: Text(switch (mode) {
-                                runtime_models.RouteMode.rule => l10n.rule,
-                                runtime_models.RouteMode.direct => l10n.direct,
-                                runtime_models.RouteMode.all => l10n.all,
-                              }),
-                            ),
-                        ],
-                        onChanged: core.busy
-                            ? null
-                            : (selected) {
-                                if (selected != null) {
-                                  onRouteModeChanged(selected);
-                                }
-                              },
-                      );
-                    }
-                    return SegmentedButton<runtime_models.RouteMode>(
-                      expandedInsets: EdgeInsets.zero,
-                      segments: [
-                        ButtonSegment(
-                          value: runtime_models.RouteMode.rule,
-                          icon: const Icon(Icons.account_tree_outlined),
-                          label: Text(l10n.rule),
-                        ),
-                        ButtonSegment(
-                          value: runtime_models.RouteMode.direct,
-                          icon: const Icon(Icons.flash_on_outlined),
-                          label: Text(l10n.direct),
-                        ),
-                        ButtonSegment(
-                          value: runtime_models.RouteMode.all,
-                          icon: const Icon(Icons.public),
-                          label: Text(l10n.all),
-                        ),
-                      ],
-                      selected: {core.settings.routeMode},
-                      onSelectionChanged: core.busy
-                          ? null
-                          : (selected) {
-                              if (selected.isNotEmpty) {
-                                onRouteModeChanged(selected.first);
-                              }
-                            },
-                    );
-                  },
+                _ResponsiveModeSelector<runtime_models.RouteMode>(
+                  value: core.settings.routeMode,
+                  busy: core.busy,
+                  items: [
+                    for (final mode in runtime_models.RouteMode.values)
+                      DropdownMenuItem(
+                        value: mode,
+                        child: Text(switch (mode) {
+                          runtime_models.RouteMode.rule => l10n.rule,
+                          runtime_models.RouteMode.direct => l10n.direct,
+                          runtime_models.RouteMode.all => l10n.all,
+                        }),
+                      ),
+                  ],
+                  segments: [
+                    ButtonSegment(
+                      value: runtime_models.RouteMode.rule,
+                      icon: const Icon(Icons.account_tree_outlined),
+                      label: Text(l10n.rule),
+                    ),
+                    ButtonSegment(
+                      value: runtime_models.RouteMode.direct,
+                      icon: const Icon(Icons.flash_on_outlined),
+                      label: Text(l10n.direct),
+                    ),
+                    ButtonSegment(
+                      value: runtime_models.RouteMode.all,
+                      icon: const Icon(Icons.public),
+                      label: Text(l10n.all),
+                    ),
+                  ],
+                  onChanged: onRouteModeChanged,
                 ),
               ],
             );

@@ -197,9 +197,7 @@ class _TopToolbar extends StatelessWidget {
         ),
         if (items.length > visibleCount)
           PopupMenuButton<int>(
-            tooltip: Localizations.localeOf(context).languageCode == 'zh'
-                ? '更多'
-                : 'More',
+            tooltip: AppLocalizations.of(context).more,
             onSelected: onDestinationSelected,
             itemBuilder: (context) => [
               for (var i = visibleCount; i < items.length; i++)

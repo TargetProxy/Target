@@ -159,4 +159,10 @@
   ,"connectionError": "Connection error"
   ,"connectionErrorMessage": "TargetLib could not connect. See the logs for details."
   ,"closeConnection": "Close connection"
+  ,"more": "More"
+  ,"showWindow": "Show window"
+  ,"quit": "Quit"
+  ,"systemProxy": "System proxy"
+  ,"systemProxyDescription": "Apply mixed proxy to system network settings"
+  ,"timeout": "Timeout"
 }

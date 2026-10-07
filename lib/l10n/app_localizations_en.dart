@@ -494,4 +494,23 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get closeConnection => 'Close connection';
+
+  @override
+  String get more => 'More';
+
+  @override
+  String get showWindow => 'Show window';
+
+  @override
+  String get quit => 'Quit';
+
+  @override
+  String get systemProxy => 'System proxy';
+
+  @override
+  String get systemProxyDescription =>
+      'Apply mixed proxy to system network settings';
+
+  @override
+  String get timeout => 'Timeout';
 }

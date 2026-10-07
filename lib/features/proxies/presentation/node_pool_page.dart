@@ -249,7 +249,7 @@ class _NodePoolPageState extends ConsumerState<NodePoolPage> {
                             )
                           : Text(
                               node.latencyTimedOut
-                                  ? 'timeout'
+                                  ? l10n.timeout
                                   : (node.latencyMs == null
                                         ? '—'
                                         : '${node.latencyMs} ms'),

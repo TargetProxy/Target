@@ -472,4 +472,22 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get closeConnection => '关闭连接';
+
+  @override
+  String get more => '更多';
+
+  @override
+  String get showWindow => '显示窗口';
+
+  @override
+  String get quit => '退出';
+
+  @override
+  String get systemProxy => '系统代理';
+
+  @override
+  String get systemProxyDescription => '将混合代理应用到系统网络设置';
+
+  @override
+  String get timeout => '超时';
 }

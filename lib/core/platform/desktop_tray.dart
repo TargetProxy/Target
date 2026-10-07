@@ -4,6 +4,8 @@ import 'package:flutter_alone/flutter_alone.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../../l10n/app_localizations.dart';
+
 final class DesktopTray with WindowListener {
   late final TrayIcon _icon;
   late final Image _image;
@@ -13,17 +15,20 @@ final class DesktopTray with WindowListener {
 
   Future<void> Function()? onExit;
 
-  Future<void> initialize(String tooltip, {required bool chinese}) async {
+  Future<void> initialize(
+    String tooltip, {
+    required AppLocalizations l10n,
+  }) async {
     await windowManager.ensureInitialized();
     await windowManager.setTitle(tooltip);
     _icon = TrayIcon.create()!;
     _image = ImageAsset.fromAsset('assets/TargetAppIcon.png')!;
     _showItem = MenuItem.createWithLabelAndType(
-      chinese ? '显示窗口' : 'Show window',
+      l10n.showWindow,
       MenuItemType.normal,
     )!;
     _exitItem = MenuItem.createWithLabelAndType(
-      chinese ? '退出' : 'Quit',
+      l10n.quit,
       MenuItemType.normal,
     )!;
     _menu = Menu.create()!

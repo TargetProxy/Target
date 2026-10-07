@@ -6,6 +6,7 @@ import '../../../../core/runtime/core_notifier.dart';
 import '../../../../core/utils/format_bytes.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../application/connections_notifier.dart';
+import '../connection_actions.dart';
 
 class ConnectionsSidebar extends ConsumerWidget {
   const ConnectionsSidebar({required this.onOpenConnections, super.key});
@@ -54,7 +55,11 @@ class ConnectionsSidebar extends ConsumerWidget {
                         connectionsState.activeCount == 0 ||
                             connectionsState.closingAll
                         ? null
-                        : () => _closeAll(context, ref, connectionsNotifier),
+                        : () => closeAllConnectionsWithFeedback(
+                            context,
+                            ref,
+                            connectionsNotifier,
+                          ),
                     icon: connectionsState.closingAll
                         ? const SizedBox.square(
                             dimension: 16,
@@ -123,7 +128,7 @@ class ConnectionsSidebar extends ConsumerWidget {
                           return _ConnectionSummary(
                             connection: connection,
                             closing: connectionsState.isClosing(connection.id),
-                            onClose: () => _closeOne(
+                            onClose: () => closeConnectionWithFeedback(
                               context,
                               ref,
                               connectionsNotifier,
@@ -141,62 +146,6 @@ class ConnectionsSidebar extends ConsumerWidget {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _closeOne(
-    BuildContext context,
-    WidgetRef ref,
-    ConnectionsNotifier notifier,
-    String id,
-  ) async {
-    final closed = await notifier.close(id);
-    if (!context.mounted || closed) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          ref.read(connectionsProvider).lastError ??
-              AppLocalizations.of(context).unableToCloseConnection,
-        ),
-      ),
-    );
-  }
-
-  Future<void> _closeAll(
-    BuildContext context,
-    WidgetRef ref,
-    ConnectionsNotifier notifier,
-  ) async {
-    final l10n = AppLocalizations.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(l10n.closeAllConnections),
-        content: Text(l10n.activeConnectionsWillInterrupt),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text(l10n.cancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: Text(l10n.closeAll),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    final count = await notifier.closeAll();
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          count == null
-              ? ref.read(connectionsProvider).lastError ??
-                    l10n.unableToCloseConnections
-              : l10n.closedConnections(count),
         ),
       ),
     );
