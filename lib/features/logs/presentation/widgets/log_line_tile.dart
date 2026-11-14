@@ -1,4 +1,7 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
+import 'package:prism_ui/prism_ui.dart';
+
+import '../../../../core/ui/record.dart';
 import 'package:talker/talker.dart';
 
 import '../../application/logs_notifier.dart';
@@ -10,47 +13,25 @@ class LogLineTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final level = entry.logLevel ?? LogLevel.info;
-
+    final styles = RecordTextStyles.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            formatLogTime(entry.time),
-            style: theme.textTheme.bodySmall?.copyWith(
-              fontFamily: 'Consolas',
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-            decoration: BoxDecoration(
-              color: _levelColor(level, theme).withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
+      padding: const EdgeInsets.only(bottom: recordListGap),
+      child: RecordListItem(
+        header: RecordHeader(
+          children: [
+            Text(formatLogTime(entry.time)),
+            Text(
               level.name.toUpperCase(),
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: _levelColor(level, theme),
-                fontWeight: FontWeight.w600,
-              ),
+              style: AppTextStyle.caption1.of(context, emphasized: true)
+                  .copyWith(color: _levelColor(level, Theme.of(context))),
             ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              '[${entry.title ?? ''}] ${entry.message ?? ''}',
-              style: theme.textTheme.bodySmall?.copyWith(
-                fontFamily: 'Consolas',
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
+          ],
+        ),
+        body: Text(
+          '[${entry.title ?? ''}] ${entry.message ?? ''}',
+          style: styles.primary,
+        ),
       ),
     );
   }

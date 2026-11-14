@@ -1,10 +1,13 @@
-// ignore_for_file: deprecated_member_use
-
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:prism_ui/prism_ui.dart' as prism;
+
+import 'widgets/proxy_card.dart';
 
 import '../../../core/widgets/target_page_layout.dart';
+import '../../../core/ui/app_glyphs.dart';
+import '../../../core/ui/scaffold/scaffold.dart' as ui;
 import '../../../data/models/proxy_node.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../maps/application/proxy_country_map.dart';
@@ -31,20 +34,20 @@ class _NodePoolPageState extends ConsumerState<NodePoolPage> {
   }
 
   Color _latencyColor(BuildContext context, ProxyNode node) {
-    final scheme = Theme.of(context).colorScheme;
+    final scheme = prism.Theme.of(context).colorScheme;
     if (node.latencyTimedOut) return scheme.error;
     final latency = node.latencyMs;
     if (latency == null) return scheme.onSurfaceVariant;
-    if (latency <= 200) return Colors.green;
-    if (latency <= 500) return Colors.orange.shade700;
-    if (latency <= 1000) return Colors.deepOrange;
-    return Colors.red;
+    if (latency <= 200) return const Color(0xFF34C759);
+    if (latency <= 500) return const Color(0xFFFF9500);
+    if (latency <= 1000) return const Color(0xFFFF6B00);
+    return const Color(0xFFFF3B30);
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
+    final theme = prism.Theme.of(context);
     final proxies = ref.watch(proxiesProvider);
     final subscriptions = ref.watch(subscriptionsProvider);
     final notifier = ref.read(proxiesProvider.notifier);
@@ -79,200 +82,165 @@ class _NodePoolPageState extends ConsumerState<NodePoolPage> {
     final busy = subscriptions.busy || subscriptions.changingIds.isNotEmpty;
     final error = proxies.lastError ?? subscriptions.lastError;
 
-    return SafeArea(
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(
-            maxWidth: TargetPageLayout.maxWidth + 48,
-          ),
-          child: CustomScrollView(
-            slivers: [
-              SliverPadding(
-                padding: TargetPageLayout.padding,
-                sliver: SliverToBoxAdapter(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      TargetPageHeader(title: l10n.nodeLibrary),
-                      const SizedBox(height: 16),
-                      Wrap(
-                        spacing: 12,
-                        runSpacing: 8,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          FilledButton.icon(
-                            onPressed: proxies.testing || nodes.isEmpty
-                                ? null
-                                : notifier.testAllLatency,
-                            icon: const Icon(Icons.speed),
-                            label: Text(l10n.testLatency),
-                          ),
-                          if (proxies.testing)
-                            const SizedBox.square(
-                              dimension: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+    return ui.Scaffold(
+      title: l10n.nodeLibrary,
+      primaryAction: prism.IconButtonData(
+        glyph: AppGlyphs.bolt,
+        tooltip: l10n.testLatency,
+        isLoading: proxies.testing,
+        onPressed: proxies.testing || nodes.isEmpty ? null : notifier.testAllLatency,
+      ),
+      body: Builder(
+        builder: (context) => Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: TargetPageLayout.maxWidth + 48,
+            ),
+            child: CustomScrollView(
+              slivers: [
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(
+                    24, prism.BuildContextExtension(context).contentTopPadding + 16, 24, 16,
+                  ),
+                  sliver: SliverToBoxAdapter(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (error != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Text(
+                              error,
+                              style: TextStyle(color: theme.colorScheme.error),
                             ),
-                        ],
-                      ),
-                      if (error != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Text(
-                            error,
-                            style: TextStyle(color: theme.colorScheme.error),
                           ),
-                        ),
-                      const SizedBox(height: 16),
-                      if (nodes.isNotEmpty) ...[
-                        AbstractWorldMap(
-                          height: 320,
-                          nodes: countries,
-                          selectedId: country,
-                          onSelect: (value) => setState(() => _country = value),
-                        ),
                         const SizedBox(height: 16),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            ChoiceChip(
-                              label: Text(l10n.allRegions),
-                              selected: country == null,
-                              onSelected: (_) =>
-                                  setState(() => _country = null),
-                            ),
-                            for (final entry in countries)
-                              ChoiceChip(
-                                key: ValueKey('region-${entry.countryCode}'),
-                                label: Text(
-                                  '${entry.countryCode} · ${entry.nodeCount}',
-                                ),
-                                selected: country == entry.countryCode,
-                                onSelected: (value) => setState(
-                                  () => _country = value
-                                      ? entry.countryCode
-                                      : null,
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: _search,
-                          onChanged: (_) => setState(() {}),
-                          decoration: InputDecoration(
-                            hintText: l10n.searchNodes,
-                            prefixIcon: const Icon(Icons.search),
+                        if (nodes.isNotEmpty) ...[
+                          AbstractWorldMap(
+                            height: 320,
+                            nodes: countries,
+                            selectedId: country,
+                            onSelect: (value) => setState(() => _country = value),
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            ChoiceChip(
-                              label: Text(l10n.allSubscriptions),
-                              selected: source == null,
-                              onSelected: (_) => setState(() {
-                                _source = null;
-                                _country = null;
-                              }),
-                            ),
-                            for (final sub in enabled)
-                              ChoiceChip(
-                                key: ValueKey('source-${sub.id}'),
-                                label: Text(sub.name),
-                                selected: source == sub.id,
-                                onSelected: (value) => setState(() {
-                                  _source = value ? sub.id : null;
+                          const SizedBox(height: 16),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              prism.Chip(
+                                label: l10n.allRegions,
+                                selected: country == null,
+                                onPressed: () =>
+                                    setState(() => _country = null),
+                              ),
+                              for (final entry in countries)
+                                prism.Chip(
+                                  key: ValueKey('region-${entry.countryCode}'),
+                                  label: '${entry.countryCode} · ${entry.nodeCount}',
+                                  selected: country == entry.countryCode,
+                                  onPressed: () => setState(() => _country =
+                                      country == entry.countryCode ? null : entry.countryCode),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          prism.SearchField(
+                            controller: _search,
+                            onChanged: (_) => setState(() {}),
+                            hintText: l10n.searchNodes,
+                          ),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              prism.Chip(
+                                label: l10n.allSubscriptions,
+                                selected: source == null,
+                                onPressed: () => setState(() {
+                                  _source = null;
                                   _country = null;
                                 }),
                               ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          l10n.poolNodeCount(visible.length),
-                          style: theme.textTheme.titleSmall,
-                        ),
-                      ],
-                      if (visible.isEmpty) ...[
-                        const SizedBox(height: 24),
-                        Text(
-                          nodes.isEmpty ? l10n.emptyPool : l10n.noMatchingNodes,
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 8),
-                        Center(
-                          child: TextButton(
-                            onPressed: nodes.isEmpty
-                                ? () => context.go('/proxies')
-                                : () => setState(() {
-                                    _search.clear();
-                                    _source = null;
+                              for (final sub in enabled)
+                                prism.Chip(
+                                  key: ValueKey('source-${sub.id}'),
+                                  label: sub.name,
+                                  selected: source == sub.id,
+                                  onPressed: () => setState(() {
+                                    _source = source == sub.id ? null : sub.id;
                                     _country = null;
                                   }),
-                            child: Text(
-                              nodes.isEmpty
-                                  ? l10n.manageSubscriptions
-                                  : l10n.clearFilters,
-                            ),
+                                ),
+                            ],
                           ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                sliver: SliverList.builder(
-                  itemCount: visible.length,
-                  itemBuilder: (context, index) {
-                    final node = visible[index];
-                    return ListTile(
-                      key: ValueKey('node-${node.id}'),
-                      dense: true,
-
-                      title: Text(
-                        node.name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      subtitle: Text(
-                        '${sourceName(node)} · ${node.typeLabel}${node.isAvailable ? '' : ' · ${l10n.nodeUnavailable}'}',
-                      ),
-                      trailing: proxies.testing
-                          ? const SizedBox.square(
-                              dimension: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Text(
-                              node.latencyTimedOut
-                                  ? l10n.timeout
-                                  : (node.latencyMs == null
-                                        ? '—'
-                                        : '${node.latencyMs} ms'),
-                              style: TextStyle(
-                                color: _latencyColor(context, node),
-                                fontWeight: node.latencyTimedOut
-                                    ? FontWeight.bold
-                                    : FontWeight.w600,
+                          const SizedBox(height: 16),
+                          Text(
+                            l10n.poolNodeCount(visible.length),
+                            style: prism.AppTextStyle.headline.of(context),
+                          ),
+                        ],
+                        if (visible.isEmpty) ...[
+                          const SizedBox(height: 24),
+                          Text(
+                            nodes.isEmpty ? l10n.emptyPool : l10n.noMatchingNodes,
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 8),
+                          Center(
+                            child: prism.TextButton(
+                              onPressed: nodes.isEmpty
+                                  ? () => context.go('/proxies')
+                                  : () => setState(() {
+                                      _search.clear();
+                                      _source = null;
+                                      _country = null;
+                                    }),
+                              child: Text(
+                                nodes.isEmpty
+                                    ? l10n.manageSubscriptions
+                                    : l10n.clearFilters,
                               ),
                             ),
-                      leading: Radio<String>(
-                        value: node.id,
-                        groupValue: proxies.selectedGroup?.selectedNodeId,
-                        onChanged: busy
-                            ? null
-                            : (_) => notifier.selectNode(node.id),
-                      ),
-                      enabled: node.isAvailable,
-                    );
-                  },
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ],
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(24, 0, 24, 24 + prism.BuildContextExtension(context).bottomInset),
+                  sliver: SliverLayoutBuilder(
+                    builder: (context, constraints) => SliverGrid.builder(
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: (constraints.crossAxisExtent / 240)
+                            .floor().clamp(1, 4),
+                        mainAxisExtent: prism.MeasureScope.of(context)
+                            .textHeight(prism.AppTextStyle.subheadline) * 2 +
+                            prism.MeasureScope.of(context)
+                            .textHeight(prism.AppTextStyle.footnote) + 40,
+                        mainAxisSpacing: 12,
+                        crossAxisSpacing: 12,
+                      ),
+                      itemCount: visible.length,
+                      itemBuilder: (context, index) {
+                        final node = visible[index];
+                        return ProxyCard(
+                          key: ValueKey('node-${node.id}'),
+                          proxy: node,
+                          source: sourceName(node),
+                          selected: proxies.selectedGroup?.selectedNodeId == node.id,
+                          busy: busy,
+                          testing: proxies.testing,
+                          latencyColor: _latencyColor(context, node),
+                          onSelected: () => notifier.selectNode(node.id),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

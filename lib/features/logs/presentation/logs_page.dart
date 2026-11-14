@@ -1,6 +1,10 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
+import 'package:material_ui/material_ui.dart' show Icons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
+import 'package:prism_ui/prism_ui.dart' as prism;
+
+import '../../../core/ui/app_glyphs.dart';
 
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/target_page_layout.dart';
@@ -37,19 +41,19 @@ class _LogsPageState extends ConsumerState<LogsPage> {
       subtitle: l10n.runtimeDiagnostics,
       scrollableBody: false,
       actions: [
-        IconButton(
+        prism.IconButton(
           onPressed: _copyVisible,
-          icon: const Icon(Icons.copy),
+          icon: const GlyphIcon(AppGlyphs.copy),
           tooltip: l10n.copyVisible,
         ),
-        IconButton(
+        prism.IconButton(
           onPressed: _export,
-          icon: const Icon(Icons.share),
+          icon: const GlyphIcon(AppGlyphs.export),
           tooltip: l10n.export,
         ),
-        IconButton(
+        prism.IconButton(
           onPressed: notifier.clear,
-          icon: const Icon(Icons.delete_sweep),
+          icon: const GlyphIcon(AppGlyphs.delete),
           tooltip: l10n.clear,
         ),
       ],
@@ -92,27 +96,25 @@ class _LogsPageState extends ConsumerState<LogsPage> {
     final l10n = AppLocalizations.of(context);
     final text = ref.read(logsProvider.notifier).exportLogs();
     Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(l10n.logsCopied)));
+    prism.BannerHost.maybeOf(context)?.show(l10n.logsCopied);
   }
 
   void _export() {
     final l10n = AppLocalizations.of(context);
-    showDialog(
+    prism.showFloatingDialog<void>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: Text(l10n.exportLogs),
-        content: Text(l10n.sanitizeLogsPrompt),
+      child: prism.AlertDialog(
+        title: l10n.exportLogs,
+        child: Text(l10n.sanitizeLogsPrompt),
         actions: [
-          TextButton(
+          prism.TextButton(
             onPressed: () {
               Navigator.pop(context);
               _doExport(sanitize: false);
             },
             child: Text(l10n.raw),
           ),
-          FilledButton(
+          prism.TextButton(
             onPressed: () {
               Navigator.pop(context);
               _doExport(sanitize: true);
@@ -128,10 +130,8 @@ class _LogsPageState extends ConsumerState<LogsPage> {
     final l10n = AppLocalizations.of(context);
     final text = ref.read(logsProvider.notifier).exportLogs(sanitize: sanitize);
     Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(sanitize ? l10n.sanitizedLogsCopied : l10n.logsCopied),
-      ),
+    prism.BannerHost.maybeOf(context)?.show(
+      sanitize ? l10n.sanitizedLogsCopied : l10n.logsCopied,
     );
   }
 }

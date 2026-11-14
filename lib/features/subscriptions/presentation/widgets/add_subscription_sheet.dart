@@ -1,7 +1,10 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
+import 'package:prism_ui/prism_ui.dart';
+
+import '../../../../core/ui/app_glyphs.dart';
+import '../../../../core/ui/scaffold/scaffold.dart' as ui;
 import 'package:flutter/services.dart';
 
-import '../../../../core/theme/app_spacing.dart';
 import '../../../../l10n/app_localizations.dart';
 
 class AddSubscriptionSheet extends StatefulWidget {
@@ -26,64 +29,48 @@ class _AddSubscriptionSheetState extends State<AddSubscriptionSheet> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
+    return ui.Scaffold(
+      title: l10n.addSubscriptionTitle,
+      confirmationAction: IconButtonData(
+        glyph: AppGlyphs.add,
+        tooltip: l10n.add,
+        onPressed: _submit,
       ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.cardPadding),
+      iconActions: [
+        IconButtonData(
+          glyph: AppGlyphs.paste,
+          tooltip: l10n.paste,
+          onPressed: _pasteFromClipboard,
+        ),
+      ],
+      body: Builder(
+        builder: (context) => SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            24, context.contentTopPadding + 16, 24, context.bottomInset + 24,
+          ),
           child: Form(
             key: _formKey,
             autovalidateMode: AutovalidateMode.onUserInteraction,
             child: Column(
-              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  l10n.addSubscriptionTitle,
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: AppSpacing.itemGap),
+                Text(l10n.nameOptional, style: AppTextStyle.footnote.of(context).toLighter),
+                const SizedBox(height: 6),
                 TextFormField(
                   controller: _nameController,
-                  decoration: InputDecoration(labelText: l10n.nameOptional),
+                  textInputAction: TextInputAction.next,
                 ),
-                const SizedBox(height: AppSpacing.itemGap),
+                const SizedBox(height: 16),
+                Text(l10n.subscriptionUrl, style: AppTextStyle.footnote.of(context).toLighter),
+                const SizedBox(height: 6),
                 TextFormField(
                   controller: _urlController,
-                  decoration: InputDecoration(
-                    labelText: l10n.subscriptionUrl,
-                    hintText: 'https://example.com/sub',
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return l10n.urlRequired;
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: AppSpacing.sectionGap),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _pasteFromClipboard,
-                        icon: const Icon(Icons.paste),
-                        label: Text(l10n.paste),
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.itemGap),
-                    Expanded(
-                      child: FilledButton(
-                        onPressed: _submit,
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(vertical: 12),
-                          child: Text(l10n.add),
-                        ),
-                      ),
-                    ),
-                  ],
+                  decoration: const InputDecoration(hintText: 'https://example.com/sub'),
+                  keyboardType: TextInputType.url,
+                  autocorrect: false,
+                  onFieldSubmitted: (_) => _submit(),
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? l10n.urlRequired : null,
                 ),
               ],
             ),
@@ -95,6 +82,7 @@ class _AddSubscriptionSheetState extends State<AddSubscriptionSheet> {
 
   Future<void> _pasteFromClipboard() async {
     final data = await Clipboard.getData(Clipboard.kTextPlain);
+    if (!mounted) return;
     final text = data?.text;
     if (text != null && text.isNotEmpty) {
       _urlController.text = text;

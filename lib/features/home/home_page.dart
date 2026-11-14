@@ -8,16 +8,14 @@ import '../../core/runtime/core_models.dart';
 import '../../core/logging/app_logger.dart';
 import '../../core/platform/app_platform.dart';
 import 'package:targetlib/targetlib.dart';
-import '../../data/models/app_settings.dart';
 import '../../data/models/runtime_settings.dart' as runtime_models;
 import '../../data/models/ip_info.dart';
-import '../../core/widgets/target_page_layout.dart';
+import 'package:prism_ui/prism_ui.dart' as prism;
+import '../../core/ui/scaffold/scaffold.dart' as ui;
+import 'presentation/dashboard/dashboard.dart';
 import '../../l10n/app_localizations.dart';
-import '../../l10n/core_status_l10n.dart';
 import '../settings/application/settings_notifier.dart';
 import 'presentation/widgets/connection_error_banner.dart';
-import 'presentation/widgets/ip_info_card.dart';
-import '../traffic/presentation/widgets/live_traffic_card.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -113,60 +111,62 @@ class _HomePageState extends ConsumerState<HomePage> {
     final capabilities = ref.watch(appCapabilitiesProvider);
     final appSettings = ref.watch(settingsProvider).settings;
     final l10n = AppLocalizations.of(context);
-    return TargetPageScaffold(
+    return ui.Scaffold(
       title: l10n.dashboard,
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final wide = constraints.maxWidth >= 900;
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (capabilities.supportsManagedService &&
-                  !_serviceChecking &&
-                  (_serviceCheckFailed ||
-                      _serviceStatus != TargetLibServiceStatus.running)) ...[
-                _ServiceStatusCard(
-                  starting: _serviceStarting,
-                  status: _serviceStatus,
-                  checkFailed: _serviceCheckFailed,
-                  error: _serviceError,
-                  onAction:
-                      !_serviceCheckFailed &&
-                          _serviceStatus == TargetLibServiceStatus.stopped
-                      ? _startTargetLibService
-                      : _checkTargetLibService,
-                ),
-                const SizedBox(height: 16),
-              ],
-              _DashboardCards(
-                core: core,
-                capabilities: capabilities,
-                appSettings: appSettings,
-                wide: wide,
-                onProxyModeChanged: _changeProxyMode,
-                onRouteModeChanged: _changeRouteMode,
-                onSystemProxyChanged: (value) => ref
-                    .read(settingsProvider.notifier)
-                    .updateSettings(
-                      (settings) => settings.copyWith(systemProxy: value),
+      body: Builder(
+        builder: (context) => SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            prism.BuildContextExtension(context).contentTopPadding,
+            20,
+            24 + prism.BuildContextExtension(context).bottomInset,
+          ),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1440),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                spacing: 16,
+                children: [
+                  if (capabilities.supportsManagedService &&
+                      !_serviceChecking &&
+                      (_serviceCheckFailed ||
+                          _serviceStatus != TargetLibServiceStatus.running))
+                    _ServiceStatusCard(
+                      starting: _serviceStarting,
+                      status: _serviceStatus,
+                      checkFailed: _serviceCheckFailed,
+                      error: _serviceError,
+                      onAction: !_serviceCheckFailed &&
+                              _serviceStatus == TargetLibServiceStatus.stopped
+                          ? _startTargetLibService
+                          : _checkTargetLibService,
                     ),
-                onServiceAction: () => core.running
-                    ? ref.read(coreProvider.notifier).stop()
-                    : _connect(),
-                ipInfo: _ipInfo,
-                ipLoading: _ipLoading,
-                ipError: _ipError,
-                onRefreshIp: _fetchIpInfo,
+                  TargetDashboard(
+                    core: core,
+                    capabilities: capabilities,
+                    appSettings: appSettings,
+                    onProxyModeChanged: _changeProxyMode,
+                    onRouteModeChanged: _changeRouteMode,
+                    onSystemProxyChanged: (value) => ref
+                        .read(settingsProvider.notifier)
+                        .updateSettings((settings) => settings.copyWith(systemProxy: value)),
+                    onServiceAction: () => core.running
+                        ? ref.read(coreProvider.notifier).stop()
+                        : _connect(),
+                    ipInfo: _ipInfo,
+                    ipLoading: _ipLoading,
+                    ipError: _ipError,
+                    onRefreshIp: _fetchIpInfo,
+                  ),
+                  if (core.message.isNotEmpty &&
+                      (!core.available || core.lifecycle == CoreLifecycle.failed))
+                    ConnectionErrorBanner(message: core.message),
+                ],
               ),
-              if (core.message.isNotEmpty &&
-                  (!core.available ||
-                      core.lifecycle == CoreLifecycle.failed)) ...[
-                const SizedBox(height: 16),
-                ConnectionErrorBanner(message: core.message),
-              ],
-            ],
-          );
-        },
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -240,407 +240,6 @@ class _HomePageState extends ConsumerState<HomePage> {
           backgroundColor: error ? Theme.of(context).colorScheme.error : null,
         ),
       );
-  }
-}
-
-class _DashboardCards extends StatelessWidget {
-  const _DashboardCards({
-    required this.core,
-    required this.capabilities,
-    required this.appSettings,
-    required this.wide,
-    required this.onProxyModeChanged,
-    required this.onRouteModeChanged,
-    required this.onSystemProxyChanged,
-    required this.onServiceAction,
-    required this.ipInfo,
-    required this.ipLoading,
-    required this.ipError,
-    required this.onRefreshIp,
-  });
-
-  final CoreState core;
-  final AppCapabilities capabilities;
-  final AppSettings appSettings;
-  final bool wide;
-  final ValueChanged<runtime_models.ProxyMode> onProxyModeChanged;
-  final ValueChanged<runtime_models.RouteMode> onRouteModeChanged;
-  final ValueChanged<bool> onSystemProxyChanged;
-  final VoidCallback onServiceAction;
-  final IpInfo? ipInfo;
-  final bool ipLoading;
-  final String? ipError;
-  final VoidCallback onRefreshIp;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final cardWidth = wide
-            ? (constraints.maxWidth - 16) / 2
-            : constraints.maxWidth;
-        final serviceCard = _ServiceOverviewCard(
-          core: core,
-          onAction: onServiceAction,
-        );
-        final trafficCard = const LiveTrafficCard(compact: true);
-        final settingsCard = _RoutingSettingsCard(
-          core: core,
-          capabilities: capabilities,
-          appSettings: appSettings,
-          onProxyModeChanged: onProxyModeChanged,
-          onRouteModeChanged: onRouteModeChanged,
-          onSystemProxyChanged: onSystemProxyChanged,
-        );
-        final ipCard = IpInfoCard(
-          ipInfo: ipInfo,
-          loading: ipLoading,
-          error: ipError,
-          onRefresh: onRefreshIp,
-        );
-
-        if (!wide) {
-          return Column(
-            children: [
-              serviceCard,
-              const SizedBox(height: 16),
-              trafficCard,
-              const SizedBox(height: 16),
-              settingsCard,
-              const SizedBox(height: 16),
-              ipCard,
-            ],
-          );
-        }
-
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                children: [
-                  SizedBox(width: cardWidth, child: serviceCard),
-                  const SizedBox(height: 16),
-                  SizedBox(width: cardWidth, child: settingsCard),
-                ],
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                children: [
-                  SizedBox(width: cardWidth, child: trafficCard),
-                  const SizedBox(height: 16),
-                  SizedBox(width: cardWidth, child: ipCard),
-                ],
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _ServiceOverviewCard extends StatelessWidget {
-  const _ServiceOverviewCard({required this.core, required this.onAction});
-
-  final CoreState core;
-  final VoidCallback onAction;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    final statusColor = core.running
-        ? Colors.green
-        : theme.colorScheme.onSurfaceVariant;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.layers_outlined, color: theme.colorScheme.primary),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    l10n.profiles,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-                Container(
-                  width: 9,
-                  height: 9,
-                  decoration: BoxDecoration(
-                    color: statusColor,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 7),
-                Flexible(
-                  child: Text(
-                    l10n.coreStatusLabel(core.lifecycle),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.end,
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: statusColor,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            Text(
-              core.running ? l10n.serviceRunning : l10n.serviceStopped,
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              core.available
-                  ? (core.running
-                        ? l10n.trafficRouted
-                        : l10n.startServicePrompt)
-                  : l10n.coreUnavailable,
-              style: theme.textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 16),
-            Align(
-              alignment: Alignment.centerRight,
-              child: FilledButton.icon(
-                onPressed: core.busy || !core.available ? null : onAction,
-                icon: Icon(
-                  core.running
-                      ? Icons.stop_circle_outlined
-                      : Icons.play_arrow_rounded,
-                ),
-                label: Text(
-                  core.busy
-                      ? l10n.working
-                      : core.running
-                      ? l10n.stop
-                      : l10n.start,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ResponsiveModeSelector<T> extends StatelessWidget {
-  const _ResponsiveModeSelector({
-    required this.value,
-    required this.items,
-    required this.segments,
-    required this.busy,
-    required this.onChanged,
-  });
-
-  final T value;
-  final List<DropdownMenuItem<T>> items;
-  final List<ButtonSegment<T>> segments;
-  final bool busy;
-  final ValueChanged<T> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (constraints.maxWidth < 520) {
-          return DropdownButton<T>(
-            isExpanded: true,
-            value: value,
-            items: items,
-            onChanged: busy
-                ? null
-                : (selected) {
-                    if (selected != null) onChanged(selected);
-                  },
-          );
-        }
-        return SegmentedButton<T>(
-          expandedInsets: EdgeInsets.zero,
-          segments: segments,
-          selected: {value},
-          onSelectionChanged: busy
-              ? null
-              : (selected) {
-                  if (selected.isNotEmpty) onChanged(selected.first);
-                },
-        );
-      },
-    );
-  }
-}
-
-class _RoutingSettingsCard extends StatelessWidget {
-  const _RoutingSettingsCard({
-    required this.core,
-    required this.capabilities,
-    required this.appSettings,
-    required this.onProxyModeChanged,
-    required this.onRouteModeChanged,
-    required this.onSystemProxyChanged,
-  });
-
-  final CoreState core;
-  final AppCapabilities capabilities;
-  final AppSettings appSettings;
-  final ValueChanged<runtime_models.ProxyMode> onProxyModeChanged;
-  final ValueChanged<runtime_models.RouteMode> onRouteModeChanged;
-  final ValueChanged<bool> onSystemProxyChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final horizontal = constraints.maxWidth >= 900;
-            final proxy = Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(l10n.proxyMode, style: theme.textTheme.labelLarge),
-                const SizedBox(height: 8),
-                if (capabilities.vpnOnly)
-                  Row(
-                    children: [
-                      const Icon(Icons.vpn_lock_outlined, size: 20),
-                      const SizedBox(width: 8),
-                      Text(l10n.vpnTun),
-                    ],
-                  )
-                else
-                  _ResponsiveModeSelector<runtime_models.ProxyMode>(
-                    value: core.settings.proxyMode,
-                    busy: core.busy,
-                    items: [
-                      DropdownMenuItem(
-                        value: runtime_models.ProxyMode.mixed,
-                        child: Text(l10n.mixed),
-                      ),
-                      DropdownMenuItem(
-                        value: runtime_models.ProxyMode.tun,
-                        child: Text(l10n.tun),
-                      ),
-                    ],
-                    segments: [
-                      ButtonSegment(
-                        value: runtime_models.ProxyMode.mixed,
-                        icon: const Icon(Icons.lan_outlined),
-                        label: Text(l10n.mixed),
-                      ),
-                      ButtonSegment(
-                        value: runtime_models.ProxyMode.tun,
-                        icon: const Icon(Icons.vpn_lock_outlined),
-                        label: Text(l10n.tun),
-                      ),
-                    ],
-                    onChanged: onProxyModeChanged,
-                  ),
-                if (capabilities.supportsMixedProxy) ...[
-                  const SizedBox(height: 8),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(l10n.systemProxy),
-                    subtitle: Text(l10n.systemProxyDescription),
-                    value: appSettings.systemProxy,
-                    onChanged: onSystemProxyChanged,
-                  ),
-                ],
-              ],
-            );
-            final route = Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(l10n.routingMode, style: theme.textTheme.labelLarge),
-                const SizedBox(height: 8),
-                _ResponsiveModeSelector<runtime_models.RouteMode>(
-                  value: core.settings.routeMode,
-                  busy: core.busy,
-                  items: [
-                    for (final mode in runtime_models.RouteMode.values)
-                      DropdownMenuItem(
-                        value: mode,
-                        child: Text(switch (mode) {
-                          runtime_models.RouteMode.rule => l10n.rule,
-                          runtime_models.RouteMode.direct => l10n.direct,
-                          runtime_models.RouteMode.all => l10n.all,
-                        }),
-                      ),
-                  ],
-                  segments: [
-                    ButtonSegment(
-                      value: runtime_models.RouteMode.rule,
-                      icon: const Icon(Icons.account_tree_outlined),
-                      label: Text(l10n.rule),
-                    ),
-                    ButtonSegment(
-                      value: runtime_models.RouteMode.direct,
-                      icon: const Icon(Icons.flash_on_outlined),
-                      label: Text(l10n.direct),
-                    ),
-                    ButtonSegment(
-                      value: runtime_models.RouteMode.all,
-                      icon: const Icon(Icons.public),
-                      label: Text(l10n.all),
-                    ),
-                  ],
-                  onChanged: onRouteModeChanged,
-                ),
-              ],
-            );
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.tune_outlined, color: theme.colorScheme.primary),
-                    const SizedBox(width: 8),
-                    Text(
-                      l10n.routingMode,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                if (horizontal)
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(child: proxy),
-                      const SizedBox(width: 20),
-                      Expanded(child: route),
-                    ],
-                  )
-                else ...[
-                  proxy,
-                  const SizedBox(height: 16),
-                  route,
-                ],
-              ],
-            );
-          },
-        ),
-      ),
-    );
   }
 }
 

@@ -5,13 +5,10 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   flutter_alone
   proxy_manager
-  screen_retriever_windows
   targetlib
-  window_manager
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST
-  cnativeapi
   jni
 )
 

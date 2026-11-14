@@ -2,6 +2,10 @@ import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:prism_ui/prism_ui.dart' as prism;
+
+import '../core/ui/prism_theme.dart';
+import '../core/ui/ui_localizations.dart';
 
 import '../core/logging/app_logger.dart';
 import '../core/theme/app_theme.dart';
@@ -118,6 +122,31 @@ class _TargetAppViewState extends ConsumerState<_TargetAppView> {
         }
         return const Locale('en');
       },
+      builder: (context, child) => prism.PrismApp(
+        title: AppIdentity.displayName,
+        debugShowCheckedModeBanner: false,
+        theme: PrismTheme.light,
+        darkTheme: PrismTheme.dark,
+        liquidGlass: prism.LiquidGlassQuality.standard,
+        themeMode: Theme.of(context).brightness == Brightness.dark
+            ? prism.ThemeMode.dark
+            : prism.ThemeMode.light,
+        locale: Localizations.localeOf(context),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: [
+          AppLocalizations.delegate,
+          TargetUiLocalizations.delegate,
+          ...GlobalMaterialLocalizations.delegates,
+        ],
+        builder: (context, _) {
+          final size = MediaQuery.sizeOf(context);
+          return prism.ViewScope(
+            size: size,
+            isMobile: size.width <= 600,
+            child: child!,
+          );
+        },
+      ),
       routerConfig: _appRouter.router,
     );
   }

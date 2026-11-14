@@ -1,6 +1,9 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
+import 'package:prism_ui/prism_ui.dart';
 
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/ui/app_glyphs.dart';
+import '../../../../core/ui/record.dart';
+
 import '../../../../core/utils/format_bytes.dart';
 import '../../../../core/runtime/core_models.dart';
 import '../../../../l10n/app_localizations.dart';
@@ -19,89 +22,46 @@ class ConnectionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final styles = RecordTextStyles.of(context);
     final l10n = AppLocalizations.of(context);
     final total = connection.uplinkTotal + connection.downlinkTotal;
     final duration = _formatDuration(connection.createdAt, connection.closedAt);
-    final networkLabel = connection.network.toUpperCase();
-    final protocolLabel = connection.protocol.isNotEmpty
-        ? connection.protocol
-        : '-';
-
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  _NetworkChip(network: networkLabel),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _displayDestination(connection),
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    formatBytes(total),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  if (onClose != null) ...[
-                    const SizedBox(width: 4),
-                    IconButton(
-                      onPressed: closing ? null : onClose,
-                      icon: closing
-                          ? const SizedBox.square(
-                              dimension: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.link_off_rounded, size: 18),
-                      tooltip: l10n.closeConnection,
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ],
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  _TrafficArrow(
-                    icon: Icons.arrow_upward_rounded,
-                    value: formatBytes(connection.uplinkTotal),
-                    color: AppColors.upload,
-                  ),
-                  const SizedBox(width: 12),
-                  _TrafficArrow(
-                    icon: Icons.arrow_downward_rounded,
-                    value: formatBytes(connection.downlinkTotal),
-                    color: AppColors.download,
-                  ),
-                  const Spacer(),
-                  _MetaChip(
-                    icon: Icons.route_rounded,
-                    label: connection.outbound,
-                  ),
-                  const SizedBox(width: 6),
-                  _MetaChip(icon: Icons.policy_rounded, label: protocolLabel),
-                  if (duration.isNotEmpty) ...[
-                    const SizedBox(width: 6),
-                    _MetaChip(icon: Icons.timer_rounded, label: duration),
-                  ],
-                ],
-              ),
-            ],
+      padding: const EdgeInsets.only(bottom: recordListGap),
+      child: RecordListItem(
+        header: RecordHeader(
+          children: [
+            Text(connection.network.toUpperCase()),
+            Text(connection.protocol.isEmpty ? '-' : connection.protocol),
+            Text(formatBytes(total)),
+          ],
+          trailing: onClose == null ? null : IconButton(
+            onPressed: closing ? null : onClose,
+            tooltip: l10n.closeConnection,
+            icon: closing
+                ? const ActivityIndicator(size: 18)
+                : const GlyphIcon(AppGlyphs.close, size: 18),
           ),
+        ),
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(_displayDestination(connection), style: styles.title),
+            const SizedBox(height: 6),
+            DefaultTextStyle(
+              style: styles.secondary,
+              child: Wrap(
+                spacing: 12,
+                runSpacing: 4,
+                children: [
+                  Text('↑ ${formatBytes(connection.uplinkTotal)}'),
+                  Text('↓ ${formatBytes(connection.downlinkTotal)}'),
+                  Text(connection.outbound),
+                  if (duration.isNotEmpty) Text(duration),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -124,101 +84,5 @@ class ConnectionTile extends StatelessWidget {
     final h = seconds ~/ 3600;
     final m = (seconds % 3600) ~/ 60;
     return '${h}h ${m}m';
-  }
-}
-
-class _NetworkChip extends StatelessWidget {
-  const _NetworkChip({required this.network});
-
-  final String network;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final color = switch (network) {
-      'TCP' => theme.colorScheme.primary,
-      'UDP' => const Color(0xffd97706),
-      _ => theme.colorScheme.onSurfaceVariant,
-    };
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(
-        network,
-        style: theme.textTheme.labelSmall?.copyWith(
-          color: color,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-}
-
-class _TrafficArrow extends StatelessWidget {
-  const _TrafficArrow({
-    required this.icon,
-    required this.value,
-    required this.color,
-  });
-
-  final IconData icon;
-  final String value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 12, color: color),
-        const SizedBox(width: 2),
-        Text(
-          value,
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: color,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _MetaChip extends StatelessWidget {
-  const _MetaChip({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 10, color: theme.colorScheme.onSurfaceVariant),
-          const SizedBox(width: 3),
-          Text(
-            label,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }

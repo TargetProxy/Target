@@ -1,4 +1,7 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
+import 'package:prism_ui/prism_ui.dart';
+
+import '../ui/scaffold/scaffold.dart' as ui;
 
 class TargetPageLayout extends StatelessWidget {
   const TargetPageLayout({required this.child, super.key});
@@ -22,11 +25,6 @@ class TargetPageLayout extends StatelessWidget {
   }
 }
 
-/// A page shell: an optional fixed header row (title, subtitle, trailing
-/// actions) above a scrolling body.
-///
-/// Use this for pages whose body needs its own scrolling, or that host a custom
-/// header. Use [TargetPageLayout] when the page is a single plain column.
 class TargetPageScaffold extends StatelessWidget {
   const TargetPageScaffold({
     required this.body,
@@ -39,7 +37,6 @@ class TargetPageScaffold extends StatelessWidget {
 
   final Widget body;
 
-  /// Omit to render a page without the standard header row.
   final String? title;
   final String? subtitle;
   final List<Widget> actions;
@@ -47,50 +44,36 @@ class TargetPageScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final title = this.title;
-    return SafeArea(
-      child: Column(
-        children: [
-          if (title != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxWidth: TargetPageLayout.maxWidth,
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TargetPageHeader(title: title, subtitle: subtitle),
-                    ),
-                    ...actions,
-                  ],
-                ),
-              ),
-            ),
-          Expanded(child: _buildBody()),
-        ],
-      ),
+    return ui.Scaffold(
+      title: title,
+      actions: actions,
+      body: Builder(builder: _buildBody),
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody(BuildContext context) {
     final content = Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: TargetPageLayout.maxWidth),
-        child: body,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: scrollableBody ? MainAxisSize.min : MainAxisSize.max,
+          children: [
+            if (subtitle != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(subtitle!, style: AppTextStyle.subheadline.of(context).toLighter),
+              ),
+            if (scrollableBody) body else Expanded(child: body),
+          ],
+        ),
       ),
     );
-    if (!scrollableBody) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
-        child: content,
-      );
-    }
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
-      child: content,
+    final padding = EdgeInsets.fromLTRB(
+      24, context.contentTopPadding + 16, 24, context.bottomInset + 24,
     );
+    if (!scrollableBody) return Padding(padding: padding, child: content);
+    return SingleChildScrollView(padding: padding, child: content);
   }
 }
 
@@ -102,23 +85,18 @@ class TargetPageHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           title,
-          style: theme.textTheme.headlineMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
+          style: AppTextStyle.title1.of(context, emphasized: true),
         ),
         if (subtitle != null) ...[
           const SizedBox(height: 6),
           Text(
             subtitle!,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
+            style: AppTextStyle.subheadline.of(context).toLighter,
           ),
         ],
       ],

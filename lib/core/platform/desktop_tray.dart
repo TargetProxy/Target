@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_alone/flutter_alone.dart';
 import 'package:tray_manager/tray_manager.dart';
-import 'package:window_manager/window_manager.dart';
+import 'package:window_manager/legacy.dart';
 
 import '../../l10n/app_localizations.dart';
 

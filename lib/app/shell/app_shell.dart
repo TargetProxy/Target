@@ -1,9 +1,10 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
+import 'package:material_ui/material_ui.dart' as material;
+import 'package:prism_ui/prism_ui.dart';
 import 'package:go_router/go_router.dart';
 
-import '../app_identity.dart';
 import '../router.dart';
-import '../../features/connections/presentation/widgets/connections_sidebar.dart';
+import '../../core/ui/app_glyphs.dart';
 import '../../l10n/app_localizations.dart';
 
 class AppShell extends StatelessWidget {
@@ -31,6 +32,7 @@ class AppShell extends StatelessWidget {
 
     return _NavigationScaffold(
       selectedIndex: selectedIndex,
+      scrollUnderDock: location == AppRoute.home.path,
       onDestinationSelected: (index) => context.go(_destinations[index].path),
       items: [for (final route in _destinations) _destinationItem(route, l10n)],
       child: child,
@@ -47,168 +49,106 @@ class AppShell extends StatelessWidget {
   }
 }
 
-typedef _NavigationItem = ({
-  String label,
-  IconData icon,
-  IconData selectedIcon,
-});
+typedef _NavigationItem = ({String label, Glyph glyph});
 
-_NavigationItem _destinationItem(AppRoute route, AppLocalizations l10n) {
-  return switch (route) {
-    AppRoute.home => (
-      label: l10n.dashboard,
-      icon: Icons.dashboard_outlined,
-      selectedIcon: Icons.dashboard,
-    ),
-    AppRoute.proxies => (
-      label: l10n.profiles,
-      icon: Icons.hub_outlined,
-      selectedIcon: Icons.hub,
-    ),
-    AppRoute.nodes => (
-      label: l10n.nodeSelection,
-      icon: Icons.alt_route,
-      selectedIcon: Icons.alt_route,
-    ),
-    AppRoute.rules => (
-      label: l10n.rules,
-      icon: Icons.rule_folder_outlined,
-      selectedIcon: Icons.rule_folder,
-    ),
-    AppRoute.connections => (
-      label: l10n.connections,
-      icon: Icons.cable_outlined,
-      selectedIcon: Icons.cable,
-    ),
-    AppRoute.logs => (
-      label: l10n.logs,
-      icon: Icons.receipt_long_outlined,
-      selectedIcon: Icons.receipt_long,
-    ),
-  };
-}
+_NavigationItem _destinationItem(AppRoute route, AppLocalizations l10n) =>
+    switch (route) {
+      AppRoute.home => (label: l10n.dashboard, glyph: AppGlyphs.dashboard),
+      AppRoute.proxies => (label: l10n.profiles, glyph: AppGlyphs.profiles),
+      AppRoute.nodes => (label: l10n.nodeSelection, glyph: AppGlyphs.proxies),
+      AppRoute.rules => (label: l10n.rules, glyph: AppGlyphs.rules),
+      AppRoute.connections => (label: l10n.connections, glyph: AppGlyphs.connections),
+      AppRoute.logs => (label: l10n.logs, glyph: AppGlyphs.logs),
+    };
 
-class _NavigationScaffold extends StatelessWidget {
+class _NavigationScaffold extends StatefulWidget {
   const _NavigationScaffold({
     required this.selectedIndex,
+    required this.scrollUnderDock,
     required this.onDestinationSelected,
     required this.child,
     required this.items,
   });
 
   final int selectedIndex;
+  final bool scrollUnderDock;
   final ValueChanged<int> onDestinationSelected;
   final Widget child;
   final List<_NavigationItem> items;
 
   @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final useDesktop = constraints.maxWidth >= 720;
-
-        if (useDesktop) {
-          return Scaffold(
-            body: Column(
-              children: [
-                _TopToolbar(
-                  selectedIndex: selectedIndex,
-                  items: items,
-                  onDestinationSelected: onDestinationSelected,
-                ),
-                Expanded(
-                  child: Row(
-                    children: [
-                      ConnectionsSidebar(
-                        onOpenConnections: () =>
-                            context.go(AppRoute.connections.path),
-                      ),
-                      const VerticalDivider(width: 1),
-                      Expanded(child: child),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
-
-        return Scaffold(
-          body: child,
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: selectedIndex,
-            onDestinationSelected: onDestinationSelected,
-            destinations: [
-              for (final item in items)
-                NavigationDestination(
-                  icon: Icon(item.icon),
-                  selectedIcon: Icon(item.selectedIcon),
-                  label: item.label,
-                ),
-            ],
-          ),
-        );
-      },
-    );
-  }
+  State<_NavigationScaffold> createState() => _NavigationScaffoldState();
 }
 
-class _TopToolbar extends StatelessWidget {
-  const _TopToolbar({
-    required this.selectedIndex,
-    required this.items,
-    required this.onDestinationSelected,
-  });
-
-  final int selectedIndex;
-  final List<_NavigationItem> items;
-  final ValueChanged<int> onDestinationSelected;
+class _NavigationScaffoldState extends State<_NavigationScaffold> {
+  bool _expanded = true;
 
   @override
   Widget build(BuildContext context) {
-    final visibleCount = items.length < 4 ? items.length : 4;
-    final selected = selectedIndex < visibleCount ? {selectedIndex} : <int>{};
-    return AppBar(
-      automaticallyImplyLeading: false,
-      titleSpacing: 20,
-      title: Text(AppIdentity.displayName),
-      actions: [
-        SegmentedButton<int>(
-          segments: [
-            for (var i = 0; i < visibleCount; i++)
-              ButtonSegment<int>(
-                value: i,
-                icon: Icon(items[i].icon, size: 18),
-                label: Text(items[i].label),
-              ),
-          ],
-          selected: selected,
-          emptySelectionAllowed: true,
-          showSelectedIcon: false,
-          onSelectionChanged: (values) {
-            if (values.isNotEmpty) onDestinationSelected(values.first);
-          },
-        ),
-        if (items.length > visibleCount)
-          PopupMenuButton<int>(
-            tooltip: AppLocalizations.of(context).more,
-            onSelected: onDestinationSelected,
-            itemBuilder: (context) => [
-              for (var i = visibleCount; i < items.length; i++)
-                PopupMenuItem<int>(
-                  value: i,
-                  child: Row(
-                    children: [
-                      Icon(items[i].icon),
-                      const SizedBox(width: 12),
-                      Text(items[i].label),
+    return material.Scaffold(
+      body: Surface(
+        color: SurfaceLevel.page.colorOf(context.colorScheme),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isMobile = constraints.maxWidth <= 600;
+            if (!isMobile) {
+              final canExpand = constraints.maxWidth > 840;
+              return Row(
+                children: [
+                  NavigationSidebar(
+                    destinations: [
+                      for (final item in widget.items)
+                        SidebarDestination(glyph: item.glyph, label: item.label),
                     ],
+                    selectedIndex: widget.selectedIndex,
+                    expanded: canExpand && _expanded,
+                    onSelected: widget.onDestinationSelected,
+                    onToggle: canExpand
+                        ? () => setState(() => _expanded = !_expanded)
+                        : null,
+                  ),
+                  Expanded(child: widget.child),
+                ],
+              );
+            }
+            return Stack(
+              children: [
+                Positioned.fill(
+                  child: BottomInsetScope(
+                    inset: widget.scrollUnderDock ? NavigationDock.insetOf(context) : 0,
+                    child: MediaQuery.removePadding(
+                      context: context,
+                      removeBottom: true,
+                      child: Padding(
+                        padding: EdgeInsets.only(
+                          bottom: widget.scrollUnderDock ? 0 : NavigationDock.insetOf(context),
+                        ),
+                        child: widget.child,
+                      ),
+                    ),
                   ),
                 ),
-            ],
-          ),
-        const SizedBox(width: 12),
-      ],
+                PositionedDirectional(
+                  start: 0,
+                  end: 0,
+                  bottom: 0,
+                  child: NavigationDock(
+                    destinations: [
+                      for (final item in widget.items)
+                        NavigationDockDestination(
+                          glyph: item.glyph,
+                          label: item.label,
+                        ),
+                    ],
+                    selectedIndex: widget.selectedIndex,
+                    onSelected: widget.onDestinationSelected,
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
     );
   }
 }

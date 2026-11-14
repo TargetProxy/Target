@@ -1,5 +1,9 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
+import 'package:material_ui/material_ui.dart' show Icons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:prism_ui/prism_ui.dart' as prism;
+
+import '../../../core/ui/app_glyphs.dart';
 
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/target_page_layout.dart';
@@ -22,16 +26,13 @@ class ConnectionsPage extends ConsumerWidget {
       title: l10n.connections,
       scrollableBody: false,
       actions: [
-        IconButton(
+        prism.IconButton(
           onPressed: state.activeCount == 0 || state.closingAll
               ? null
               : () => closeAllConnectionsWithFeedback(context, ref, notifier),
           icon: state.closingAll
-              ? const SizedBox.square(
-                  dimension: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.clear_all_rounded),
+              ? const prism.ActivityIndicator(size: 20)
+              : const GlyphIcon(AppGlyphs.close),
           tooltip: l10n.closeAllConnections,
         ),
       ],
@@ -99,63 +100,35 @@ class _ConnectionsToolbar extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: l10n.searchConnections,
-                isDense: true,
-                prefixIcon: Icon(Icons.search_rounded, size: 20),
-              ),
+            child: prism.SearchField(
+              hintText: l10n.searchConnections,
               onChanged: onSearchChanged,
             ),
           ),
           const SizedBox(width: 8),
-          PopupMenuButton<ConnectionSortBy>(
-            icon: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.sort_rounded, size: 20),
-                const SizedBox(width: 2),
-                Icon(
-                  sortAsc
-                      ? Icons.arrow_upward_rounded
-                      : Icons.arrow_downward_rounded,
-                  size: 14,
-                ),
-              ],
+          prism.PopupAnchor(
+            targetBuilder: (open) => prism.IconButton(
+              onPressed: open,
+              tooltip: '${l10n.sortBy} ${sortAsc ? '↑' : '↓'}',
+              icon: const GlyphIcon(AppGlyphs.sort),
             ),
-            tooltip: l10n.sortBy,
-            onSelected: onSortChanged,
-            itemBuilder: (context) => [
-              _sortItem(ConnectionSortBy.traffic, l10n.trafficSort),
-              _sortItem(ConnectionSortBy.destination, l10n.destinationSort),
-              _sortItem(ConnectionSortBy.outbound, l10n.outboundSort),
-              _sortItem(ConnectionSortBy.network, l10n.networkSort),
-            ],
+            popupBuilder: (_) => prism.PopupMenu(items: [
+              for (final (value, label) in [
+                (ConnectionSortBy.traffic, l10n.trafficSort),
+                (ConnectionSortBy.destination, l10n.destinationSort),
+                (ConnectionSortBy.outbound, l10n.outboundSort),
+                (ConnectionSortBy.network, l10n.networkSort),
+              ])
+                prism.PopupMenuItem(
+                  label: '$label${sortBy == value ? (sortAsc ? ' ↑' : ' ↓') : ''}',
+                  checked: sortBy == value,
+                  onPressed: () => onSortChanged(value),
+                ),
+            ]),
           ),
         ],
       ),
     );
   }
 
-  PopupMenuItem<ConnectionSortBy> _sortItem(
-    ConnectionSortBy value,
-    String label,
-  ) {
-    return PopupMenuItem(
-      value: value,
-      child: Row(
-        children: [
-          Text(label),
-          const Spacer(),
-          if (sortBy == value)
-            Icon(
-              sortAsc
-                  ? Icons.arrow_upward_rounded
-                  : Icons.arrow_downward_rounded,
-              size: 14,
-            ),
-        ],
-      ),
-    );
-  }
 }

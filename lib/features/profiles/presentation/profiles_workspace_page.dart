@@ -1,9 +1,13 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
+import 'package:prism_ui/prism_ui.dart';
+
+import '../../../core/ui/app_glyphs.dart';
+import '../../../core/ui/scaffold/scaffold.dart' as ui;
+import 'widgets/subscription_card.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/utils/format_bytes.dart';
-import '../../../core/widgets/target_page_layout.dart';
 import '../../../data/models/subscription.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../proxies/application/proxy_catalog.dart';
@@ -26,193 +30,146 @@ class ProfilesWorkspacePage extends ConsumerWidget {
         .map((node) => node.id)
         .toSet()
         .length;
-    return Align(
-      alignment: Alignment.topCenter,
-      child: SafeArea(
-        child: TargetPageLayout(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TargetPageHeader(
-                title: l10n.profiles,
-                subtitle: l10n.subscriptionsHint,
+    return ui.Scaffold(
+      title: l10n.profiles,
+      primaryAction: IconButtonData(
+        glyph: AppGlyphs.add,
+        tooltip: l10n.addSubscription,
+        onPressed: busy ? null : () => _addSubscription(context, ref),
+      ),
+      body: Builder(
+        builder: (context) => ListView(
+          padding: EdgeInsets.fromLTRB(
+            24, context.contentTopPadding + 16, 24, context.bottomInset + 24,
+          ),
+          children: [
+            Text(l10n.subscriptionsHint, style: AppTextStyle.subheadline.of(context).toLighter),
+            const SizedBox(height: 8),
+            Text(l10n.poolSummary(
+              state.subscriptions.where((sub) => sub.enabled).length,
+              nodeCount,
+            )),
+            const SizedBox(height: 16),
+            if (state.lastError != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(state.lastError!, style: TextStyle(color: context.colorScheme.error)),
               ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 12,
-                runSpacing: 8,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  FilledButton.icon(
-                    onPressed: busy
-                        ? null
-                        : () => _addSubscription(context, ref),
-                    icon: const Icon(Icons.add),
-                    label: Text(l10n.addSubscription),
-                  ),
-                  Text(
-                    l10n.poolSummary(
-                      state.subscriptions.where((sub) => sub.enabled).length,
-                      nodeCount,
-                    ),
-                  ),
-                ],
+            if (state.subscriptions.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 32),
+                child: Text(l10n.noSubscriptionsHint, textAlign: TextAlign.center),
               ),
-              const SizedBox(height: 16),
-              if (state.lastError != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Text(
-                    state.lastError!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-                ),
-              if (state.subscriptions.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 32),
-                  child: Text(
-                    l10n.noSubscriptionsHint,
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              for (final subscription in state.subscriptions) ...[
-                Card(
+            for (final subscription in state.subscriptions)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: SubscriptionCard(
                   key: ValueKey('subscription-${subscription.id}'),
-                  child: Column(
-                    children: [
-                      CheckboxListTile(
-                        key: ValueKey('enable-${subscription.id}'),
-                        value: subscription.enabled,
-                        onChanged: busy
-                            ? null
-                            : (value) {
-                                if (value != null) {
-                                  notifier.setEnabled(subscription.id, value);
-                                }
-                              },
-                        controlAffinity: ListTileControlAffinity.leading,
-                        title: Text(subscription.name),
-                        subtitle: Text(
-                          '${l10n.poolNodeCount(subscription.nodeCount)} · ${subscription.enabled ? l10n.includedInPool : l10n.excludedFromPool}',
+                  profile: subscription,
+                  busy: busy,
+                  isUpdating: state.changingIds.contains(subscription.id) ||
+                      subscription.updateStatus == SubscriptionUpdateStatus.updating,
+                  onToggle: () => notifier.setEnabled(subscription.id, !subscription.enabled),
+                  onUpdate: () => notifier.updateSubscription(subscription.id),
+                  onDetails: () => _showDetails(context, subscription),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showDetails(BuildContext context, Subscription subscription) {
+    final l10n = AppLocalizations.of(context);
+    showFormSheet<void>(
+      context: context,
+      builder: (_) => ui.Scaffold(
+        title: l10n.subscriptionDetails,
+        body: Builder(
+          builder: (context) => SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              24, context.contentTopPadding + 16, 24, context.bottomInset + 24,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _UsageProgress(subscription: subscription),
+                _DetailRow(
+                  label: l10n.subscriptionAddress,
+                  value: subscription.safeUrl,
+                  selectable: true,
+                ),
+                _DetailRow(
+                  label: l10n.lastUpdated,
+                  value: subscription.lastUpdatedAt == null
+                      ? l10n.neverUpdated
+                      : DateFormat.yMMMd(
+                          l10n.localeName,
+                        ).add_Hm().format(
+                          subscription.lastUpdatedAt!.toLocal(),
                         ),
-                        secondary:
-                            state.changingIds.contains(subscription.id) ||
-                                subscription.updateStatus ==
-                                    SubscriptionUpdateStatus.updating
-                            ? const SizedBox.square(
-                                dimension: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : IconButton(
-                                onPressed: busy
-                                    ? null
-                                    : () => notifier.updateSubscription(
-                                        subscription.id,
-                                      ),
-                                tooltip: l10n.updateSubscription,
-                                icon: const Icon(Icons.refresh),
-                            ),
-                      ),
-                      _UsageProgress(subscription: subscription),
-                      ExpansionTile(
-                        key: PageStorageKey('details-${subscription.id}'),
-                        title: Text(
-                          l10n.subscriptionDetails,
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                        childrenPadding: const EdgeInsets.fromLTRB(
-                          16,
-                          0,
-                          16,
-                          16,
-                        ),
-                        expandedCrossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _DetailRow(
-                            label: l10n.subscriptionAddress,
-                            value: subscription.safeUrl,
-                            selectable: true,
-                          ),
-                          _DetailRow(
-                            label: l10n.lastUpdated,
-                            value: subscription.lastUpdatedAt == null
-                                ? l10n.neverUpdated
-                                : DateFormat.yMMMd(
-                                    l10n.localeName,
-                                  ).add_Hm().format(
-                                    subscription.lastUpdatedAt!.toLocal(),
-                                  ),
-                          ),
-                          _DetailRow(
-                            label: l10n.subscriptionNodes,
-                            value: '${subscription.nodeCount}',
-                          ),
-                          _DetailRow(
-                            label: l10n.automaticUpdates,
-                            value: subscription.autoUpdate
-                                ? l10n.enabled
-                                : l10n.disabled,
-                          ),
-                          _DetailRow(
-                            label: l10n.updateInterval,
-                            value: _formatInterval(
-                              subscription.updateIntervalSeconds,
-                              disabledLabel: l10n.disabled,
-                            ),
-                          ),
-                          _DetailRow(
-                            label: l10n.trafficUsed,
-                            value: formatBytes(
-                              subscription.uploadBytes +
-                                  subscription.downloadBytes,
-                            ),
-                          ),
-                          if (subscription.expiresAt != null)
-                            _DetailRow(
-                              label: l10n.expires,
-                              value: DateFormat.yMMMd(l10n.localeName)
-                                  .add_Hm()
-                                  .format(subscription.expiresAt!.toLocal()),
-                            ),
-                          if (subscription.profileTitle?.isNotEmpty == true)
-                            _DetailRow(
-                              label: l10n.profile,
-                              value: subscription.profileTitle!,
-                            ),
-                          if (subscription.webPageUrl?.isNotEmpty == true)
-                            _DetailRow(
-                              label: l10n.webPage,
-                              value: subscription.webPageUrl!,
-                              selectable: true,
-                            ),
-                          if (subscription.supportUrl?.isNotEmpty == true)
-                            _DetailRow(
-                              label: l10n.support,
-                              value: subscription.supportUrl!,
-                              selectable: true,
-                            ),
-                          if (subscription.lastError?.isNotEmpty == true)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: Text(
-                                subscription.lastError!,
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.error,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
+                ),
+                _DetailRow(
+                  label: l10n.subscriptionNodes,
+                  value: '${subscription.nodeCount}',
+                ),
+                _DetailRow(
+                  label: l10n.automaticUpdates,
+                  value: subscription.autoUpdate
+                      ? l10n.enabled
+                      : l10n.disabled,
+                ),
+                _DetailRow(
+                  label: l10n.updateInterval,
+                  value: _formatInterval(
+                    subscription.updateIntervalSeconds,
+                    disabledLabel: l10n.disabled,
                   ),
                 ),
-                const SizedBox(height: 12),
+                _DetailRow(
+                  label: l10n.trafficUsed,
+                  value: formatBytes(
+                    subscription.uploadBytes +
+                        subscription.downloadBytes,
+                  ),
+                ),
+                if (subscription.expiresAt != null)
+                  _DetailRow(
+                    label: l10n.expires,
+                    value: DateFormat.yMMMd(l10n.localeName)
+                        .add_Hm()
+                        .format(subscription.expiresAt!.toLocal()),
+                  ),
+                if (subscription.profileTitle?.isNotEmpty == true)
+                  _DetailRow(
+                    label: l10n.profile,
+                    value: subscription.profileTitle!,
+                  ),
+                if (subscription.webPageUrl?.isNotEmpty == true)
+                  _DetailRow(
+                    label: l10n.webPage,
+                    value: subscription.webPageUrl!,
+                    selectable: true,
+                  ),
+                if (subscription.supportUrl?.isNotEmpty == true)
+                  _DetailRow(
+                    label: l10n.support,
+                    value: subscription.supportUrl!,
+                    selectable: true,
+                  ),
+                if (subscription.lastError?.isNotEmpty == true)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      subscription.lastError!,
+                      style: TextStyle(
+                        color: context.colorScheme.error,
+                      ),
+                    ),
+                  ),
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -220,15 +177,8 @@ class ProfilesWorkspacePage extends ConsumerWidget {
   }
 
   Future<void> _addSubscription(BuildContext context, WidgetRef ref) async {
-    final result = await showModalBottomSheet<Map<String, String>>(
+    final result = await showFormSheet<Map<String, String>>(
       context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      useSafeArea: true,
-      clipBehavior: Clip.antiAlias,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
       builder: (_) => const AddSubscriptionSheet(),
     );
     if (result == null || !context.mounted) return;
@@ -298,9 +248,7 @@ class _DetailRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final labelStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
-      color: Theme.of(context).colorScheme.onSurfaceVariant,
-    );
+    final labelStyle = AppTextStyle.footnote.of(context).toLighter;
     final valueWidget = selectable
         ? SelectionArea(
             child: Text(value, maxLines: 2, overflow: TextOverflow.ellipsis),

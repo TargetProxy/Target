@@ -1,4 +1,7 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
+import 'package:prism_ui/prism_ui.dart';
+
+import '../../../core/ui/app_glyphs.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:targetlib/targetlib.dart' as pb;
@@ -143,17 +146,16 @@ class _RulesPageState extends ConsumerState<RulesPage> {
               .toList();
     final selected = proxies.selectedGroup?.selectedNode;
 
-    return SafeArea(
-      child: TargetPageLayout(
-        child: Column(
+    return TargetPageScaffold(
+      title: l10n.rules,
+      body: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            TargetPageHeader(title: l10n.rules),
             Align(
               alignment: Alignment.centerLeft,
               child: TextButton.icon(
                 onPressed: () => context.go('/nodes'),
-                icon: const Icon(Icons.alt_route),
+                icon: const GlyphIcon(AppGlyphs.rules),
                 label: Text(l10n.selectDefaultNode),
               ),
             ),
@@ -166,14 +168,15 @@ class _RulesPageState extends ConsumerState<RulesPage> {
                 ),
               ),
             Card(
+              inert: true,
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.public),
+                    ListRow(
+                      padding: EdgeInsets.zero,
+                      leading: const GlyphIcon(AppGlyphs.proxies),
                       title: Text(l10n.defaultNode),
                       subtitle: Text(
                         selected?.displayName ?? l10n.nodeNotSelected,
@@ -184,10 +187,10 @@ class _RulesPageState extends ConsumerState<RulesPage> {
                       runSpacing: 8,
                       children: [
                         for (final node in visible.take(12))
-                          ChoiceChip(
-                            label: Text(node.displayName),
+                          Chip(
+                            label: node.displayName,
                             selected: node.id == selected?.id,
-                            onSelected: (_) => ref
+                            onPressed: () => ref
                                 .read(proxiesProvider.notifier)
                                 .selectNode(node.id),
                           ),
@@ -209,16 +212,16 @@ class _RulesPageState extends ConsumerState<RulesPage> {
               Wrap(
                 spacing: 8,
                 children: [
-                  ChoiceChip(
-                    label: Text(l10n.allRegions),
+                  Chip(
+                    label: l10n.allRegions,
                     selected: _country == null,
-                    onSelected: (_) => setState(() => _country = null),
+                    onPressed: () => setState(() => _country = null),
                   ),
                   for (final entry in countries)
-                    ChoiceChip(
-                      label: Text('${entry.countryCode} · ${entry.nodeCount}'),
+                    Chip(
+                      label: '${entry.countryCode} · ${entry.nodeCount}',
                       selected: _country == entry.countryCode,
-                      onSelected: (_) =>
+                      onPressed: () =>
                           setState(() => _country = entry.countryCode),
                     ),
                 ],
@@ -227,18 +230,18 @@ class _RulesPageState extends ConsumerState<RulesPage> {
             ],
             _ruleEditor(context, visible),
             const SizedBox(height: 16),
-            if (_loading) const Center(child: CircularProgressIndicator()),
+            if (_loading) const Center(child: ActivityIndicator()),
             for (var index = 0; index < _routes.length; index++)
               _routeTile(_routes[index], nodes, l10n),
           ],
         ),
-      ),
     );
   }
 
   Widget _ruleEditor(BuildContext context, List<ProxyNode> nodes) {
     final l10n = AppLocalizations.of(context);
     return Card(
+      inert: true,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -257,21 +260,21 @@ class _RulesPageState extends ConsumerState<RulesPage> {
                   width: 180,
                   child: TextField(
                     controller: _service,
-                    decoration: InputDecoration(labelText: l10n.serviceId),
+                    decoration: InputDecoration(hintText: l10n.serviceId),
                   ),
                 ),
                 SizedBox(
                   width: 220,
                   child: TextField(
                     controller: _name,
-                    decoration: InputDecoration(labelText: l10n.displayName),
+                    decoration: InputDecoration(hintText: l10n.displayName),
                   ),
                 ),
                 SizedBox(
                   width: 320,
                   child: TextField(
                     controller: _domains,
-                    decoration: InputDecoration(labelText: l10n.domainsHint),
+                    decoration: InputDecoration(hintText: l10n.domainsHint),
                   ),
                 ),
               ],
@@ -285,13 +288,11 @@ class _RulesPageState extends ConsumerState<RulesPage> {
               builder: (context, candidates, _) => Container(
                 height: 64,
                 alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: candidates.isNotEmpty
-                        ? Theme.of(context).colorScheme.primary
-                        : Theme.of(context).dividerColor,
+                decoration: ShapeDecoration(
+                  shape: AppShape.lg.copyWith(
+                    side: BorderSide(color: candidates.isNotEmpty
+                        ? context.colorScheme.primary : context.colorScheme.outlineVariant),
                   ),
-                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   _selectedNode == null
@@ -311,12 +312,9 @@ class _RulesPageState extends ConsumerState<RulesPage> {
                   final node = nodes[index];
                   return Draggable<ProxyNode>(
                     data: node,
-                    feedback: Material(
-                      child: Chip(label: Text(node.displayName)),
-                    ),
+                    feedback: Chip(label: node.displayName),
                     child: Chip(
-                      avatar: const Icon(Icons.drag_indicator, size: 16),
-                      label: Text(node.displayName),
+                      label: node.displayName,
                     ),
                   );
                 },
@@ -327,7 +325,7 @@ class _RulesPageState extends ConsumerState<RulesPage> {
               alignment: Alignment.centerRight,
               child: FilledButton.icon(
                 onPressed: _saveRule,
-                icon: const Icon(Icons.add),
+                icon: const GlyphIcon(AppGlyphs.add),
                 label: Text(l10n.saveRule),
               ),
             ),
@@ -357,21 +355,20 @@ class _RulesPageState extends ConsumerState<RulesPage> {
           if (mounted) setState(() => _error = error.toString());
         }
       },
-      builder: (context, candidates, _) => Card(
-        color: candidates.isNotEmpty
-            ? Theme.of(context).colorScheme.secondaryContainer
-            : null,
-        child: ListTile(
-          leading: Icon(
-            route.enabled ? Icons.alt_route : Icons.pause_circle_outline,
-          ),
+      builder: (context, candidates, _) => Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Card(
+        inert: true,
+        isSelected: candidates.isNotEmpty,
+        fillsSelection: candidates.isNotEmpty,
+        child: ListRow(
+          leading: GlyphIcon(route.enabled ? AppGlyphs.rules : AppGlyphs.playPause(1)),
           title: Text(
             route.displayName.isEmpty ? route.serviceId : route.displayName,
           ),
           subtitle: Text(
             '${route.domains.join(', ')}\n${l10n.routeExit(node?.displayName ?? route.currentNodeName)}',
           ),
-          isThreeLine: true,
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -382,11 +379,12 @@ class _RulesPageState extends ConsumerState<RulesPage> {
               IconButton(
                 tooltip: l10n.deleteRule,
                 onPressed: () => _deleteRule(route.serviceId),
-                icon: const Icon(Icons.delete_outline),
+                icon: const GlyphIcon(AppGlyphs.delete),
               ),
             ],
           ),
         ),
+      ),
       ),
     );
   }

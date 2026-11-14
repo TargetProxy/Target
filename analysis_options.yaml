@@ -17,6 +17,7 @@ analyzer:
     - macos/**
     - linux/**
     - targetlib-inspect/**
+    - packages/prism_ui/**
 include: package:flutter_lints/flutter.yaml
 
 linter:
