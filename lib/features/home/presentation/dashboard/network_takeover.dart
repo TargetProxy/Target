@@ -8,6 +8,7 @@ import '../../../../data/models/runtime_settings.dart';
 import '../../../../l10n/app_localizations.dart';
 
 import 'card.dart';
+import 'layout.dart';
 
 typedef _RowMetrics = ({
   EdgeInsets padding,
@@ -55,8 +56,12 @@ class _TakeoverRow extends StatelessWidget {
     final appLocalizations = AppLocalizations.of(context);
     final systemProxy = kind == TakeoverSwitch.systemProxy;
     final title = _titleOf(context, kind);
-    final value = systemProxy ? settings.systemProxy : core.settings.proxyMode == ProxyMode.tun;
-    final on = systemProxy ? '${core.settings.mixedPort}' : appLocalizations.enabled;
+    final value = systemProxy
+        ? settings.systemProxy
+        : core.settings.proxyMode == ProxyMode.tun;
+    final on = systemProxy
+        ? '${core.settings.mixedPort}'
+        : appLocalizations.enabled;
     void change(bool value) => systemProxy
         ? onSystemProxyChanged(value)
         : onProxyModeChanged(value ? ProxyMode.tun : ProxyMode.mixed);
@@ -131,10 +136,7 @@ class NetworkTakeoverCard extends StatelessWidget {
                 width: constraints.maxWidth,
                 iconSize: metrics.icon,
                 padding: metrics.padding,
-                titles: [
-                  for (final kind in kinds)
-                    _titleOf(context, kind),
-                ],
+                titles: [for (final kind in kinds) _titleOf(context, kind)],
               );
               return Column(
                 spacing: 8,
@@ -160,3 +162,66 @@ class NetworkTakeoverCard extends StatelessWidget {
   }
 }
 
+_RowMetrics _tileMetricsOf(DashboardDensity density) => density.isCompact
+    ? (
+        padding: const EdgeInsets.fromLTRB(10, 0, 12, 0),
+        titleStart: dashboardCardPadding(density).left,
+        radius: dashboardCardRadius(density),
+        icon: 36,
+        subtitle: false,
+      )
+    : (
+        padding: const EdgeInsets.fromLTRB(12, 0, 16, 0),
+        titleStart: dashboardCardPadding(density).left,
+        radius: dashboardCardRadius(density),
+        icon: 40,
+        subtitle: true,
+      );
+
+class NetworkTakeoverTile extends StatelessWidget {
+  const NetworkTakeoverTile(
+    this.kind, {
+    required this.core,
+    required this.settings,
+    required this.capabilities,
+    required this.onProxyModeChanged,
+    required this.onSystemProxyChanged,
+    super.key,
+  });
+  final CoreState core;
+  final AppSettings settings;
+  final AppCapabilities capabilities;
+  final ValueChanged<ProxyMode> onProxyModeChanged;
+  final ValueChanged<bool> onSystemProxyChanged;
+
+  final TakeoverSwitch kind;
+
+  @override
+  Widget build(BuildContext context) {
+    final metrics = _tileMetricsOf(DashboardDensityScope.of(context));
+    return DashboardCard(
+      padding: EdgeInsets.zero,
+      child: LayoutBuilder(
+        builder: (context, constraints) => _TakeoverRow(
+          kind: kind,
+          core: core,
+          settings: settings,
+          supportsMixedProxy: capabilities.supportsMixedProxy,
+          onProxyModeChanged: onProxyModeChanged,
+          onSystemProxyChanged: onSystemProxyChanged,
+          metrics: metrics,
+          color: Colors.transparent,
+          showIcon: DashboardSwitchRow.iconFits(
+            context,
+            width: constraints.maxWidth,
+            iconSize: metrics.icon,
+            padding: metrics.padding,
+            titles: [
+              for (final kind in TakeoverSwitch.values) _titleOf(context, kind),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

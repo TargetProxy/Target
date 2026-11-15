@@ -87,6 +87,46 @@ class DashboardCard extends StatelessWidget {
   }
 }
 
+class DashboardIconButton extends StatelessWidget {
+  const DashboardIconButton({
+    super.key,
+    required this.glyph,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  static const size = 32.0;
+  static const glyphSize = 18.0;
+
+  final Glyph glyph;
+  final String tooltip;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: size,
+    // Keep the hit target round inside the 24-pixel card header.
+    child: OverflowBox(
+      fit: OverflowBoxFit.deferToChild,
+      minHeight: size,
+      maxHeight: size,
+      child: IconButton(
+        tooltip: tooltip,
+        padding: EdgeInsets.zero,
+        iconSize: glyphSize,
+        style: ButtonStyle.from(
+          minimumSize: const Size.square(size),
+          fixedSize: const Size.square(size),
+          tapTargetSize: TapTargetSize.shrinkWrap,
+          foregroundColor: context.colorScheme.onSurfaceVariant,
+        ),
+        onPressed: onPressed,
+        icon: GlyphIcon(glyph, size: glyphSize),
+      ),
+    ),
+  );
+}
+
 class DashboardCardHeader extends StatelessWidget {
   const DashboardCardHeader({
     super.key,
@@ -178,9 +218,9 @@ class DashboardFitText extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final width = MeasureScope.of(context)
-            .computeTextSize(Text(text, style: style))
-            .width;
+        final width = MeasureScope.of(
+          context,
+        ).computeTextSize(Text(text, style: style)).width;
         if (width * _minScale <= constraints.maxWidth) {
           return FittedBox(
             fit: BoxFit.scaleDown,
@@ -701,9 +741,9 @@ class DashboardSwitchRow extends StatelessWidget {
         DashboardSwitch.trackWidth;
     return titles.every(
       (title) =>
-          MeasureScope.of(context)
-              .computeTextSize(Text(title, style: style))
-              .width <=
+          MeasureScope.of(
+            context,
+          ).computeTextSize(Text(title, style: style)).width <=
           room,
     );
   }
@@ -781,3 +821,34 @@ class DashboardSwitchRow extends StatelessWidget {
   }
 }
 
+/// The last [height] dp of a list that runs past its card fade out instead of
+/// showing a scroll bar.
+class DashboardFadeOut extends StatelessWidget {
+  const DashboardFadeOut({super.key, required this.child});
+
+  static const height = 44.0;
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ShaderMask(
+      blendMode: BlendMode.dstIn,
+      shaderCallback: (bounds) {
+        final stop = bounds.height <= 0
+            ? 1.0
+            : ((bounds.height - height) / bounds.height).clamp(0.0, 1.0);
+        return LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: const [Colors.black, Colors.black, Colors.transparent],
+          stops: [0, stop, 1],
+        ).createShader(bounds);
+      },
+      child: ScrollConfiguration(
+        behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+        child: child,
+      ),
+    );
+  }
+}

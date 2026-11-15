@@ -6,6 +6,7 @@ import '../../../../core/ui/app_glyphs.dart';
 import '../../../../data/models/runtime_settings.dart';
 import '../../../../l10n/app_localizations.dart';
 import 'card.dart';
+import 'layout.dart';
 import 'style.dart';
 
 Glyph _glyphOf(RouteMode mode) => switch (mode) {
@@ -24,7 +25,11 @@ String _labelOf(BuildContext context, RouteMode mode) {
 }
 
 class OutboundModeCard extends StatelessWidget {
-  const OutboundModeCard({required this.core, required this.onChanged, super.key});
+  const OutboundModeCard({
+    required this.core,
+    required this.onChanged,
+    super.key,
+  });
 
   final CoreState core;
   final ValueChanged<RouteMode> onChanged;
@@ -58,7 +63,9 @@ class OutboundModeCard extends StatelessWidget {
                     inner: 12,
                     background: tone,
                     semanticLabel: _labelOf(context, item),
-                    onTap: () { if (!core.busy && item != mode) onChanged(item); },
+                    onTap: () {
+                      if (!core.busy && item != mode) onChanged(item);
+                    },
                     builder: (foreground) => SizedBox(
                       height: 52,
                       child: Column(
@@ -89,3 +96,95 @@ class OutboundModeCard extends StatelessWidget {
   }
 }
 
+class OutboundModeBar extends StatelessWidget {
+  const OutboundModeBar({
+    required this.core,
+    required this.onChanged,
+    super.key,
+  });
+
+  final CoreState core;
+  final ValueChanged<RouteMode> onChanged;
+
+  static const _inset = 8.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final density = DashboardDensityScope.of(context);
+    final mode = core.settings.routeMode;
+    final appLocalizations = AppLocalizations.of(context);
+    final outer = dashboardCardRadius(density) - _inset;
+    final style = AppTextStyle.subheadline.of(context, emphasized: true);
+    return DashboardCard(
+      semanticLabel: appLocalizations.routingMode,
+      padding: EdgeInsetsDirectional.fromSTEB(
+        dashboardCardPadding(density).left,
+        _inset,
+        _inset,
+        _inset,
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) => Row(
+          spacing: 16,
+          children: [
+            GlyphIcon(
+              AppGlyphs.split,
+              size: 18,
+              color: context.colorScheme.onSurfaceVariant,
+            ),
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: constraints.maxWidth / 4),
+              child: Text(
+                appLocalizations.routingMode,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: DashboardText.cardTitle(context),
+              ),
+            ),
+            Expanded(
+              child: DashboardConnectedGroup(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final (index, item) in OutboundModeCard._modes.indexed)
+                    Expanded(
+                      child: DashboardConnectedButton(
+                        selected: item == mode,
+                        first: index == 0,
+                        last: index == OutboundModeCard._modes.length - 1,
+                        outer: outer,
+                        inner: 10,
+                        background: DashboardColors.of(context).tone,
+                        semanticLabel: _labelOf(context, item),
+                        onTap: () {
+                          if (!core.busy) onChanged(item);
+                        },
+                        builder: (foreground) => Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          spacing: 6,
+                          children: [
+                            GlyphIcon(
+                              _glyphOf(item),
+                              size: 18,
+                              color: foreground,
+                            ),
+                            Flexible(
+                              child: Text(
+                                _labelOf(context, item),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: style.copyWith(color: foreground),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

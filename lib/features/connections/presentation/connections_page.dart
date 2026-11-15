@@ -1,11 +1,12 @@
 import 'package:flutter/widgets.dart';
-import 'package:material_ui/material_ui.dart' show Icons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:prism_ui/prism_ui.dart' as prism;
 
 import '../../../core/ui/app_glyphs.dart';
+import '../../../core/ui/scaffold/scaffold.dart' as ui;
 
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/ui/null_status_illustration.dart';
 import '../../../core/widgets/target_page_layout.dart';
 import '../../../l10n/app_localizations.dart';
 import '../application/connections_notifier.dart';
@@ -25,7 +26,33 @@ class ConnectionsPage extends ConsumerWidget {
     return TargetPageScaffold(
       title: l10n.connections,
       scrollableBody: false,
+      searchState: ui.AppBarSearchState(
+        onSearch: notifier.setSearchQuery,
+      ),
       actions: [
+        prism.PopupAnchor(
+          targetBuilder: (open) => prism.IconButton(
+            onPressed: open,
+            tooltip: '${l10n.sortBy} ${state.sortAsc ? '↑' : '↓'}',
+            icon: const GlyphIcon(AppGlyphs.sort),
+          ),
+          popupBuilder: (_) => prism.PopupMenu(
+            items: [
+              for (final (value, label) in [
+                (ConnectionSortBy.traffic, l10n.trafficSort),
+                (ConnectionSortBy.destination, l10n.destinationSort),
+                (ConnectionSortBy.outbound, l10n.outboundSort),
+                (ConnectionSortBy.network, l10n.networkSort),
+              ])
+                prism.PopupMenuItem(
+                  label:
+                      '$label${state.sortBy == value ? (state.sortAsc ? ' ↑' : ' ↓') : ''}',
+                  checked: state.sortBy == value,
+                  onPressed: () => notifier.setSortBy(value),
+                ),
+            ],
+          ),
+        ),
         prism.IconButton(
           onPressed: state.activeCount == 0 || state.closingAll
               ? null
@@ -38,18 +65,10 @@ class ConnectionsPage extends ConsumerWidget {
       ],
       body: Column(
         children: [
-          _ConnectionsToolbar(
-            l10n: l10n,
-            searchQuery: state.searchQuery,
-            sortBy: state.sortBy,
-            sortAsc: state.sortAsc,
-            onSearchChanged: notifier.setSearchQuery,
-            onSortChanged: notifier.setSortBy,
-          ),
           Expanded(
             child: connections.isEmpty
                 ? EmptyState(
-                    icon: Icons.cable_rounded,
+                    illustration: NullStatusIllustration.connections,
                     title: l10n.noConnections,
                   )
                 : ListView.builder(
@@ -74,61 +93,4 @@ class ConnectionsPage extends ConsumerWidget {
       ),
     );
   }
-}
-
-class _ConnectionsToolbar extends StatelessWidget {
-  const _ConnectionsToolbar({
-    required this.searchQuery,
-    required this.sortBy,
-    required this.sortAsc,
-    required this.l10n,
-    required this.onSearchChanged,
-    required this.onSortChanged,
-  });
-
-  final String searchQuery;
-  final ConnectionSortBy sortBy;
-  final bool sortAsc;
-  final AppLocalizations l10n;
-  final ValueChanged<String> onSearchChanged;
-  final ValueChanged<ConnectionSortBy> onSortChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: prism.SearchField(
-              hintText: l10n.searchConnections,
-              onChanged: onSearchChanged,
-            ),
-          ),
-          const SizedBox(width: 8),
-          prism.PopupAnchor(
-            targetBuilder: (open) => prism.IconButton(
-              onPressed: open,
-              tooltip: '${l10n.sortBy} ${sortAsc ? '↑' : '↓'}',
-              icon: const GlyphIcon(AppGlyphs.sort),
-            ),
-            popupBuilder: (_) => prism.PopupMenu(items: [
-              for (final (value, label) in [
-                (ConnectionSortBy.traffic, l10n.trafficSort),
-                (ConnectionSortBy.destination, l10n.destinationSort),
-                (ConnectionSortBy.outbound, l10n.outboundSort),
-                (ConnectionSortBy.network, l10n.networkSort),
-              ])
-                prism.PopupMenuItem(
-                  label: '$label${sortBy == value ? (sortAsc ? ' ↑' : ' ↓') : ''}',
-                  checked: sortBy == value,
-                  onPressed: () => onSortChanged(value),
-                ),
-            ]),
-          ),
-        ],
-      ),
-    );
-  }
-
 }

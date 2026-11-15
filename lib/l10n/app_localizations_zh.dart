@@ -487,4 +487,43 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get timeout => '超时';
+
+  @override
+  String get customizeDashboard => '自定义首页';
+
+  @override
+  String get dashboardStatus => '核心状态';
+
+  @override
+  String get dashboardNetwork => '网络接管';
+
+  @override
+  String get done => '完成';
+
+  @override
+  String get dashboardService => '服务状态';
+
+  @override
+  String get dashboardMemory => '内存';
+
+  @override
+  String get dashboardAppMemory => '应用内存';
+
+  @override
+  String get dashboardAddableSection => '添加卡片';
+
+  @override
+  String get dashboardRemove => '移除';
+
+  @override
+  String get dashboardGroups => '个分组';
+
+  @override
+  String get dashboardNodes => '个节点';
+
+  @override
+  String get dashboardUnavailable => '不可用';
+
+  @override
+  String get dashboardStatusShort => '状态';
 }

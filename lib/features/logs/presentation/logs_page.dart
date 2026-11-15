@@ -1,5 +1,4 @@
 import 'package:flutter/widgets.dart';
-import 'package:material_ui/material_ui.dart' show Icons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:prism_ui/prism_ui.dart' as prism;
@@ -7,6 +6,7 @@ import 'package:prism_ui/prism_ui.dart' as prism;
 import '../../../core/ui/app_glyphs.dart';
 
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/ui/null_status_illustration.dart';
 import '../../../core/widgets/target_page_layout.dart';
 import '../../../l10n/app_localizations.dart';
 import '../application/logs_notifier.dart';
@@ -38,7 +38,6 @@ class _LogsPageState extends ConsumerState<LogsPage> {
 
     return TargetPageScaffold(
       title: l10n.logs,
-      subtitle: l10n.runtimeDiagnostics,
       scrollableBody: false,
       actions: [
         prism.IconButton(
@@ -70,12 +69,13 @@ class _LogsPageState extends ConsumerState<LogsPage> {
           Expanded(
             child: entries.isEmpty
                 ? EmptyState(
-                    icon: Icons.receipt_long_outlined,
+                    illustration: NullStatusIllustration.logs,
                     title: l10n.noLogs,
                     description: l10n.logsRealtimeHint,
                   )
                 : ListView.builder(
                     controller: _scrollController,
+                    padding: EdgeInsets.zero,
                     itemCount: entries.length,
                     itemBuilder: (context, index) {
                       return LogLineTile(
@@ -130,8 +130,8 @@ class _LogsPageState extends ConsumerState<LogsPage> {
     final l10n = AppLocalizations.of(context);
     final text = ref.read(logsProvider.notifier).exportLogs(sanitize: sanitize);
     Clipboard.setData(ClipboardData(text: text));
-    prism.BannerHost.maybeOf(context)?.show(
-      sanitize ? l10n.sanitizedLogsCopied : l10n.logsCopied,
-    );
+    prism.BannerHost.maybeOf(
+      context,
+    )?.show(sanitize ? l10n.sanitizedLogsCopied : l10n.logsCopied);
   }
 }

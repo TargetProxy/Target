@@ -8,6 +8,7 @@ import 'package:targetlib/targetlib.dart' as pb;
 
 import '../../../core/runtime/core_notifier.dart';
 import '../../../core/widgets/target_page_layout.dart';
+import '../../../core/widgets/error_notice.dart';
 import '../../../data/models/runtime_settings.dart' as runtime_models;
 import '../../../data/models/proxy_node.dart';
 import '../../../features/maps/application/proxy_country_map.dart';
@@ -149,92 +150,89 @@ class _RulesPageState extends ConsumerState<RulesPage> {
     return TargetPageScaffold(
       title: l10n.rules,
       body: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: () => context.go('/nodes'),
-                icon: const GlyphIcon(AppGlyphs.rules),
-                label: Text(l10n.selectDefaultNode),
-              ),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => context.go('/nodes'),
+              icon: const GlyphIcon(AppGlyphs.rules),
+              label: Text(l10n.selectDefaultNode),
             ),
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Text(
-                  _error!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
-              ),
-            Card(
-              inert: true,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    ListRow(
-                      padding: EdgeInsets.zero,
-                      leading: const GlyphIcon(AppGlyphs.proxies),
-                      title: Text(l10n.defaultNode),
-                      subtitle: Text(
-                        selected?.displayName ?? l10n.nodeNotSelected,
-                      ),
-                    ),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final node in visible.take(12))
-                          Chip(
-                            label: node.displayName,
-                            selected: node.id == selected?.id,
-                            onPressed: () => ref
-                                .read(proxiesProvider.notifier)
-                                .selectNode(node.id),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+          ),
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: ErrorNotice(message: _error!),
             ),
-            const SizedBox(height: 16),
-            if (nodes.isNotEmpty) ...[
-              AbstractWorldMap(
-                height: 280,
-                nodes: countries,
-                selectedId: _country,
-                onSelect: (value) => setState(() => _country = value),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
+          Card(
+            inert: true,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Chip(
-                    label: l10n.allRegions,
-                    selected: _country == null,
-                    onPressed: () => setState(() => _country = null),
-                  ),
-                  for (final entry in countries)
-                    Chip(
-                      label: '${entry.countryCode} · ${entry.nodeCount}',
-                      selected: _country == entry.countryCode,
-                      onPressed: () =>
-                          setState(() => _country = entry.countryCode),
+                  ListRow(
+                    padding: EdgeInsets.zero,
+                    leading: const GlyphIcon(AppGlyphs.proxies),
+                    title: Text(l10n.defaultNode),
+                    subtitle: Text(
+                      selected?.displayName ?? l10n.nodeNotSelected,
                     ),
+                  ),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final node in visible.take(12))
+                        Chip(
+                          label: node.displayName,
+                          selected: node.id == selected?.id,
+                          onPressed: () => ref
+                              .read(proxiesProvider.notifier)
+                              .selectNode(node.id),
+                        ),
+                    ],
+                  ),
                 ],
               ),
-              const SizedBox(height: 16),
-            ],
-            _ruleEditor(context, visible),
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (nodes.isNotEmpty) ...[
+            AbstractWorldMap(
+              height: 280,
+              nodes: countries,
+              selectedId: _country,
+              onSelect: (value) => setState(() => _country = value),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: [
+                Chip(
+                  label: l10n.allRegions,
+                  selected: _country == null,
+                  onPressed: () => setState(() => _country = null),
+                ),
+                for (final entry in countries)
+                  Chip(
+                    label: '${entry.countryCode} · ${entry.nodeCount}',
+                    selected: _country == entry.countryCode,
+                    onPressed: () =>
+                        setState(() => _country = entry.countryCode),
+                  ),
+              ],
+            ),
             const SizedBox(height: 16),
-            if (_loading) const Center(child: ActivityIndicator()),
-            for (var index = 0; index < _routes.length; index++)
-              _routeTile(_routes[index], nodes, l10n),
           ],
-        ),
+          _ruleEditor(context, visible),
+          const SizedBox(height: 16),
+          if (_loading) const Center(child: ActivityIndicator()),
+          for (var index = 0; index < _routes.length; index++)
+            _routeTile(_routes[index], nodes, l10n),
+        ],
+      ),
     );
   }
 
@@ -290,8 +288,11 @@ class _RulesPageState extends ConsumerState<RulesPage> {
                 alignment: Alignment.center,
                 decoration: ShapeDecoration(
                   shape: AppShape.lg.copyWith(
-                    side: BorderSide(color: candidates.isNotEmpty
-                        ? context.colorScheme.primary : context.colorScheme.outlineVariant),
+                    side: BorderSide(
+                      color: candidates.isNotEmpty
+                          ? context.colorScheme.primary
+                          : context.colorScheme.outlineVariant,
+                    ),
                   ),
                 ),
                 child: Text(
@@ -313,9 +314,7 @@ class _RulesPageState extends ConsumerState<RulesPage> {
                   return Draggable<ProxyNode>(
                     data: node,
                     feedback: Chip(label: node.displayName),
-                    child: Chip(
-                      label: node.displayName,
-                    ),
+                    child: Chip(label: node.displayName),
                   );
                 },
               ),
@@ -358,33 +357,35 @@ class _RulesPageState extends ConsumerState<RulesPage> {
       builder: (context, candidates, _) => Padding(
         padding: const EdgeInsets.only(bottom: 12),
         child: Card(
-        inert: true,
-        isSelected: candidates.isNotEmpty,
-        fillsSelection: candidates.isNotEmpty,
-        child: ListRow(
-          leading: GlyphIcon(route.enabled ? AppGlyphs.rules : AppGlyphs.playPause(1)),
-          title: Text(
-            route.displayName.isEmpty ? route.serviceId : route.displayName,
-          ),
-          subtitle: Text(
-            '${route.domains.join(', ')}\n${l10n.routeExit(node?.displayName ?? route.currentNodeName)}',
-          ),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Switch(
-                value: route.enabled,
-                onChanged: (value) => _toggleRule(route, value),
-              ),
-              IconButton(
-                tooltip: l10n.deleteRule,
-                onPressed: () => _deleteRule(route.serviceId),
-                icon: const GlyphIcon(AppGlyphs.delete),
-              ),
-            ],
+          inert: true,
+          isSelected: candidates.isNotEmpty,
+          fillsSelection: candidates.isNotEmpty,
+          child: ListRow(
+            leading: GlyphIcon(
+              route.enabled ? AppGlyphs.rules : AppGlyphs.playPause(1),
+            ),
+            title: Text(
+              route.displayName.isEmpty ? route.serviceId : route.displayName,
+            ),
+            subtitle: Text(
+              '${route.domains.join(', ')}\n${l10n.routeExit(node?.displayName ?? route.currentNodeName)}',
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Switch(
+                  value: route.enabled,
+                  onChanged: (value) => _toggleRule(route, value),
+                ),
+                IconButton(
+                  tooltip: l10n.deleteRule,
+                  onPressed: () => _deleteRule(route.serviceId),
+                  icon: const GlyphIcon(AppGlyphs.delete),
+                ),
+              ],
+            ),
           ),
         ),
-      ),
       ),
     );
   }

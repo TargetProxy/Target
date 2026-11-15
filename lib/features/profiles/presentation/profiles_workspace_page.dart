@@ -2,6 +2,8 @@ import 'package:flutter/widgets.dart';
 import 'package:prism_ui/prism_ui.dart';
 
 import '../../../core/ui/app_glyphs.dart';
+import '../../../core/ui/null_status_illustration.dart';
+import '../../../core/widgets/error_notice.dart';
 import '../../../core/ui/scaffold/scaffold.dart' as ui;
 import 'widgets/subscription_card.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -40,25 +42,43 @@ class ProfilesWorkspacePage extends ConsumerWidget {
       body: Builder(
         builder: (context) => ListView(
           padding: EdgeInsets.fromLTRB(
-            24, context.contentTopPadding + 16, 24, context.bottomInset + 24,
+            16,
+            context.appBarInset,
+            16,
+            context.bottomInset + 24,
           ),
           children: [
-            Text(l10n.subscriptionsHint, style: AppTextStyle.subheadline.of(context).toLighter),
+            Text(
+              l10n.subscriptionsHint,
+              style: AppTextStyle.subheadline.of(context).toLighter,
+            ),
             const SizedBox(height: 8),
-            Text(l10n.poolSummary(
-              state.subscriptions.where((sub) => sub.enabled).length,
-              nodeCount,
-            )),
+            Text(
+              l10n.poolSummary(
+                state.subscriptions.where((sub) => sub.enabled).length,
+                nodeCount,
+              ),
+            ),
             const SizedBox(height: 16),
             if (state.lastError != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                child: Text(state.lastError!, style: TextStyle(color: context.colorScheme.error)),
+                child: ErrorNotice(message: state.lastError!),
               ),
             if (state.subscriptions.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 32),
-                child: Text(l10n.noSubscriptionsHint, textAlign: TextAlign.center),
+                child: NullStatus(
+                  illustration: NullStatusIllustration.profile,
+                  label: l10n.profiles,
+                  description: l10n.noSubscriptionsHint,
+                  action: FilledButton(
+                    onPressed: busy
+                        ? null
+                        : () => _addSubscription(context, ref),
+                    child: Text(l10n.addSubscription),
+                  ),
+                ),
               ),
             for (final subscription in state.subscriptions)
               Padding(
@@ -67,9 +87,14 @@ class ProfilesWorkspacePage extends ConsumerWidget {
                   key: ValueKey('subscription-${subscription.id}'),
                   profile: subscription,
                   busy: busy,
-                  isUpdating: state.changingIds.contains(subscription.id) ||
-                      subscription.updateStatus == SubscriptionUpdateStatus.updating,
-                  onToggle: () => notifier.setEnabled(subscription.id, !subscription.enabled),
+                  isUpdating:
+                      state.changingIds.contains(subscription.id) ||
+                      subscription.updateStatus ==
+                          SubscriptionUpdateStatus.updating,
+                  onToggle: () => notifier.setEnabled(
+                    subscription.id,
+                    !subscription.enabled,
+                  ),
                   onUpdate: () => notifier.updateSubscription(subscription.id),
                   onDetails: () => _showDetails(context, subscription),
                 ),
@@ -89,7 +114,10 @@ class ProfilesWorkspacePage extends ConsumerWidget {
         body: Builder(
           builder: (context) => SingleChildScrollView(
             padding: EdgeInsets.fromLTRB(
-              24, context.contentTopPadding + 16, 24, context.bottomInset + 24,
+              24,
+              context.appBarInset,
+              24,
+              context.bottomInset + 24,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -104,9 +132,7 @@ class ProfilesWorkspacePage extends ConsumerWidget {
                   label: l10n.lastUpdated,
                   value: subscription.lastUpdatedAt == null
                       ? l10n.neverUpdated
-                      : DateFormat.yMMMd(
-                          l10n.localeName,
-                        ).add_Hm().format(
+                      : DateFormat.yMMMd(l10n.localeName).add_Hm().format(
                           subscription.lastUpdatedAt!.toLocal(),
                         ),
                 ),
@@ -116,9 +142,7 @@ class ProfilesWorkspacePage extends ConsumerWidget {
                 ),
                 _DetailRow(
                   label: l10n.automaticUpdates,
-                  value: subscription.autoUpdate
-                      ? l10n.enabled
-                      : l10n.disabled,
+                  value: subscription.autoUpdate ? l10n.enabled : l10n.disabled,
                 ),
                 _DetailRow(
                   label: l10n.updateInterval,
@@ -130,16 +154,15 @@ class ProfilesWorkspacePage extends ConsumerWidget {
                 _DetailRow(
                   label: l10n.trafficUsed,
                   value: formatBytes(
-                    subscription.uploadBytes +
-                        subscription.downloadBytes,
+                    subscription.uploadBytes + subscription.downloadBytes,
                   ),
                 ),
                 if (subscription.expiresAt != null)
                   _DetailRow(
                     label: l10n.expires,
-                    value: DateFormat.yMMMd(l10n.localeName)
-                        .add_Hm()
-                        .format(subscription.expiresAt!.toLocal()),
+                    value: DateFormat.yMMMd(
+                      l10n.localeName,
+                    ).add_Hm().format(subscription.expiresAt!.toLocal()),
                   ),
                 if (subscription.profileTitle?.isNotEmpty == true)
                   _DetailRow(
@@ -161,12 +184,7 @@ class ProfilesWorkspacePage extends ConsumerWidget {
                 if (subscription.lastError?.isNotEmpty == true)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      subscription.lastError!,
-                      style: TextStyle(
-                        color: context.colorScheme.error,
-                      ),
-                    ),
+                    child: ErrorNotice(message: subscription.lastError!),
                   ),
               ],
             ),

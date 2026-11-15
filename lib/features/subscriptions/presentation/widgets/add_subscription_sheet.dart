@@ -46,7 +46,10 @@ class _AddSubscriptionSheetState extends State<AddSubscriptionSheet> {
       body: Builder(
         builder: (context) => SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(
-            24, context.contentTopPadding + 16, 24, context.bottomInset + 24,
+            24,
+            context.appBarInset,
+            24,
+            context.bottomInset + 24,
           ),
           child: Form(
             key: _formKey,
@@ -54,23 +57,32 @@ class _AddSubscriptionSheetState extends State<AddSubscriptionSheet> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(l10n.nameOptional, style: AppTextStyle.footnote.of(context).toLighter),
+                Text(
+                  l10n.nameOptional,
+                  style: AppTextStyle.footnote.of(context).toLighter,
+                ),
                 const SizedBox(height: 6),
                 TextFormField(
                   controller: _nameController,
                   textInputAction: TextInputAction.next,
                 ),
                 const SizedBox(height: 16),
-                Text(l10n.subscriptionUrl, style: AppTextStyle.footnote.of(context).toLighter),
+                Text(
+                  l10n.subscriptionUrl,
+                  style: AppTextStyle.footnote.of(context).toLighter,
+                ),
                 const SizedBox(height: 6),
                 TextFormField(
                   controller: _urlController,
-                  decoration: const InputDecoration(hintText: 'https://example.com/sub'),
+                  decoration: const InputDecoration(
+                    hintText: 'https://example.com/sub',
+                  ),
                   keyboardType: TextInputType.url,
                   autocorrect: false,
                   onFieldSubmitted: (_) => _submit(),
                   validator: (value) => value == null || value.trim().isEmpty
-                      ? l10n.urlRequired : null,
+                      ? l10n.urlRequired
+                      : null,
                 ),
               ],
             ),

@@ -510,4 +510,43 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get timeout => 'Timeout';
+
+  @override
+  String get customizeDashboard => 'Customize dashboard';
+
+  @override
+  String get dashboardStatus => 'Core status';
+
+  @override
+  String get dashboardNetwork => 'Network controls';
+
+  @override
+  String get done => 'Done';
+
+  @override
+  String get dashboardService => 'Service';
+
+  @override
+  String get dashboardMemory => 'Memory';
+
+  @override
+  String get dashboardAppMemory => 'App memory';
+
+  @override
+  String get dashboardAddableSection => 'Add widgets';
+
+  @override
+  String get dashboardRemove => 'Remove';
+
+  @override
+  String get dashboardGroups => 'groups';
+
+  @override
+  String get dashboardNodes => 'nodes';
+
+  @override
+  String get dashboardUnavailable => 'Unavailable';
+
+  @override
+  String get dashboardStatusShort => 'Status';
 }

@@ -1033,6 +1033,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Timeout'**
   String get timeout;
+
+  /// No description provided for @customizeDashboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Customize dashboard'**
+  String get customizeDashboard;
+
+  /// No description provided for @dashboardStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Core status'**
+  String get dashboardStatus;
+
+  /// No description provided for @dashboardNetwork.
+  ///
+  /// In en, this message translates to:
+  /// **'Network controls'**
+  String get dashboardNetwork;
+
+  /// No description provided for @done.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get done;
+
+  /// No description provided for @dashboardService.
+  ///
+  /// In en, this message translates to:
+  /// **'Service'**
+  String get dashboardService;
+
+  /// No description provided for @dashboardMemory.
+  ///
+  /// In en, this message translates to:
+  /// **'Memory'**
+  String get dashboardMemory;
+
+  /// No description provided for @dashboardAppMemory.
+  ///
+  /// In en, this message translates to:
+  /// **'App memory'**
+  String get dashboardAppMemory;
+
+  /// No description provided for @dashboardAddableSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Add widgets'**
+  String get dashboardAddableSection;
+
+  /// No description provided for @dashboardRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get dashboardRemove;
+
+  /// No description provided for @dashboardGroups.
+  ///
+  /// In en, this message translates to:
+  /// **'groups'**
+  String get dashboardGroups;
+
+  /// No description provided for @dashboardNodes.
+  ///
+  /// In en, this message translates to:
+  /// **'nodes'**
+  String get dashboardNodes;
+
+  /// No description provided for @dashboardUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Unavailable'**
+  String get dashboardUnavailable;
+
+  /// No description provided for @dashboardStatusShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get dashboardStatusShort;
 }
 
 class _AppLocalizationsDelegate

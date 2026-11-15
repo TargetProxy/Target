@@ -54,8 +54,11 @@ class ProxyCard extends StatelessWidget {
           Text(
             proxy.latencyTimedOut
                 ? l10n.timeout
-                : proxy.latencyMs == null ? '—' : '${proxy.latencyMs} ms',
-            style: AppTextStyle.caption2.of(context, emphasized: true)
+                : proxy.latencyMs == null
+                ? '—'
+                : '${proxy.latencyMs} ms',
+            style: AppTextStyle.caption2
+                .of(context, emphasized: true)
                 .copyWith(color: latencyColor),
           ),
       ],
@@ -63,7 +66,6 @@ class ProxyCard extends StatelessWidget {
     return Card(
       radius: AppCorner.lg,
       enterActionsOnRight: true,
-      key: key,
       onPressed: busy || !proxy.isAvailable ? null : onSelected,
       isSelected: selected,
       padding: const EdgeInsets.all(12),
@@ -76,8 +78,7 @@ class ProxyCard extends StatelessWidget {
             spacing: 4,
             children: [
               Expanded(child: proxyNameText),
-              if (selected)
-                const SelectionBadge(),
+              if (selected) const SelectionBadge(),
             ],
           ),
           const SizedBox(height: 8),

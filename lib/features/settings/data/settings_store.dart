@@ -22,11 +22,15 @@ class SharedPreferencesSettingsStore implements AppSettingsStore {
     final prefs = await SharedPreferences.getInstance();
     // 若没有任何 key，返回默认值（首次启动）
     // 兼容旧 JSON 文件的读取已移除，按你的要求直接按字段存取
+    final savedOrder = prefs.getStringList(_k('dashboardOrder'));
+    final savedVisible = prefs.getStringList(_k('dashboardVisible'));
     return AppSettings(
       themeMode: ThemeModeOptionParsing.fromName(
         prefs.getString(_k('themeMode')),
       ),
       systemProxy: prefs.getBool(_k('systemProxy')) ?? true,
+      dashboardOrder: savedOrder ?? defaultDashboardOrder,
+      dashboardVisible: savedVisible ?? defaultDashboardOrder,
     );
   }
 
@@ -36,6 +40,8 @@ class SharedPreferencesSettingsStore implements AppSettingsStore {
     await Future.wait([
       prefs.setString(_k('themeMode'), settings.themeMode.name),
       prefs.setBool(_k('systemProxy'), settings.systemProxy),
+      prefs.setStringList(_k('dashboardOrder'), settings.dashboardOrder),
+      prefs.setStringList(_k('dashboardVisible'), settings.dashboardVisible),
     ]);
   }
 }

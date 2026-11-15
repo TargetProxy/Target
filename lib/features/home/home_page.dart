@@ -1,4 +1,4 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -7,12 +7,18 @@ import '../../core/runtime/core_notifier.dart';
 import '../../core/runtime/core_models.dart';
 import '../../core/logging/app_logger.dart';
 import '../../core/platform/app_platform.dart';
+import '../../core/ui/app_glyphs.dart';
 import 'package:targetlib/targetlib.dart';
 import '../../data/models/runtime_settings.dart' as runtime_models;
 import '../../data/models/ip_info.dart';
 import 'package:prism_ui/prism_ui.dart' as prism;
+import 'package:prism_ui/prism_ui.dart';
+
 import '../../core/ui/scaffold/scaffold.dart' as ui;
+import '../../data/models/app_settings.dart';
 import 'presentation/dashboard/dashboard.dart';
+import '../../l10n/core_status_l10n.dart';
+import 'presentation/dashboard/card.dart';
 import '../../l10n/app_localizations.dart';
 import '../settings/application/settings_notifier.dart';
 import 'presentation/widgets/connection_error_banner.dart';
@@ -25,6 +31,7 @@ class HomePage extends ConsumerStatefulWidget {
 }
 
 class _HomePageState extends ConsumerState<HomePage> {
+  bool _editing = false;
   IpInfo? _ipInfo;
   bool _ipLoading = false;
   String? _ipError;
@@ -113,60 +120,96 @@ class _HomePageState extends ConsumerState<HomePage> {
     final l10n = AppLocalizations.of(context);
     return ui.Scaffold(
       title: l10n.dashboard,
-      body: Builder(
-        builder: (context) => SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(
-            20,
-            prism.BuildContextExtension(context).contentTopPadding,
-            20,
-            24 + prism.BuildContextExtension(context).bottomInset,
+      confirmationAction: _editing
+          ? prism.IconButtonData(
+              glyph: AppGlyphs.check,
+              tooltip: l10n.done,
+              onPressed: () => setState(() => _editing = false),
+            )
+          : null,
+      iconActions: [
+        if (!_editing)
+          prism.IconButtonData(
+            glyph: AppGlyphs.edit,
+            tooltip: l10n.customizeDashboard,
+            onPressed: () => setState(() => _editing = true),
           ),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1440),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                spacing: 16,
-                children: [
-                  if (capabilities.supportsManagedService &&
-                      !_serviceChecking &&
-                      (_serviceCheckFailed ||
-                          _serviceStatus != TargetLibServiceStatus.running))
-                    _ServiceStatusCard(
-                      starting: _serviceStarting,
-                      status: _serviceStatus,
-                      checkFailed: _serviceCheckFailed,
-                      error: _serviceError,
-                      onAction: !_serviceCheckFailed &&
-                              _serviceStatus == TargetLibServiceStatus.stopped
-                          ? _startTargetLibService
-                          : _checkTargetLibService,
-                    ),
-                  TargetDashboard(
-                    core: core,
-                    capabilities: capabilities,
-                    appSettings: appSettings,
-                    onProxyModeChanged: _changeProxyMode,
-                    onRouteModeChanged: _changeRouteMode,
-                    onSystemProxyChanged: (value) => ref
-                        .read(settingsProvider.notifier)
-                        .updateSettings((settings) => settings.copyWith(systemProxy: value)),
-                    onServiceAction: () => core.running
-                        ? ref.read(coreProvider.notifier).stop()
-                        : _connect(),
-                    ipInfo: _ipInfo,
-                    ipLoading: _ipLoading,
-                    ipError: _ipError,
-                    onRefreshIp: _fetchIpInfo,
-                  ),
-                  if (core.message.isNotEmpty &&
-                      (!core.available || core.lifecycle == CoreLifecycle.failed))
-                    ConnectionErrorBanner(message: core.message),
-                ],
-              ),
+      ],
+      body: TargetDashboard(
+        core: core,
+        capabilities: capabilities,
+        appSettings: appSettings,
+        onProxyModeChanged: _changeProxyMode,
+        onRouteModeChanged: _changeRouteMode,
+        onSystemProxyChanged: (value) => ref
+            .read(settingsProvider.notifier)
+            .updateSettings(
+              (settings) => settings.copyWith(systemProxy: value),
             ),
-          ),
-        ),
+        onServiceAction: () =>
+            core.running ? ref.read(coreProvider.notifier).stop() : _connect(),
+        ipInfo: _ipInfo,
+        ipLoading: _ipLoading,
+        ipError: _ipError,
+        onRefreshIp: _fetchIpInfo,
+        dashboardOrder: appSettings.dashboardOrder,
+        dashboardVisible: appSettings.dashboardVisible,
+        editing: _editing,
+        onDone: () => setState(() => _editing = false),
+        onWidgetsChanged: (cards) =>
+            ref.read(settingsProvider.notifier).updateSettings((settings) {
+              final shown = cards.map((card) => card.name).toList();
+              return settings.copyWith(
+                dashboardOrder: [
+                  ...shown,
+                  for (final item in defaultDashboardOrder)
+                    if (!shown.contains(item)) item,
+                ],
+                dashboardVisible: shown,
+              );
+            }),
+        serviceLabel: capabilities.supportsManagedService
+            ? (_serviceStatus == TargetLibServiceStatus.running
+                  ? l10n.running
+                  : _serviceStatus == TargetLibServiceStatus.stopped
+                  ? l10n.stopped
+                  : l10n.dashboardUnavailable)
+            : core.available
+            ? l10n.coreStatusLabel(core.lifecycle)
+            : l10n.dashboardUnavailable,
+        serviceRunning: capabilities.supportsManagedService
+            ? _serviceStatus == TargetLibServiceStatus.running
+            : core.running,
+        serviceBusy: _serviceChecking || _serviceStarting,
+        onServiceStatusAction: capabilities.supportsManagedService
+            ? (_serviceStatus == TargetLibServiceStatus.stopped
+                  ? _startTargetLibService
+                  : _checkTargetLibService)
+            : () => core.running
+                  ? ref.read(coreProvider.notifier).stop()
+                  : _connect(),
+        header:
+            capabilities.supportsManagedService &&
+                !_serviceChecking &&
+                (_serviceCheckFailed ||
+                    _serviceStatus != TargetLibServiceStatus.running)
+            ? _ServiceStatusCard(
+                starting: _serviceStarting,
+                status: _serviceStatus,
+                checkFailed: _serviceCheckFailed,
+                error: _serviceError,
+                onAction:
+                    !_serviceCheckFailed &&
+                        _serviceStatus == TargetLibServiceStatus.stopped
+                    ? _startTargetLibService
+                    : _checkTargetLibService,
+              )
+            : null,
+        footer:
+            core.message.isNotEmpty &&
+                (!core.available || core.lifecycle == CoreLifecycle.failed)
+            ? ConnectionErrorBanner(message: core.message)
+            : null,
       ),
     );
   }
@@ -183,22 +226,13 @@ class _HomePageState extends ConsumerState<HomePage> {
     // localized summary and the raw detail stays in the log.
     AppLogger.warning('Core connect failed: ${core.message}', source: 'home');
     final l10n = AppLocalizations.of(context);
-    final messenger = ScaffoldMessenger.of(context);
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 8),
-          content: Text(l10n.connectionErrorMessage),
-          action: SnackBarAction(
-            label: l10n.viewLogs,
-            onPressed: () {
-              if (mounted) context.go(AppRoute.logs.path);
-            },
-          ),
-        ),
-      );
+    prism.BannerHost.maybeOf(context)?.show(
+      l10n.connectionErrorMessage,
+      level: prism.BannerLevel.error,
+      onTap: () {
+        if (mounted) context.go(AppRoute.logs.path);
+      },
+    );
   }
 
   Future<void> _changeProxyMode(runtime_models.ProxyMode mode) async {
@@ -231,15 +265,11 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   void _showMessage(String message, {bool error = false}) {
-    final messenger = ScaffoldMessenger.of(context);
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: error ? Theme.of(context).colorScheme.error : null,
-        ),
-      );
+    prism.BannerHost.maybeOf(context)?.show(
+      message,
+      level: error ? prism.BannerLevel.error : prism.BannerLevel.info,
+      onTap: error ? () => context.go(AppRoute.logs.path) : null,
+    );
   }
 }
 
@@ -261,70 +291,55 @@ class _ServiceStatusCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final scheme = Theme.of(context).colorScheme;
-    return Card(
-      color: scheme.secondaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.admin_panel_settings_outlined,
-                  color: scheme.onSecondaryContainer,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    checkFailed
-                        ? l10n.serviceCheckFailed
-                        : status == TargetLibServiceStatus.stopped
-                        ? l10n.targetLibStopped
-                        : status == TargetLibServiceStatus.notInstalled
-                        ? l10n.targetLibNotInstalled
-                        : l10n.targetLibUnknown,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              (checkFailed ? error : null) ??
-                  (status == TargetLibServiceStatus.stopped
-                      ? l10n.startRegisteredService
-                      : l10n.repairTargetLib),
-              style: TextStyle(color: scheme.onSecondaryContainer),
-            ),
-            const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerRight,
-              child: FilledButton.icon(
-                onPressed: starting ? null : onAction,
-                icon: starting
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Icon(
-                        !checkFailed && status == TargetLibServiceStatus.stopped
-                            ? Icons.play_arrow
-                            : Icons.refresh,
-                      ),
-                label: Text(
-                  starting
-                      ? l10n.starting
-                      : !checkFailed && status == TargetLibServiceStatus.stopped
-                      ? l10n.startService
-                      : l10n.checkAgain,
+    final scheme = context.colorScheme;
+    return DashboardCard(
+      side: BorderSide(color: scheme.primary.withValues(alpha: .25)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            spacing: 12,
+            children: [
+              GlyphIcon(AppGlyphs.tools, color: scheme.primary),
+              Expanded(
+                child: Text(
+                  checkFailed
+                      ? l10n.serviceCheckFailed
+                      : status == TargetLibServiceStatus.stopped
+                      ? l10n.targetLibStopped
+                      : status == TargetLibServiceStatus.notInstalled
+                      ? l10n.targetLibNotInstalled
+                      : l10n.targetLibUnknown,
+                  style: AppTextStyle.subheadline.of(context, emphasized: true),
                 ),
               ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            (checkFailed ? error : null) ??
+                (status == TargetLibServiceStatus.stopped
+                    ? l10n.startRegisteredService
+                    : l10n.repairTargetLib),
+            style: AppTextStyle.footnote
+                .of(context)
+                .copyWith(color: scheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: prism.FilledButton(
+              onPressed: starting ? null : onAction,
+              child: Text(
+                starting
+                    ? l10n.starting
+                    : !checkFailed && status == TargetLibServiceStatus.stopped
+                    ? l10n.startService
+                    : l10n.checkAgain,
+              ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

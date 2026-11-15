@@ -9,7 +9,7 @@ class TargetPageLayout extends StatelessWidget {
   final Widget child;
 
   static const maxWidth = 960.0;
-  static const padding = EdgeInsets.all(24);
+  static const padding = EdgeInsets.all(16);
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +18,7 @@ class TargetPageLayout extends StatelessWidget {
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: maxWidth),
-          child: child,
+          child: SizedBox(width: double.infinity, child: child),
         ),
       ),
     );
@@ -31,6 +31,7 @@ class TargetPageScaffold extends StatelessWidget {
     this.title,
     this.subtitle,
     this.actions = const [],
+    this.searchState,
     this.scrollableBody = true,
     super.key,
   });
@@ -40,6 +41,7 @@ class TargetPageScaffold extends StatelessWidget {
   final String? title;
   final String? subtitle;
   final List<Widget> actions;
+  final ui.AppBarSearchState? searchState;
   final bool scrollableBody;
 
   @override
@@ -47,30 +49,35 @@ class TargetPageScaffold extends StatelessWidget {
     return ui.Scaffold(
       title: title,
       actions: actions,
+      searchState: searchState,
       body: Builder(builder: _buildBody),
     );
   }
 
   Widget _buildBody(BuildContext context) {
-    final content = Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: TargetPageLayout.maxWidth),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: scrollableBody ? MainAxisSize.min : MainAxisSize.max,
-          children: [
-            if (subtitle != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Text(subtitle!, style: AppTextStyle.subheadline.of(context).toLighter),
+    final content = SizedBox(
+      width: double.infinity,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: scrollableBody ? MainAxisSize.min : MainAxisSize.max,
+        children: [
+          if (subtitle != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text(
+                subtitle!,
+                style: AppTextStyle.subheadline.of(context).toLighter,
               ),
-            if (scrollableBody) body else Expanded(child: body),
-          ],
-        ),
+            ),
+          if (scrollableBody) body else Expanded(child: body),
+        ],
       ),
     );
     final padding = EdgeInsets.fromLTRB(
-      24, context.contentTopPadding + 16, 24, context.bottomInset + 24,
+      16,
+      context.appBarInset,
+      16,
+      context.bottomInset + 24,
     );
     if (!scrollableBody) return Padding(padding: padding, child: content);
     return SingleChildScrollView(padding: padding, child: content);
@@ -88,10 +95,7 @@ class TargetPageHeader extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: AppTextStyle.title1.of(context, emphasized: true),
-        ),
+        Text(title, style: AppTextStyle.title1.of(context, emphasized: true)),
         if (subtitle != null) ...[
           const SizedBox(height: 6),
           Text(

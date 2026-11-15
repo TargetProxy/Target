@@ -23,7 +23,8 @@ class LogLineTile extends StatelessWidget {
             Text(formatLogTime(entry.time)),
             Text(
               level.name.toUpperCase(),
-              style: AppTextStyle.caption1.of(context, emphasized: true)
+              style: AppTextStyle.caption1
+                  .of(context, emphasized: true)
                   .copyWith(color: _levelColor(level, Theme.of(context))),
             ),
           ],

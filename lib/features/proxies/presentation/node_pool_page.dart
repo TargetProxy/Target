@@ -5,8 +5,9 @@ import 'package:prism_ui/prism_ui.dart' as prism;
 
 import 'widgets/proxy_card.dart';
 
-import '../../../core/widgets/target_page_layout.dart';
 import '../../../core/ui/app_glyphs.dart';
+import '../../../core/ui/null_status_illustration.dart';
+import '../../../core/widgets/error_notice.dart';
 import '../../../core/ui/scaffold/scaffold.dart' as ui;
 import '../../../data/models/proxy_node.dart';
 import '../../../l10n/app_localizations.dart';
@@ -47,7 +48,6 @@ class _NodePoolPageState extends ConsumerState<NodePoolPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final theme = prism.Theme.of(context);
     final proxies = ref.watch(proxiesProvider);
     final subscriptions = ref.watch(subscriptionsProvider);
     final notifier = ref.read(proxiesProvider.notifier);
@@ -88,160 +88,172 @@ class _NodePoolPageState extends ConsumerState<NodePoolPage> {
         glyph: AppGlyphs.bolt,
         tooltip: l10n.testLatency,
         isLoading: proxies.testing,
-        onPressed: proxies.testing || nodes.isEmpty ? null : notifier.testAllLatency,
+        onPressed: proxies.testing || nodes.isEmpty
+            ? null
+            : notifier.testAllLatency,
       ),
       body: Builder(
-        builder: (context) => Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: TargetPageLayout.maxWidth + 48,
-            ),
-            child: CustomScrollView(
-              slivers: [
-                SliverPadding(
-                  padding: EdgeInsets.fromLTRB(
-                    24, prism.BuildContextExtension(context).contentTopPadding + 16, 24, 16,
-                  ),
-                  sliver: SliverToBoxAdapter(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (error != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Text(
-                              error,
-                              style: TextStyle(color: theme.colorScheme.error),
+        builder: (context) => CustomScrollView(
+          slivers: [
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                prism.BuildContextExtension(context).appBarInset,
+                16,
+                16,
+              ),
+              sliver: SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (error != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: ErrorNotice(message: error),
+                      ),
+                    const SizedBox(height: 16),
+                    if (nodes.isNotEmpty) ...[
+                      AbstractWorldMap(
+                        height: 320,
+                        nodes: countries,
+                        selectedId: country,
+                        onSelect: (value) => setState(() => _country = value),
+                      ),
+                      const SizedBox(height: 16),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          prism.Chip(
+                            label: l10n.allRegions,
+                            selected: country == null,
+                            onPressed: () => setState(() => _country = null),
+                          ),
+                          for (final entry in countries)
+                            prism.Chip(
+                              key: ValueKey('region-${entry.countryCode}'),
+                              label:
+                                  '${entry.countryCode} · ${entry.nodeCount}',
+                              selected: country == entry.countryCode,
+                              onPressed: () => setState(
+                                () => _country = country == entry.countryCode
+                                    ? null
+                                    : entry.countryCode,
+                              ),
                             ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      prism.SearchField(
+                        controller: _search,
+                        onChanged: (_) => setState(() {}),
+                        hintText: l10n.searchNodes,
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          prism.Chip(
+                            label: l10n.allSubscriptions,
+                            selected: source == null,
+                            onPressed: () => setState(() {
+                              _source = null;
+                              _country = null;
+                            }),
                           ),
-                        const SizedBox(height: 16),
-                        if (nodes.isNotEmpty) ...[
-                          AbstractWorldMap(
-                            height: 320,
-                            nodes: countries,
-                            selectedId: country,
-                            onSelect: (value) => setState(() => _country = value),
-                          ),
-                          const SizedBox(height: 16),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              prism.Chip(
-                                label: l10n.allRegions,
-                                selected: country == null,
-                                onPressed: () =>
-                                    setState(() => _country = null),
-                              ),
-                              for (final entry in countries)
-                                prism.Chip(
-                                  key: ValueKey('region-${entry.countryCode}'),
-                                  label: '${entry.countryCode} · ${entry.nodeCount}',
-                                  selected: country == entry.countryCode,
-                                  onPressed: () => setState(() => _country =
-                                      country == entry.countryCode ? null : entry.countryCode),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          prism.SearchField(
-                            controller: _search,
-                            onChanged: (_) => setState(() {}),
-                            hintText: l10n.searchNodes,
-                          ),
-                          const SizedBox(height: 12),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              prism.Chip(
-                                label: l10n.allSubscriptions,
-                                selected: source == null,
-                                onPressed: () => setState(() {
-                                  _source = null;
-                                  _country = null;
-                                }),
-                              ),
-                              for (final sub in enabled)
-                                prism.Chip(
-                                  key: ValueKey('source-${sub.id}'),
-                                  label: sub.name,
-                                  selected: source == sub.id,
-                                  onPressed: () => setState(() {
-                                    _source = source == sub.id ? null : sub.id;
+                          for (final sub in enabled)
+                            prism.Chip(
+                              key: ValueKey('source-${sub.id}'),
+                              label: sub.name,
+                              selected: source == sub.id,
+                              onPressed: () => setState(() {
+                                _source = source == sub.id ? null : sub.id;
+                                _country = null;
+                              }),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        l10n.poolNodeCount(visible.length),
+                        style: prism.AppTextStyle.headline.of(context),
+                      ),
+                    ],
+                    if (visible.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 32),
+                        child: prism.NullStatus(
+                          illustration: nodes.isEmpty
+                              ? NullStatusIllustration.proxies
+                              : prism.Illustration.search,
+                          label: nodes.isEmpty
+                              ? l10n.emptyPool
+                              : l10n.noMatchingNodes,
+                          action: prism.FilledButton(
+                            onPressed: nodes.isEmpty
+                                ? () => context.go('/proxies')
+                                : () => setState(() {
+                                    _search.clear();
+                                    _source = null;
                                     _country = null;
                                   }),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            l10n.poolNodeCount(visible.length),
-                            style: prism.AppTextStyle.headline.of(context),
-                          ),
-                        ],
-                        if (visible.isEmpty) ...[
-                          const SizedBox(height: 24),
-                          Text(
-                            nodes.isEmpty ? l10n.emptyPool : l10n.noMatchingNodes,
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 8),
-                          Center(
-                            child: prism.TextButton(
-                              onPressed: nodes.isEmpty
-                                  ? () => context.go('/proxies')
-                                  : () => setState(() {
-                                      _search.clear();
-                                      _source = null;
-                                      _country = null;
-                                    }),
-                              child: Text(
-                                nodes.isEmpty
-                                    ? l10n.manageSubscriptions
-                                    : l10n.clearFilters,
-                              ),
+                            child: Text(
+                              nodes.isEmpty
+                                  ? l10n.manageSubscriptions
+                                  : l10n.clearFilters,
                             ),
                           ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-                SliverPadding(
-                  padding: EdgeInsets.fromLTRB(24, 0, 24, 24 + prism.BuildContextExtension(context).bottomInset),
-                  sliver: SliverLayoutBuilder(
-                    builder: (context, constraints) => SliverGrid.builder(
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: (constraints.crossAxisExtent / 240)
-                            .floor().clamp(1, 4),
-                        mainAxisExtent: prism.MeasureScope.of(context)
-                            .textHeight(prism.AppTextStyle.subheadline) * 2 +
-                            prism.MeasureScope.of(context)
-                            .textHeight(prism.AppTextStyle.footnote) + 40,
-                        mainAxisSpacing: 12,
-                        crossAxisSpacing: 12,
+                        ),
                       ),
-                      itemCount: visible.length,
-                      itemBuilder: (context, index) {
-                        final node = visible[index];
-                        return ProxyCard(
-                          key: ValueKey('node-${node.id}'),
-                          proxy: node,
-                          source: sourceName(node),
-                          selected: proxies.selectedGroup?.selectedNodeId == node.id,
-                          busy: busy,
-                          testing: proxies.testing,
-                          latencyColor: _latencyColor(context, node),
-                          onSelected: () => notifier.selectNode(node.id),
-                        );
-                      },
-                    ),
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ),
-          ),
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                0,
+                16,
+                24 + prism.BuildContextExtension(context).bottomInset,
+              ),
+              sliver: SliverLayoutBuilder(
+                builder: (context, constraints) => SliverGrid.builder(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: (constraints.crossAxisExtent / 240)
+                        .floor()
+                        .clamp(1, 4),
+                    mainAxisExtent:
+                        prism.MeasureScope.of(
+                              context,
+                            ).textHeight(prism.AppTextStyle.subheadline) *
+                            2 +
+                        prism.MeasureScope.of(
+                          context,
+                        ).textHeight(prism.AppTextStyle.footnote) +
+                        40,
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                  ),
+                  itemCount: visible.length,
+                  itemBuilder: (context, index) {
+                    final node = visible[index];
+                    return ProxyCard(
+                      key: ValueKey('node-${node.id}'),
+                      proxy: node,
+                      source: sourceName(node),
+                      selected:
+                          proxies.selectedGroup?.selectedNodeId == node.id,
+                      busy: busy,
+                      testing: proxies.testing,
+                      latencyColor: _latencyColor(context, node),
+                      onSelected: () => notifier.selectNode(node.id),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

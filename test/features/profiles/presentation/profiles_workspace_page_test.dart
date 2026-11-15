@@ -5,7 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:target/core/runtime/core_gateway.dart';
 import 'package:target/core/runtime/core_models.dart';
-import 'package:target/core/theme/app_theme.dart';
+import 'package:prism_ui/prism_ui.dart' as prism;
+import 'package:target/core/ui/prism_theme.dart';
+import 'package:target/core/ui/ui_localizations.dart';
+import 'package:target/features/profiles/presentation/widgets/subscription_card.dart';
+import 'package:target/features/proxies/presentation/widgets/proxy_card.dart';
 import 'package:target/app/router.dart';
 import 'package:target/app/shell/app_shell.dart';
 import 'package:target/core/runtime/core_notifier.dart';
@@ -26,7 +30,7 @@ void main() {
     Widget page = const ProfilesWorkspacePage(),
     Size size = const Size(1200, 900),
     Locale locale = const Locale('en'),
-    ThemeMode themeMode = ThemeMode.dark,
+    prism.ThemeMode themeMode = prism.ThemeMode.dark,
   }) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = size;
@@ -41,16 +45,21 @@ void main() {
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
-        child: MaterialApp(
-          theme: AppTheme.light,
-          darkTheme: AppTheme.dark,
+        child: prism.PrismApp(
+          theme: PrismTheme.light,
+          darkTheme: PrismTheme.dark,
           themeMode: themeMode,
           locale: locale,
           localizationsDelegates: [
-            AppLocalizations.delegate,
-            ...GlobalMaterialLocalizations.delegates,
+            ...AppLocalizations.localizationsDelegates,
+            TargetUiLocalizations.delegate,
           ],
           supportedLocales: AppLocalizations.supportedLocales,
+          builder: (context, child) => prism.ViewScope(
+            size: size,
+            isMobile: size.width <= 600,
+            child: child!,
+          ),
           home: AppShell(
             location: page is NodePoolPage
                 ? AppRoute.nodes.path
@@ -65,10 +74,10 @@ void main() {
     return container;
   }
 
-  CheckboxListTile checkbox(WidgetTester tester, String id) =>
-      tester.widget<CheckboxListTile>(find.byKey(ValueKey('enable-$id')));
+  SubscriptionCard subscriptionCard(WidgetTester tester, String id) =>
+      tester.widget<SubscriptionCard>(find.byKey(ValueKey('subscription-$id')));
 
-  for (final mode in [ThemeMode.light, ThemeMode.dark]) {
+  for (final mode in [prism.ThemeMode.light, prism.ThemeMode.dark]) {
     testWidgets('subscription controls and dialog use the app theme in $mode', (
       tester,
     ) async {
@@ -79,16 +88,22 @@ void main() {
         themeMode: mode,
       );
       final context = tester.element(
-        find.byKey(const ValueKey('enable-primary')),
+        find.byKey(const ValueKey('subscription-primary')),
       );
-      final expected = mode == ThemeMode.dark ? AppTheme.dark : AppTheme.light;
-      expect(Theme.of(context).colorScheme, expected.colorScheme);
-      expect(MaterialLocalizations.of(context).copyButtonLabel, '复制');
-      await tester.tap(find.text('添加订阅'));
+      final expected = mode == prism.ThemeMode.dark
+          ? PrismTheme.dark
+          : PrismTheme.light;
+      expect(
+        prism.Theme.of(context).colorScheme.primary,
+        expected.colorScheme.primary,
+      );
+      await tester.tap(find.byTooltip('添加订阅'));
       await tester.pumpAndSettle();
-      expect(find.byType(TextFormField), findsNWidgets(2));
-      final fieldContext = tester.element(find.byType(TextFormField).first);
-      expect(Theme.of(fieldContext).colorScheme, expected.colorScheme);
+      expect(find.byType(prism.TextFormField), findsNWidgets(2));
+      final fieldContext = tester.element(
+        find.byType(prism.TextFormField).first,
+      );
+      expect(prism.Theme.of(fieldContext).brightness, expected.brightness);
       final l10n = AppLocalizations.of(fieldContext);
       await tester.tap(find.text(l10n.add));
       await tester.pumpAndSettle();
@@ -102,30 +117,30 @@ void main() {
     (tester) async {
       final gateway = _ProfilesGateway();
       final container = await mount(tester, gateway);
-      expect(checkbox(tester, 'primary').value, isTrue);
-      expect(checkbox(tester, 'backup').value, isTrue);
+      expect(subscriptionCard(tester, 'primary').profile.enabled, isTrue);
+      expect(subscriptionCard(tester, 'backup').profile.enabled, isTrue);
       expect(
         container.read(proxiesProvider).selectedGroup?.nodes,
         hasLength(2),
       );
 
-      await tester.tap(find.byKey(const ValueKey('enable-primary')));
+      await tester.tap(find.byKey(const ValueKey('subscription-primary')));
       await tester.pumpAndSettle();
       expect(gateway.changes, [('primary', false)]);
-      expect(checkbox(tester, 'primary').value, isFalse);
-      expect(checkbox(tester, 'backup').value, isTrue);
+      expect(subscriptionCard(tester, 'primary').profile.enabled, isFalse);
+      expect(subscriptionCard(tester, 'backup').profile.enabled, isTrue);
       expect(
         container.read(proxiesProvider).selectedGroup?.nodes.single.id,
         'jp-1',
       );
 
-      await tester.tap(find.byKey(const ValueKey('enable-primary')));
+      await tester.tap(find.byKey(const ValueKey('subscription-primary')));
       await tester.pumpAndSettle();
       expect(
         container.read(proxiesProvider).selectedGroup?.nodes,
         hasLength(2),
       );
-      expect(checkbox(tester, 'backup').value, isTrue);
+      expect(subscriptionCard(tester, 'backup').profile.enabled, isTrue);
     },
   );
 
@@ -134,10 +149,10 @@ void main() {
     (tester) async {
       final gateway = _ProfilesGateway()..failChange = true;
       final container = await mount(tester, gateway);
-      await tester.tap(find.byKey(const ValueKey('enable-primary')));
+      await tester.tap(find.byKey(const ValueKey('subscription-primary')));
       await tester.pumpAndSettle();
-      expect(checkbox(tester, 'primary').value, isTrue);
-      expect(checkbox(tester, 'backup').value, isTrue);
+      expect(subscriptionCard(tester, 'primary').profile.enabled, isTrue);
+      expect(subscriptionCard(tester, 'backup').profile.enabled, isTrue);
       expect(
         container.read(proxiesProvider).selectedGroup?.nodes,
         hasLength(2),
@@ -152,14 +167,14 @@ void main() {
   testWidgets('pending changes cannot be submitted twice', (tester) async {
     final gateway = _ProfilesGateway()..changeGate = Completer<void>();
     await mount(tester, gateway);
-    await tester.tap(find.byKey(const ValueKey('enable-primary')));
+    await tester.tap(find.byKey(const ValueKey('subscription-primary')));
     await tester.pump();
-    expect(checkbox(tester, 'primary').onChanged, isNull);
-    expect(checkbox(tester, 'primary').value, isTrue);
+    expect(subscriptionCard(tester, 'primary').busy, isTrue);
+    expect(subscriptionCard(tester, 'primary').profile.enabled, isTrue);
     expect(gateway.changes, hasLength(1));
     gateway.changeGate!.complete();
     await tester.pumpAndSettle();
-    expect(checkbox(tester, 'primary').value, isFalse);
+    expect(subscriptionCard(tester, 'primary').profile.enabled, isFalse);
   });
 
   testWidgets('disabling the selected source never selects another node', (
@@ -191,7 +206,7 @@ void main() {
     expect(container.read(proxiesProvider).groups, isEmpty);
   });
 
-  testWidgets('node library filters the shared pool without changing a route', (
+  testWidgets('node selection persists while filtering the shared pool', (
     tester,
   ) async {
     final container = await mount(
@@ -221,11 +236,17 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       container.read(proxiesProvider).selectedGroup?.selectedNodeId,
-      isNull,
+      'jp-1',
     );
     expect(
-      tester.widget<ListTile>(find.byKey(const ValueKey('node-jp-1'))).selected,
-      isFalse,
+      tester
+          .widget<ProxyCard>(
+            find.byWidgetPredicate(
+              (widget) => widget is ProxyCard && widget.proxy.id == 'jp-1',
+            ),
+          )
+          .selected,
+      isTrue,
     );
 
     await tester.ensureVisible(find.byKey(const ValueKey('source-primary')));
@@ -235,19 +256,20 @@ void main() {
     expect(map.nodes.single.countryCode, 'SG');
     expect(
       container.read(proxiesProvider).selectedGroup?.selectedNodeId,
-      isNull,
+      'jp-1',
     );
-    await tester.enterText(find.byType(TextField), 'no-match');
+    await tester.enterText(find.byType(EditableText), 'no-match');
     await tester.pumpAndSettle();
     expect(find.text('No matching nodes'), findsOneWidget);
     await tester.ensureVisible(find.text('Clear filters'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Clear filters'));
     await tester.pumpAndSettle();
     map = tester.widget<AbstractWorldMap>(find.byType(AbstractWorldMap));
     expect(map.nodes, hasLength(2));
     expect(
       container.read(proxiesProvider).selectedGroup?.selectedNodeId,
-      isNull,
+      'jp-1',
     );
   });
 
@@ -283,7 +305,7 @@ void main() {
           await tester.drag(
             nodePage
                 ? find.byType(CustomScrollView)
-                : find.byType(SingleChildScrollView),
+                : find.byType(ListView).first,
             const Offset(0, -650),
           );
           await tester.pumpAndSettle();
