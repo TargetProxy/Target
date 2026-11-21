@@ -16,7 +16,7 @@ Future<void> main() async {
   if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
     desktopTray = DesktopTray();
     final locale = PlatformDispatcher.instance.locale;
-    await desktopTray.initialize(
+    desktopTray.initialize(
       AppIdentity.displayName,
       l10n: lookupAppLocalizations(
         AppLocalizations.supportedLocales.any(

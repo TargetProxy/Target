@@ -1,12 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter_alone/flutter_alone.dart';
+import 'package:nativeapi/nativeapi.dart';
 import 'package:tray_manager/tray_manager.dart';
-import 'package:window_manager/legacy.dart';
 
 import '../../l10n/app_localizations.dart';
 
-final class DesktopTray with WindowListener {
+final class DesktopTray {
+  late final Window _window;
+  late final ListenerId _windowListener;
   late final TrayIcon _icon;
   late final Image _image;
   late final Menu _menu;
@@ -15,12 +17,9 @@ final class DesktopTray with WindowListener {
 
   Future<void> Function()? onExit;
 
-  Future<void> initialize(
-    String tooltip, {
-    required AppLocalizations l10n,
-  }) async {
-    await windowManager.ensureInitialized();
-    await windowManager.setTitle(tooltip);
+  void initialize(String tooltip, {required AppLocalizations l10n}) {
+    _window = WindowManager.instance.getCurrent()!;
+    _window.title = tooltip;
     _icon = TrayIcon.create()!;
     _image = ImageAsset.fromAsset('assets/TargetAppIcon.png')!;
     _showItem = MenuItem.createWithLabelAndType(
@@ -35,7 +34,7 @@ final class DesktopTray with WindowListener {
       ..addItem(_showItem)
       ..addItem(_exitItem);
     _showItem.addListener((event) {
-      if (event is MenuItemClickedEvent) unawaited(show());
+      if (event is MenuItemClickedEvent) _show();
     });
     _exitItem.addListener((event) {
       if (event is MenuItemClickedEvent) {
@@ -52,37 +51,32 @@ final class DesktopTray with WindowListener {
     _icon.addListener((event) {
       if (event is TrayIconClickedEvent ||
           event is TrayIconDoubleClickedEvent) {
-        unawaited(show());
+        _show();
       }
     });
-    windowManager.addListener(this);
-    await windowManager.setPreventClose(true);
+    _windowListener = _window.addListener((event) {
+      if (event is WindowCloseRequestedEvent) {
+        event.request.cancel();
+        _window.hide();
+      }
+    });
   }
 
-  @override
-  void onWindowClose() => unawaited(windowManager.hide());
-
-  Future<void> closeWindow() async {
-    windowManager.removeListener(this);
-    await windowManager.setPreventClose(false);
-    await windowManager.close();
+  void _show() {
+    if (_window.isMinimized) _window.restore();
+    _window.show();
+    _window.focus();
   }
 
-  Future<void> show() async {
-    if (await windowManager.isMinimized()) await windowManager.restore();
-    await windowManager.show();
-    await windowManager.focus();
-  }
-
-  Future<void> quit({bool closeWindow = true}) async {
-    if (closeWindow) await this.closeWindow();
+  Future<void> quit() async {
+    await FlutterAlone.instance.dispose();
     _icon.setVisible(false);
     _icon.dispose();
     _menu.dispose();
     _showItem.dispose();
     _exitItem.dispose();
     _image.dispose();
-    await FlutterAlone.instance.dispose();
-    await windowManager.destroy();
+    _window.removeListener(_windowListener);
+    Application.instance.quit(0);
   }
 }

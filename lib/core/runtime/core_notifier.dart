@@ -98,7 +98,6 @@ class CoreNotifier extends Notifier<CoreState> {
 
   Future<void> updateRuntimeConfig(RuntimeSettings settings) async {
     _configurationRevision++;
-    state = state.copyWith(settings: settings);
     if (!state.available) {
       return;
     }
