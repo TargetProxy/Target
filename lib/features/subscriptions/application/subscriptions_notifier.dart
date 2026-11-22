@@ -2,8 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:targetlib/targetlib.dart' as targetlib;
-
 import '../../../core/runtime/core_gateway.dart';
 import '../../../core/runtime/core_notifier.dart';
 import '../../../core/runtime/subscription_gateway.dart';
@@ -93,18 +91,16 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
         // Use it as the single source of truth for the unified node list.
         final pool = await ref.read(coreGatewayProvider).getNodePool();
         final nodes = [
-          for (final node in pool.nodes)
+          for (final node in pool)
             ProxyNode(
-              id: node.tag,
-              name: node.name.isEmpty ? node.tag : node.name,
+              id: node.id,
+              name: node.name.isEmpty ? node.id : node.name,
               type: node.type,
               subscriptionId: node.subscriptionId,
-              countryCode: node.countryCode.isEmpty ? null : node.countryCode,
+              countryCode: node.countryCode,
               server: node.server,
               port: node.port,
-              isAvailable:
-                  node.phase !=
-                  targetlib.ProfileNodePhase.PROFILE_NODE_PHASE_FAILED,
+              isAvailable: node.isAvailable,
             ),
         ];
         if (nodes.isEmpty) {
@@ -271,19 +267,11 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
   }
 
   void _logConfigComparison(RuntimeSubscriptionUpdate result) {
-    if (result.originalConfig.isEmpty && result.generatedConfig.isEmpty) {
-      return;
-    }
+    if (result.originalConfig.isEmpty) return;
     AppLogger.info(
       '===== ORIGINAL SUBSCRIPTION CONFIG =====\n'
       '${result.originalConfig}\n'
       '===== END ORIGINAL SUBSCRIPTION CONFIG =====',
-      source: 'CONFIG',
-    );
-    AppLogger.info(
-      '===== TARGETLIB GENERATED CONFIG =====\n'
-      '${result.generatedConfig}\n'
-      '===== END TARGETLIB GENERATED CONFIG =====',
       source: 'CONFIG',
     );
   }

@@ -21,7 +21,6 @@ import 'package:target/features/proxies/presentation/node_pool_page.dart';
 import 'package:target/features/proxies/application/proxies_notifier.dart';
 import 'package:target/features/subscriptions/application/subscriptions_notifier.dart';
 import 'package:target/l10n/app_localizations.dart';
-import 'package:targetlib/targetlib.dart' as targetlib;
 
 void main() {
   Future<ProviderContainer> mount(
@@ -345,18 +344,16 @@ class _ProfilesGateway extends UnavailableCoreGateway {
       RuntimeSubscriptionSnapshot(subscriptions: subscriptions);
 
   @override
-  Future<targetlib.NodePool> getNodePool() async => targetlib.NodePool(
-    nodes: [
-      for (final sub in subscriptions.where((sub) => sub.enabled))
-        targetlib.ProfileNode(
-          tag: sub.id == 'primary' ? 'sg-1' : 'jp-1',
-          name: sub.id == 'primary' ? 'Singapore' : 'Tokyo',
-          type: 'vmess',
-          countryCode: sub.id == 'primary' ? 'SG' : 'JP',
-          subscriptionId: sub.id,
-        ),
-    ],
-  );
+  Future<List<CoreNode>> getNodePool() async => [
+    for (final sub in subscriptions.where((sub) => sub.enabled))
+      CoreNode(
+        id: sub.id == 'primary' ? 'sg-1' : 'jp-1',
+        name: sub.id == 'primary' ? 'Singapore' : 'Tokyo',
+        type: 'vmess',
+        countryCode: sub.id == 'primary' ? 'SG' : 'JP',
+        subscriptionId: sub.id,
+      ),
+  ];
 
   @override
   Future<RuntimeSubscription> setSubscriptionEnabled(

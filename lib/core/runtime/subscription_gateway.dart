@@ -61,12 +61,10 @@ class RuntimeSubscriptionUpdate {
     required this.notModified,
     required this.duration,
     this.originalConfig = '',
-    this.generatedConfig = '',
   });
 
   final RuntimeSubscription subscription;
   final bool notModified;
   final Duration duration;
   final String originalConfig;
-  final String generatedConfig;
 }

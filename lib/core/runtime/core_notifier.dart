@@ -22,6 +22,7 @@ class CoreState {
     this.lifecycle = CoreLifecycle.unavailable,
     this.message = 'TargetLib is not initialized yet.',
     this.settings = const RuntimeSettings(),
+    this.requestedSettings,
     this.traffic = TrafficSnapshot.zero,
     this.connections = const [],
     this.busy = false,
@@ -32,6 +33,7 @@ class CoreState {
   final CoreLifecycle lifecycle;
   final String message;
   final RuntimeSettings settings;
+  final RuntimeSettings? requestedSettings;
   final TrafficSnapshot traffic;
   final List<CoreConnection> connections;
   final bool busy;
@@ -39,6 +41,15 @@ class CoreState {
   final String backendName;
 
   bool get running => lifecycle == CoreLifecycle.running;
+
+  // Configuration reloads report the same transitions as a manual start/stop.
+  bool get showStop => switch (lifecycle) {
+    CoreLifecycle.running => true,
+    CoreLifecycle.starting || CoreLifecycle.stopping => !busy,
+    _ => false,
+  };
+
+  RuntimeSettings get selectedSettings => requestedSettings ?? settings;
 
   String get status => switch (lifecycle) {
     CoreLifecycle.unavailable => 'Core unavailable',
@@ -53,15 +64,20 @@ class CoreState {
     CoreLifecycle? lifecycle,
     String? message,
     RuntimeSettings? settings,
+    RuntimeSettings? requestedSettings,
     TrafficSnapshot? traffic,
     List<CoreConnection>? connections,
     bool? busy,
     bool clearMessage = false,
+    bool clearRequestedSettings = false,
   }) {
     return CoreState(
       lifecycle: lifecycle ?? this.lifecycle,
       message: clearMessage ? '' : message ?? this.message,
       settings: settings ?? this.settings,
+      requestedSettings: clearRequestedSettings
+          ? null
+          : requestedSettings ?? this.requestedSettings,
       traffic: traffic ?? this.traffic,
       connections: connections ?? this.connections,
       busy: busy ?? this.busy,
@@ -75,7 +91,6 @@ class CoreNotifier extends Notifier<CoreState> {
   CoreGateway? _gateway;
   StreamSubscription<CoreSnapshot>? _subscription;
   Future<void> Function()? _startupBarrier;
-  RuntimeSettings? _pendingConfiguration;
   Future<void>? _configurationTask;
   int _configurationRevision = 0;
 
@@ -97,38 +112,32 @@ class CoreNotifier extends Notifier<CoreState> {
   }
 
   Future<void> updateRuntimeConfig(RuntimeSettings settings) async {
+    if (!state.available) return;
     _configurationRevision++;
-    if (!state.available) {
-      return;
-    }
-    _pendingConfiguration = settings;
-    final activeTask = _configurationTask;
-    if (activeTask != null) {
-      await activeTask;
-      return;
-    }
-
-    final task = _applyPendingRuntimeConfig();
-    _configurationTask = task;
-    try {
-      await task;
-    } finally {
-      if (identical(_configurationTask, task)) {
-        _configurationTask = null;
-      }
-    }
+    final task = _configurationTask ??= Future<void>.microtask(
+      _applyPendingRuntimeConfig,
+    );
+    state = state.copyWith(requestedSettings: settings);
+    await task;
   }
 
   Future<void> _applyPendingRuntimeConfig() async {
-    state = state.copyWith(busy: true);
     try {
-      while (true) {
-        final next = _pendingConfiguration;
-        if (next == null) return;
-        _pendingConfiguration = null;
-        final applied = await _gateway!.updateRuntimeConfig(next);
-        state = state.copyWith(settings: applied, clearMessage: true);
-      }
+      int revision;
+      do {
+        revision = _configurationRevision;
+        await _applyRuntimeConfig(state.selectedSettings);
+      } while (revision != _configurationRevision);
+    } finally {
+      _configurationTask = null;
+      state = state.copyWith(clearRequestedSettings: true);
+    }
+  }
+
+  Future<void> _applyRuntimeConfig(RuntimeSettings settings) async {
+    try {
+      final applied = await _gateway!.updateRuntimeConfig(settings);
+      state = state.copyWith(settings: applied, clearMessage: true);
     } on Object catch (error, stackTrace) {
       AppLogger.error(
         'Core update runtime config failed',
@@ -153,8 +162,6 @@ class CoreNotifier extends Notifier<CoreState> {
           operationName: 'refresh runtime config after update failure',
         );
       }
-    } finally {
-      state = state.copyWith(busy: false);
     }
   }
 
@@ -162,6 +169,7 @@ class CoreNotifier extends Notifier<CoreState> {
     if (!state.available) return;
     AppLogger.info('Connect requested using ${state.backendName}');
     await _run(() async {
+      await _configurationTask;
       await _startupBarrier?.call();
       await _gateway!.start();
     }, operationName: 'connect');
@@ -169,7 +177,10 @@ class CoreNotifier extends Notifier<CoreState> {
 
   Future<void> stop() async {
     if (!state.available) return;
-    await _run(_gateway!.stop, operationName: 'disconnect');
+    await _run(() async {
+      await _configurationTask;
+      await _gateway!.stop();
+    }, operationName: 'disconnect');
   }
 
   Future<void> selectNode(String nodeId) async {

@@ -39,7 +39,7 @@ class OutboundModeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mode = core.settings.routeMode;
+    final mode = core.selectedSettings.routeMode;
     final tone = DashboardColors.of(context).tone;
     final style = AppTextStyle.footnote.of(context, emphasized: true);
     return DashboardCard(
@@ -57,6 +57,7 @@ class OutboundModeCard extends StatelessWidget {
                 Expanded(
                   child: DashboardConnectedButton(
                     selected: item == mode,
+                    busy: core.busy,
                     first: index == 0,
                     last: index == 2,
                     outer: _outer,
@@ -64,7 +65,7 @@ class OutboundModeCard extends StatelessWidget {
                     background: tone,
                     semanticLabel: _labelOf(context, item),
                     onTap: () {
-                      if (!core.busy && item != mode) onChanged(item);
+                      if (item != mode) onChanged(item);
                     },
                     builder: (foreground) => SizedBox(
                       height: 52,
@@ -111,7 +112,7 @@ class OutboundModeBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final density = DashboardDensityScope.of(context);
-    final mode = core.settings.routeMode;
+    final mode = core.selectedSettings.routeMode;
     final appLocalizations = AppLocalizations.of(context);
     final outer = dashboardCardRadius(density) - _inset;
     final style = AppTextStyle.subheadline.of(context, emphasized: true);
@@ -149,6 +150,7 @@ class OutboundModeBar extends StatelessWidget {
                     Expanded(
                       child: DashboardConnectedButton(
                         selected: item == mode,
+                        busy: core.busy,
                         first: index == 0,
                         last: index == OutboundModeCard._modes.length - 1,
                         outer: outer,
@@ -156,7 +158,7 @@ class OutboundModeBar extends StatelessWidget {
                         background: DashboardColors.of(context).tone,
                         semanticLabel: _labelOf(context, item),
                         onTap: () {
-                          if (!core.busy) onChanged(item);
+                          if (item != mode) onChanged(item);
                         },
                         builder: (foreground) => Row(
                           mainAxisAlignment: MainAxisAlignment.center,

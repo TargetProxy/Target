@@ -247,10 +247,6 @@ class TargetLibGateway implements CoreGateway {
       notModified: result.notModified,
       duration: Duration(milliseconds: result.durationMilliseconds.toInt()),
       originalConfig: utf8.decode(result.originalConfig, allowMalformed: true),
-      generatedConfig: utf8.decode(
-        result.generatedConfig,
-        allowMalformed: true,
-      ),
     );
   }
 
@@ -270,22 +266,60 @@ class TargetLibGateway implements CoreGateway {
   }
 
   @override
-  Future<targetlib_pb.NodePool> getNodePool() =>
-      _coreCall(() => _manager!.getNodePool(Empty(), options: _callOptions));
+  Future<List<CoreNode>> getNodePool() async {
+    final pool = await _coreCall(
+      () => _manager!.getNodePool(Empty(), options: _callOptions),
+    );
+    return pool.nodes
+        .map(
+          (node) => CoreNode(
+            id: node.tag,
+            name: node.name,
+            type: node.type,
+            subscriptionId: node.subscriptionId,
+            countryCode: node.countryCode.isEmpty ? null : node.countryCode,
+            server: node.server,
+            port: node.port,
+            isAvailable:
+                node.phase !=
+                targetlib_pb.ProfileNodePhase.PROFILE_NODE_PHASE_FAILED,
+          ),
+        )
+        .toList();
+  }
 
   @override
-  Future<targetlib_pb.SelectNodeResponse> selectNode(String nodeId) =>
-      _coreCall(
-        () => _manager!.selectNode(
-          targetlib_pb.SelectNodeRequest(nodeId: nodeId),
-          options: _callOptions,
+  Future<void> selectNode(String nodeId) async {
+    await _coreCall(
+      () => _manager!.selectNode(
+        targetlib_pb.SelectNodeRequest(nodeId: nodeId),
+        options: _callOptions,
+      ),
+    );
+  }
+
+  @override
+  Future<CoreRoute> upsertRoute({
+    required String serviceId,
+    required String displayName,
+    required List<String> domains,
+    required String nodeId,
+    required bool enabled,
+  }) async {
+    final route = await _coreCall(
+      () => _manager!.upsertRoute(
+        targetlib_pb.UpsertRouteRequest(
+          serviceId: serviceId,
+          displayName: displayName,
+          domains: domains,
+          nodeId: nodeId,
+          enabled: enabled,
         ),
-      );
-
-  @override
-  Future<targetlib_pb.RouteInfo> upsertRoute(
-    targetlib_pb.UpsertRouteRequest request,
-  ) => _coreCall(() => _manager!.upsertRoute(request, options: _callOptions));
+        options: _callOptions,
+      ),
+    );
+    return _coreRoute(route);
+  }
 
   @override
   Future<void> deleteRoute(String serviceId) async {
@@ -298,18 +332,34 @@ class TargetLibGateway implements CoreGateway {
   }
 
   @override
-  Future<targetlib_pb.RouteList> listRoutes() =>
-      _coreCall(() => _manager!.listRoutes(Empty(), options: _callOptions));
+  Future<List<CoreRoute>> listRoutes() async {
+    final routes = await _coreCall(
+      () => _manager!.listRoutes(Empty(), options: _callOptions),
+    );
+    return routes.routes.map(_coreRoute).toList();
+  }
 
   @override
-  Future<targetlib_pb.SelectNodeResponse> selectRouteNode(
-    String serviceId,
-    String nodeId,
-  ) => _coreCall(
-    () => _manager!.selectRouteNode(
-      targetlib_pb.SelectRouteNodeRequest(serviceId: serviceId, nodeId: nodeId),
-      options: _callOptions,
-    ),
+  Future<void> selectRouteNode(String serviceId, String nodeId) async {
+    await _coreCall(
+      () => _manager!.selectRouteNode(
+        targetlib_pb.SelectRouteNodeRequest(
+          serviceId: serviceId,
+          nodeId: nodeId,
+        ),
+        options: _callOptions,
+      ),
+    );
+  }
+
+  CoreRoute _coreRoute(targetlib_pb.RouteInfo route) => CoreRoute(
+    serviceId: route.serviceId,
+    displayName: route.displayName,
+    domains: route.domains,
+    currentNodeId: route.currentNodeId,
+    currentNodeName: route.currentNodeName,
+    enabled: route.enabled,
+    effective: route.effective,
   );
 
   Future<T> _coreCall<T>(Future<T> Function() operation) async {

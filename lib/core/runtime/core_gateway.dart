@@ -1,5 +1,3 @@
-import 'package:targetlib/targetlib.dart' as pb;
-
 import '../../data/models/ip_info.dart';
 import '../../data/models/runtime_settings.dart';
 import 'core_models.dart';
@@ -28,7 +26,9 @@ abstract class CoreGateway {
 
   Future<int?> testLatency(String outboundId) => Future.value();
 
-  Stream<CoreLatencyResult> testLatencies(Iterable<String> outboundIds) async* {}
+  Stream<CoreLatencyResult> testLatencies(
+    Iterable<String> outboundIds,
+  ) async* {}
 
   Future<void> closeConnection(String connectionId) => Future.error(
     const CoreUnavailableException('Connection control is not supported.'),
@@ -60,36 +60,43 @@ abstract class CoreGateway {
     required int updateIntervalSeconds,
     required Map<String, String> headers,
     bool updateNow = false,
-  }) => Future.error(const CoreUnavailableException('Subscriptions are not supported.'));
-
-  Future<RuntimeSubscription> setSubscriptionEnabled(String id, bool enabled) =>
-      Future.error(const CoreUnavailableException('Subscriptions are not supported.'));
-
-  Future<RuntimeSubscriptionUpdate> updateSubscription(String id) => Future.error(
+  }) => Future.error(
     const CoreUnavailableException('Subscriptions are not supported.'),
   );
 
-  Future<pb.NodePool> getNodePool();
+  Future<RuntimeSubscription> setSubscriptionEnabled(String id, bool enabled) =>
+      Future.error(
+        const CoreUnavailableException('Subscriptions are not supported.'),
+      );
 
-  Future<pb.SelectNodeResponse> selectNode(String nodeId) => Future.error(
+  Future<RuntimeSubscriptionUpdate> updateSubscription(String id) =>
+      Future.error(
+        const CoreUnavailableException('Subscriptions are not supported.'),
+      );
+
+  Future<List<CoreNode>> getNodePool();
+
+  Future<void> selectNode(String nodeId) => Future.error(
     const CoreUnavailableException('Node selection is not supported.'),
   );
 
-  Future<pb.RouteInfo> upsertRoute(pb.UpsertRouteRequest request) =>
+  Future<CoreRoute> upsertRoute({
+    required String serviceId,
+    required String displayName,
+    required List<String> domains,
+    required String nodeId,
+    required bool enabled,
+  }) =>
       Future.error(const CoreUnavailableException('Routes are not supported.'));
 
-  Future<void> deleteRoute(String serviceId) => Future.error(
-    const CoreUnavailableException('Routes are not supported.'),
-  );
+  Future<void> deleteRoute(String serviceId) =>
+      Future.error(const CoreUnavailableException('Routes are not supported.'));
 
-  Future<pb.RouteList> listRoutes() => Future.error(
-    const CoreUnavailableException('Routes are not supported.'),
-  );
+  Future<List<CoreRoute>> listRoutes() =>
+      Future.error(const CoreUnavailableException('Routes are not supported.'));
 
-  Future<pb.SelectNodeResponse> selectRouteNode(
-    String serviceId,
-    String nodeId,
-  ) => Future.error(const CoreUnavailableException('Routes are not supported.'));
+  Future<void> selectRouteNode(String serviceId, String nodeId) =>
+      Future.error(const CoreUnavailableException('Routes are not supported.'));
 
   Future<void> dispose();
 }
@@ -187,26 +194,29 @@ class UnavailableCoreGateway implements CoreGateway {
       _unavailable();
 
   @override
-  Future<pb.NodePool> getNodePool() => _unavailable();
+  Future<List<CoreNode>> getNodePool() => _unavailable();
 
   @override
-  Future<pb.SelectNodeResponse> selectNode(String nodeId) => _unavailable();
+  Future<void> selectNode(String nodeId) => _unavailable();
 
   @override
-  Future<pb.RouteInfo> upsertRoute(pb.UpsertRouteRequest request) =>
-      _unavailable();
+  Future<CoreRoute> upsertRoute({
+    required String serviceId,
+    required String displayName,
+    required List<String> domains,
+    required String nodeId,
+    required bool enabled,
+  }) => _unavailable();
 
   @override
   Future<void> deleteRoute(String serviceId) => _unavailable();
 
   @override
-  Future<pb.RouteList> listRoutes() => _unavailable();
+  Future<List<CoreRoute>> listRoutes() => _unavailable();
 
   @override
-  Future<pb.SelectNodeResponse> selectRouteNode(
-    String serviceId,
-    String nodeId,
-  ) => _unavailable();
+  Future<void> selectRouteNode(String serviceId, String nodeId) =>
+      _unavailable();
 
   @override
   Future<void> dispose() async {}

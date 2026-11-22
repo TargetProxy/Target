@@ -105,7 +105,6 @@ class _LogsPageState extends ConsumerState<LogsPage> {
       context: context,
       child: prism.AlertDialog(
         title: l10n.exportLogs,
-        child: Text(l10n.sanitizeLogsPrompt),
         actions: [
           prism.TextButton(
             onPressed: () {
@@ -122,6 +121,7 @@ class _LogsPageState extends ConsumerState<LogsPage> {
             child: Text(l10n.sanitized),
           ),
         ],
+        child: Text(l10n.sanitizeLogsPrompt),
       ),
     );
   }

@@ -4,9 +4,8 @@ import 'package:prism_ui/prism_ui.dart';
 import '../../../core/ui/app_glyphs.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:targetlib/targetlib.dart' as pb;
-
 import '../../../core/runtime/core_notifier.dart';
+import '../../../core/runtime/core_models.dart';
 import '../../../core/widgets/target_page_layout.dart';
 import '../../../core/widgets/error_notice.dart';
 import '../../../data/models/runtime_settings.dart' as runtime_models;
@@ -29,7 +28,7 @@ class _RulesPageState extends ConsumerState<RulesPage> {
   final _domains = TextEditingController();
   String? _selectedNode;
   String? _country;
-  List<pb.RouteInfo> _routes = const [];
+  List<CoreRoute> _routes = const [];
   bool _loading = true;
   String? _error;
 
@@ -52,7 +51,7 @@ class _RulesPageState extends ConsumerState<RulesPage> {
       final routes = await ref.read(coreGatewayProvider).listRoutes();
       if (!mounted) return;
       setState(() {
-        _routes = routes.routes;
+        _routes = routes;
         _loading = false;
         _error = null;
       });
@@ -86,13 +85,11 @@ class _RulesPageState extends ConsumerState<RulesPage> {
         );
       }
       await core.upsertRoute(
-        pb.UpsertRouteRequest(
-          serviceId: service,
-          displayName: _name.text.trim().isEmpty ? service : _name.text.trim(),
-          domains: domains,
-          nodeId: _selectedNode!,
-          enabled: true,
-        ),
+        serviceId: service,
+        displayName: _name.text.trim().isEmpty ? service : _name.text.trim(),
+        domains: domains.toList(),
+        nodeId: _selectedNode!,
+        enabled: true,
       );
       _service.clear();
       _name.clear();
@@ -115,18 +112,16 @@ class _RulesPageState extends ConsumerState<RulesPage> {
     }
   }
 
-  Future<void> _toggleRule(pb.RouteInfo route, bool enabled) async {
+  Future<void> _toggleRule(CoreRoute route, bool enabled) async {
     try {
       await ref
           .read(coreGatewayProvider)
           .upsertRoute(
-            pb.UpsertRouteRequest(
-              serviceId: route.serviceId,
-              displayName: route.displayName,
-              domains: route.domains,
-              nodeId: route.currentNodeId,
-              enabled: enabled,
-            ),
+            serviceId: route.serviceId,
+            displayName: route.displayName,
+            domains: route.domains,
+            nodeId: route.currentNodeId,
+            enabled: enabled,
           );
       await _load();
     } on Object catch (error) {
@@ -335,7 +330,7 @@ class _RulesPageState extends ConsumerState<RulesPage> {
   }
 
   Widget _routeTile(
-    pb.RouteInfo route,
+    CoreRoute route,
     List<ProxyNode> nodes,
     AppLocalizations l10n,
   ) {

@@ -30,7 +30,6 @@ Future<void> closeAllConnectionsWithFeedback(
     context: context,
     child: AlertDialog(
       title: l10n.closeAllConnections,
-      child: Text(l10n.activeConnectionsWillInterrupt),
       destructive: true,
       actions: [
         TextButton(
@@ -42,6 +41,7 @@ Future<void> closeAllConnectionsWithFeedback(
           child: Text(l10n.closeAll),
         ),
       ],
+      child: Text(l10n.activeConnectionsWillInterrupt),
     ),
   );
   if (confirmed != true) return;

@@ -21,6 +21,7 @@ double _morphTurn(double progress) => progress * 2 * math.pi / 9;
 /// running tunnel, the way the M3 Expressive loader morphs between shapes.
 class StartToggle extends StatefulWidget {
   const StartToggle({
+    super.key,
     required this.size,
     required this.enabled,
     required this.running,

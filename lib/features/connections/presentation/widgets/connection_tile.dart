@@ -30,11 +30,6 @@ class ConnectionTile extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: recordListGap),
       child: RecordListItem(
         header: RecordHeader(
-          children: [
-            Text(connection.network.toUpperCase()),
-            Text(connection.protocol.isEmpty ? '-' : connection.protocol),
-            Text(formatBytes(total)),
-          ],
           trailing: onClose == null ? null : IconButton(
             onPressed: closing ? null : onClose,
             tooltip: l10n.closeConnection,
@@ -42,6 +37,11 @@ class ConnectionTile extends StatelessWidget {
                 ? const ActivityIndicator(size: 18)
                 : const GlyphIcon(AppGlyphs.close, size: 18),
           ),
+          children: [
+            Text(connection.network.toUpperCase()),
+            Text(connection.protocol.isEmpty ? '-' : connection.protocol),
+            Text(formatBytes(total)),
+          ],
         ),
         body: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,

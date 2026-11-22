@@ -10,7 +10,6 @@ import 'package:target/data/models/proxy_node.dart';
 import 'package:target/data/models/runtime_settings.dart';
 import 'package:target/features/proxies/application/proxies_notifier.dart';
 import 'package:target/features/proxies/application/proxy_catalog.dart';
-import 'package:targetlib/targetlib.dart' as targetlib;
 
 void main() {
   test('syncs a saved selection only while the core is running', () async {
@@ -153,12 +152,11 @@ class _RecordingCoreGateway extends UnavailableCoreGateway {
   }
 
   @override
-  Future<targetlib.SelectNodeResponse> selectNode(String nodeId) async {
+  Future<void> selectNode(String nodeId) async {
     if (throwOnSelect) {
       throw StateError('select failed');
     }
     selections.add(nodeId);
-    return targetlib.SelectNodeResponse();
   }
 
   @override

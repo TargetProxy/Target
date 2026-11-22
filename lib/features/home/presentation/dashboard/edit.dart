@@ -171,8 +171,8 @@ class _DashboardEditorState extends State<DashboardEditor>
                       cardKey: widget.cardKeyOf(card),
                       index: index,
                       sway: sway,
-                      child: widget.cardOf(card),
                       onRemove: card.removable ? () => _remove(card) : null,
+                      child: widget.cardOf(card),
                     ),
                   ),
                 );

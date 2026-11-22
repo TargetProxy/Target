@@ -82,6 +82,50 @@ class CoreConnection {
   final int closedAt;
 }
 
+@immutable
+class CoreNode {
+  const CoreNode({
+    required this.id,
+    required this.name,
+    required this.type,
+    this.subscriptionId = '',
+    this.countryCode,
+    this.server = '',
+    this.port = 0,
+    this.isAvailable = true,
+  });
+
+  final String id;
+  final String name;
+  final String type;
+  final String subscriptionId;
+  final String? countryCode;
+  final String server;
+  final int port;
+  final bool isAvailable;
+}
+
+@immutable
+class CoreRoute {
+  const CoreRoute({
+    required this.serviceId,
+    required this.displayName,
+    required this.domains,
+    required this.currentNodeId,
+    required this.currentNodeName,
+    required this.enabled,
+    required this.effective,
+  });
+
+  final String serviceId;
+  final String displayName;
+  final List<String> domains;
+  final String currentNodeId;
+  final String currentNodeName;
+  final bool enabled;
+  final bool effective;
+}
+
 /// Lifecycle and traffic only. The node pool is read from the core's node pool
 /// through the catalog, never mirrored into runtime snapshots.
 @immutable

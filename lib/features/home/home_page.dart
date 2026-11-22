@@ -141,13 +141,9 @@ class _HomePageState extends ConsumerState<HomePage> {
         appSettings: appSettings,
         onProxyModeChanged: _changeProxyMode,
         onRouteModeChanged: _changeRouteMode,
-        onSystemProxyChanged: (value) => ref
-            .read(settingsProvider.notifier)
-            .updateSettings(
-              (settings) => settings.copyWith(systemProxy: value),
-            ),
+        onSystemProxyChanged: _changeSystemProxy,
         onServiceAction: () =>
-            core.running ? ref.read(coreProvider.notifier).stop() : _connect(),
+            core.showStop ? ref.read(coreProvider.notifier).stop() : _connect(),
         ipInfo: _ipInfo,
         ipLoading: _ipLoading,
         ipError: _ipError,
@@ -185,7 +181,7 @@ class _HomePageState extends ConsumerState<HomePage> {
             ? (_serviceStatus == TargetLibServiceStatus.stopped
                   ? _startTargetLibService
                   : _checkTargetLibService)
-            : () => core.running
+            : () => core.showStop
                   ? ref.read(coreProvider.notifier).stop()
                   : _connect(),
         header:
@@ -235,15 +231,22 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
+  void _changeSystemProxy(bool value) {
+    if (ref.read(coreProvider).busy) return;
+    ref
+        .read(settingsProvider.notifier)
+        .updateSettings((settings) => settings.copyWith(systemProxy: value));
+  }
+
   Future<void> _changeProxyMode(runtime_models.ProxyMode mode) async {
-    final current = ref.read(coreProvider).settings;
+    final current = ref.read(coreProvider).selectedSettings;
     await _updateRuntimeConfig(
       current.proxyMode == mode ? null : current.copyWith(proxyMode: mode),
     );
   }
 
   Future<void> _changeRouteMode(runtime_models.RouteMode mode) async {
-    final current = ref.read(coreProvider).settings;
+    final current = ref.read(coreProvider).selectedSettings;
     await _updateRuntimeConfig(
       current.routeMode == mode ? null : current.copyWith(routeMode: mode),
     );
@@ -252,7 +255,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   Future<void> _updateRuntimeConfig(
     runtime_models.RuntimeSettings? settings,
   ) async {
-    if (settings == null) return;
+    if (settings == null || ref.read(coreProvider).busy) return;
     await ref.read(coreProvider.notifier).updateRuntimeConfig(settings);
     if (!mounted) return;
     final core = ref.read(coreProvider);

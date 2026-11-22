@@ -396,6 +396,7 @@ class DashboardConnectedButton extends StatelessWidget {
   const DashboardConnectedButton({
     super.key,
     required this.selected,
+    required this.busy,
     required this.first,
     required this.last,
     required this.outer,
@@ -407,6 +408,7 @@ class DashboardConnectedButton extends StatelessWidget {
   });
 
   final bool selected;
+  final bool busy;
   final bool first;
   final bool last;
   final double outer;
@@ -416,15 +418,36 @@ class DashboardConnectedButton extends StatelessWidget {
   final String semanticLabel;
   final Widget Function(Color foreground) builder;
 
+  static Color _foregroundFor(Color fill, Color preferred, Color alternative) {
+    final luminance = fill.computeLuminance();
+    double contrast(Color color) {
+      final foreground = color.computeLuminance();
+      return (math.max(luminance, foreground) + 0.05) /
+          (math.min(luminance, foreground) + 0.05);
+    }
+
+    if (contrast(preferred) >= 4.5) return preferred;
+    if (contrast(alternative) >= 4.5) return alternative;
+    return contrast(Colors.black) >= contrast(Colors.white)
+        ? Colors.black
+        : Colors.white;
+  }
+
   @override
   Widget build(BuildContext context) {
     final rtl = Directionality.of(context) == TextDirection.rtl;
     final startRest = first ? outer : inner;
     final endRest = last ? outer : inner;
     final colorScheme = context.colorScheme;
-    return Semantics(
+    void activate() {
+      if (!busy) onTap();
+    }
+
+    final button = Semantics(
       button: true,
       selected: selected,
+      enabled: !busy,
+      onTap: busy ? null : onTap,
       inMutuallyExclusiveGroup: true,
       label: semanticLabel,
       excludeSemantics: true,
@@ -433,9 +456,20 @@ class DashboardConnectedButton extends StatelessWidget {
           tween: Tween(end: selected ? 1 : 0),
           duration: context.motionDuration(_connectedSelectDuration),
           curve: Curves.easeOutCubic,
-          builder: (context, amount, child) {
+          builder: (context, amount, _) {
             final start = lerpDouble(startRest, outer, amount)!;
             final end = lerpDouble(endRest, outer, amount)!;
+            final fill = Color.lerp(background, colorScheme.primary, amount)!;
+            final nearSelected = amount >= 0.5;
+            final foreground = _foregroundFor(
+              fill,
+              nearSelected
+                  ? colorScheme.onPrimary
+                  : colorScheme.onSurfaceVariant,
+              nearSelected
+                  ? colorScheme.onSurfaceVariant
+                  : colorScheme.onPrimary,
+            );
             final shape = AppShape.of(
               BorderRadius.horizontal(
                 left: Radius.circular(rtl ? end : start),
@@ -444,28 +478,24 @@ class DashboardConnectedButton extends StatelessWidget {
             );
             return FocusRing(
               shape: shape,
-              standsOff: selected,
+              standsOff: nearSelected,
               child: Container(
                 clipBehavior: Clip.antiAlias,
-                decoration: ShapeDecoration(
-                  color: Color.lerp(background, colorScheme.primary, amount),
-                  shape: shape,
-                ),
+                decoration: ShapeDecoration(color: fill, shape: shape),
                 child: PressRegion(
                   shape: shape,
                   overlay: PressRegion.hoverOverlay,
-                  onTap: onTap,
-                  child: child!,
+                  onTap: activate,
+                  enableFeedback: !busy,
+                  child: builder(foreground),
                 ),
               ),
             );
           },
-          child: builder(
-            selected ? colorScheme.onPrimary : colorScheme.onSurfaceVariant,
-          ),
         ),
       ),
     );
+    return AbsorbPointer(absorbing: busy, child: button);
   }
 }
 
