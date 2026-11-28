@@ -450,16 +450,33 @@ class TargetLibGateway implements CoreGateway {
 
   @override
   Future<int?> testLatency(String outboundId) async {
-    throw const CoreUnavailableException(
-      'TargetLib does not expose node latency testing in this API version.',
-    );
+    final result = await testLatencies([outboundId]).first;
+    return result.succeeded ? result.delayMilliseconds : null;
   }
 
   @override
   Stream<CoreLatencyResult> testLatencies(Iterable<String> outboundIds) async* {
-    throw const CoreUnavailableException(
-      'TargetLib does not expose node latency testing in this API version.',
+    await _ensureConnected();
+    final results = _manager!.testNodeDelay(
+      TestNodeDelayRequest(nodeIds: outboundIds),
+      options: _callOptions,
     );
+    yield* results.map((result) {
+      final status = switch (result.status) {
+        NodeDelayStatus.NODE_DELAY_STATUS_OK => CoreLatencyStatus.success,
+        NodeDelayStatus.NODE_DELAY_STATUS_TIMEOUT => CoreLatencyStatus.timeout,
+        NodeDelayStatus.NODE_DELAY_STATUS_NOT_FOUND =>
+          CoreLatencyStatus.notFound,
+        NodeDelayStatus.NODE_DELAY_STATUS_NOT_READY =>
+          CoreLatencyStatus.notReady,
+        _ => CoreLatencyStatus.failed,
+      };
+      return CoreLatencyResult(
+        outboundId: result.nodeId,
+        status: status,
+        delayMilliseconds: result.hasDelayMs() ? result.delayMs : null,
+      );
+    });
   }
 
   @override

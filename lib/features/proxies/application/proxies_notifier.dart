@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/runtime/core_models.dart';
 import '../../../core/runtime/core_notifier.dart';
 import '../../../data/models/proxy_group.dart';
 import '../../../data/models/proxy_node.dart';
@@ -17,6 +18,7 @@ class ProxiesState {
     this.searchQuery = '',
     this.sortAsc = true,
     this.testing = false,
+    this.testingNodeIds = const {},
     this.lastError,
   });
 
@@ -25,6 +27,7 @@ class ProxiesState {
   final String searchQuery;
   final bool sortAsc;
   final bool testing;
+  final Set<String> testingNodeIds;
   final String? lastError;
 
   ProxyGroup? get selectedGroup {
@@ -66,6 +69,7 @@ class ProxiesState {
     String? searchQuery,
     bool? sortAsc,
     bool? testing,
+    Set<String>? testingNodeIds,
     String? lastError,
     bool clearError = false,
   }) {
@@ -75,6 +79,7 @@ class ProxiesState {
       searchQuery: searchQuery ?? this.searchQuery,
       sortAsc: sortAsc ?? this.sortAsc,
       testing: testing ?? this.testing,
+      testingNodeIds: testingNodeIds ?? this.testingNodeIds,
       lastError: clearError ? null : lastError ?? this.lastError,
     );
   }
@@ -84,9 +89,11 @@ class ProxiesState {
 /// catalog owns node data, so this notifier never merges pool snapshots itself.
 class ProxiesNotifier extends Notifier<ProxiesState> {
   final Map<String, String> _runtimeSelections = {};
+  StreamIterator<CoreLatencyResult>? _latencyRun;
 
   @override
   ProxiesState build() {
+    ref.onDispose(() => unawaited(_latencyRun?.cancel()));
     ref.listen(proxyCatalogProvider, (_, next) {
       state = _fromCatalog(state, next);
     });
@@ -166,69 +173,58 @@ class ProxiesNotifier extends Notifier<ProxiesState> {
     state = state.copyWith(searchQuery: query);
   }
 
-  Future<void> testAllLatency() async {
-    if (state.testing) return;
-    state = state.copyWith(testing: true, clearError: true);
+  Future<void> testAllLatency() =>
+      _testLatency(state.groups.expand((group) => group.nodes));
 
-    try {
-      // TargetLib maps these node tags back to its internal URLTest group, so
-      // every node in the pool is testable regardless of client-side grouping.
-      final nodeIds = {
-        for (final group in state.groups)
-          for (final node in group.nodes)
-            if (_isTestableNode(node)) node.id,
-      };
-      if (nodeIds.isEmpty) {
-        final protocols = state.groups
-            .expand((group) => group.nodes)
-            .map((node) => node.type)
-            .where((type) => type.isNotEmpty)
-            .toSet()
-            .join(', ');
-        state = state.copyWith(
-          lastError: protocols.isEmpty
-              ? 'TargetLib has no testable nodes. Add a subscription first.'
-              : 'TargetLib has no testable nodes. Supported nodes found: $protocols.',
-        );
-        return;
-      }
-      final catalog = ref.read(proxyCatalogProvider.notifier);
-      var successCount = 0;
-      final errors = <String>[];
-      await for (final result
-          in ref.read(coreProvider.notifier).testLatencies(nodeIds)) {
-        final latency = result.delayMilliseconds;
-        if (result.succeeded && latency != null) {
-          successCount++;
-          catalog.applyLatency(result.outboundId, latencyMs: latency);
-        } else {
-          catalog.applyLatency(result.outboundId, timedOut: true);
-          if (result.errorMessage.isNotEmpty) {
-            errors.add('${result.outboundId}: ${result.errorMessage}');
-          }
-        }
-      }
-      if (successCount == 0) {
-        state = state.copyWith(
-          lastError: errors.isEmpty
-              ? ref.read(coreProvider).message
-              : errors.first,
-        );
-      }
-    } on Object catch (error) {
-      state = state.copyWith(lastError: 'Latency test failed: $error');
-    } finally {
-      state = state.copyWith(testing: false);
-    }
+  Future<void> testNodeLatency(ProxyNode node) => _testLatency([node]);
+
+  Future<void> cancelLatencyTest() async {
+    await _latencyRun?.cancel();
   }
 
-  bool _isTestableNode(ProxyNode node) {
-    final type = node.type.toLowerCase();
-    return node.id.isNotEmpty &&
-        node.isAvailable &&
-        type != 'direct' &&
-        type != 'block' &&
-        type != 'dns';
+  Future<void> _testLatency(Iterable<ProxyNode> nodes) async {
+    if (_latencyRun != null) return;
+    final pending = {
+      for (final node in nodes)
+        if (node.isAvailable) node.id,
+    };
+    if (pending.isEmpty) return;
+    final catalog = ref.read(proxyCatalogProvider.notifier);
+    final run = StreamIterator(
+      ref.read(coreProvider.notifier).testLatencies(pending.toList()),
+    );
+    _latencyRun = run;
+    state = state.copyWith(
+      testing: true,
+      testingNodeIds: Set.unmodifiable(pending),
+      clearError: true,
+    );
+
+    try {
+      while (await run.moveNext() && ref.mounted) {
+        final result = run.current;
+        if (!pending.remove(result.outboundId)) continue;
+        final delay = result.succeeded ? result.delayMilliseconds : null;
+        final timedOut = result.status == CoreLatencyStatus.timeout;
+        catalog.applyLatency(
+          result.outboundId,
+          latencyMs: delay,
+          timedOut: timedOut,
+          failed: delay == null && !timedOut,
+        );
+        state = state.copyWith(testingNodeIds: Set.unmodifiable(pending));
+      }
+    } on Object catch (error) {
+      if (ref.mounted) {
+        state = state.copyWith(lastError: 'Latency test failed: $error');
+      }
+    } finally {
+      unawaited(run.cancel());
+      _latencyRun = null;
+      if (ref.mounted) {
+        state = state.copyWith(testing: false, testingNodeIds: const {});
+      }
+    }
   }
 }
 

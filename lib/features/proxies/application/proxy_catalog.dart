@@ -53,7 +53,12 @@ class ProxyCatalogNotifier extends Notifier<ProxyCatalogState> {
     );
   }
 
-  void applyLatency(String nodeId, {int? latencyMs, bool timedOut = false}) {
+  void applyLatency(
+    String nodeId, {
+    int? latencyMs,
+    bool timedOut = false,
+    bool failed = false,
+  }) {
     state = ProxyCatalogState(
       initialized: state.initialized,
       groups: [
@@ -62,7 +67,11 @@ class ProxyCatalogNotifier extends Notifier<ProxyCatalogState> {
             nodes: [
               for (final node in group.nodes)
                 if (node.id == nodeId)
-                  node.copyWith(latencyMs: latencyMs, latencyTimedOut: timedOut)
+                  node.copyWith(
+                    latencyMs: latencyMs,
+                    latencyTimedOut: timedOut,
+                    latencyFailed: failed,
+                  )
                 else
                   node,
             ],
@@ -101,6 +110,7 @@ class ProxyCatalogNotifier extends Notifier<ProxyCatalogState> {
     return node.copyWith(
       latencyMs: previous.latencyMs,
       latencyTimedOut: previous.latencyTimedOut,
+      latencyFailed: previous.latencyFailed,
     );
   }
 }

@@ -396,7 +396,6 @@ class DashboardConnectedButton extends StatelessWidget {
   const DashboardConnectedButton({
     super.key,
     required this.selected,
-    required this.busy,
     required this.first,
     required this.last,
     required this.outer,
@@ -408,7 +407,6 @@ class DashboardConnectedButton extends StatelessWidget {
   });
 
   final bool selected;
-  final bool busy;
   final bool first;
   final bool last;
   final double outer;
@@ -439,15 +437,10 @@ class DashboardConnectedButton extends StatelessWidget {
     final startRest = first ? outer : inner;
     final endRest = last ? outer : inner;
     final colorScheme = context.colorScheme;
-    void activate() {
-      if (!busy) onTap();
-    }
-
-    final button = Semantics(
+    return Semantics(
       button: true,
       selected: selected,
-      enabled: !busy,
-      onTap: busy ? null : onTap,
+      onTap: onTap,
       inMutuallyExclusiveGroup: true,
       label: semanticLabel,
       excludeSemantics: true,
@@ -485,8 +478,7 @@ class DashboardConnectedButton extends StatelessWidget {
                 child: PressRegion(
                   shape: shape,
                   overlay: PressRegion.hoverOverlay,
-                  onTap: activate,
-                  enableFeedback: !busy,
+                  onTap: onTap,
                   child: builder(foreground),
                 ),
               ),
@@ -495,7 +487,6 @@ class DashboardConnectedButton extends StatelessWidget {
         ),
       ),
     );
-    return AbsorbPointer(absorbing: busy, child: button);
   }
 }
 

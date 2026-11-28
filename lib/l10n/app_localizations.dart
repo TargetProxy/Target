@@ -416,6 +416,18 @@ abstract class AppLocalizations {
   /// **'Test latency'**
   String get testLatency;
 
+  /// No description provided for @testAllLatency.
+  ///
+  /// In en, this message translates to:
+  /// **'Test all nodes'**
+  String get testAllLatency;
+
+  /// No description provided for @latencyTestFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get latencyTestFailed;
+
   /// No description provided for @rules.
   ///
   /// In en, this message translates to:

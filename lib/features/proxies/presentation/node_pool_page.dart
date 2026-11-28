@@ -24,6 +24,8 @@ class NodePoolPage extends ConsumerStatefulWidget {
 }
 
 class _NodePoolPageState extends ConsumerState<NodePoolPage> {
+  static const _gridGap = 12.0;
+
   final _search = TextEditingController();
   String? _source;
   String? _country;
@@ -36,7 +38,7 @@ class _NodePoolPageState extends ConsumerState<NodePoolPage> {
 
   Color _latencyColor(BuildContext context, ProxyNode node) {
     final scheme = prism.Theme.of(context).colorScheme;
-    if (node.latencyTimedOut) return scheme.error;
+    if (node.latencyTimedOut || node.latencyFailed) return scheme.error;
     final latency = node.latencyMs;
     if (latency == null) return scheme.onSurfaceVariant;
     if (latency <= 200) return const Color(0xFF34C759);
@@ -79,19 +81,23 @@ class _NodePoolPageState extends ConsumerState<NodePoolPage> {
           (node) => country == null || proxyNodeCountryCode(node) == country,
         )
         .toList();
-    final busy = subscriptions.busy || subscriptions.changingIds.isNotEmpty;
     final error = proxies.lastError ?? subscriptions.lastError;
 
     return ui.Scaffold(
       title: l10n.nodeLibrary,
-      primaryAction: prism.IconButtonData(
-        glyph: AppGlyphs.bolt,
-        tooltip: l10n.testLatency,
-        isLoading: proxies.testing,
-        onPressed: proxies.testing || nodes.isEmpty
-            ? null
-            : notifier.testAllLatency,
-      ),
+      primaryAction: proxies.testing
+          ? prism.IconButtonData(
+              glyph: AppGlyphs.close,
+              tooltip: l10n.cancel,
+              onPressed: notifier.cancelLatencyTest,
+            )
+          : prism.IconButtonData(
+              glyph: AppGlyphs.bolt,
+              tooltip: l10n.testAllLatency,
+              onPressed: nodes.any((node) => node.isAvailable)
+                  ? notifier.testAllLatency
+                  : null,
+            ),
       body: Builder(
         builder: (context) => CustomScrollView(
           slivers: [
@@ -220,20 +226,14 @@ class _NodePoolPageState extends ConsumerState<NodePoolPage> {
               sliver: SliverLayoutBuilder(
                 builder: (context, constraints) => SliverGrid.builder(
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: (constraints.crossAxisExtent / 240)
-                        .floor()
-                        .clamp(1, 4),
-                    mainAxisExtent:
-                        prism.MeasureScope.of(
-                              context,
-                            ).textHeight(prism.AppTextStyle.subheadline) *
-                            2 +
-                        prism.MeasureScope.of(
-                          context,
-                        ).textHeight(prism.AppTextStyle.footnote) +
-                        40,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
+                    crossAxisCount:
+                        ((constraints.crossAxisExtent + _gridGap) /
+                                (240.ap(context) + _gridGap))
+                            .floor()
+                            .clamp(1, 4),
+                    mainAxisExtent: ProxyCard.extentOf(context),
+                    mainAxisSpacing: _gridGap,
+                    crossAxisSpacing: _gridGap,
                   ),
                   itemCount: visible.length,
                   itemBuilder: (context, index) {
@@ -244,9 +244,11 @@ class _NodePoolPageState extends ConsumerState<NodePoolPage> {
                       source: sourceName(node),
                       selected:
                           proxies.selectedGroup?.selectedNodeId == node.id,
-                      busy: busy,
-                      testing: proxies.testing,
+                      testing: proxies.testingNodeIds.contains(node.id),
                       latencyColor: _latencyColor(context, node),
+                      onTestLatency: proxies.testing || !node.isAvailable
+                          ? null
+                          : () => notifier.testNodeLatency(node),
                       onSelected: () => notifier.selectNode(node.id),
                     );
                   },

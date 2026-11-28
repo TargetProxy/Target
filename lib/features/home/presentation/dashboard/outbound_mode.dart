@@ -57,7 +57,6 @@ class OutboundModeCard extends StatelessWidget {
                 Expanded(
                   child: DashboardConnectedButton(
                     selected: item == mode,
-                    busy: core.busy,
                     first: index == 0,
                     last: index == 2,
                     outer: _outer,
@@ -150,7 +149,6 @@ class OutboundModeBar extends StatelessWidget {
                     Expanded(
                       child: DashboardConnectedButton(
                         selected: item == mode,
-                        busy: core.busy,
                         first: index == 0,
                         last: index == OutboundModeCard._modes.length - 1,
                         outer: outer,

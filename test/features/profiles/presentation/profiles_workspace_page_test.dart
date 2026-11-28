@@ -1,6 +1,7 @@
 import 'dart:async';
+import 'dart:ui' show PointerDeviceKind;
 
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:target/core/runtime/core_gateway.dart';
@@ -49,10 +50,7 @@ void main() {
           darkTheme: PrismTheme.dark,
           themeMode: themeMode,
           locale: locale,
-          localizationsDelegates: [
-            ...AppLocalizations.localizationsDelegates,
-            TargetUiLocalizations.delegate,
-          ],
+          localizationsDelegates: targetLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           builder: (context, child) => prism.ViewScope(
             size: size,
@@ -116,6 +114,20 @@ void main() {
     (tester) async {
       final gateway = _ProfilesGateway();
       final container = await mount(tester, gateway);
+      final card = find.byKey(const ValueKey('subscription-primary'));
+      final actions = find.descendant(
+        of: card,
+        matching: find.byType(prism.IconButton),
+      );
+      final badge = find.descendant(
+        of: card,
+        matching: find.byType(prism.SelectionBadge),
+      );
+      final detailsCenter = tester.getCenter(actions.first);
+      final updateCenter = tester.getCenter(actions.last);
+      final badgeCenter = tester.getCenter(badge);
+      expect(updateCenter - detailsCenter, badgeCenter - updateCenter);
+      expect(badgeCenter.dy, detailsCenter.dy);
       expect(subscriptionCard(tester, 'primary').profile.enabled, isTrue);
       expect(subscriptionCard(tester, 'backup').profile.enabled, isTrue);
       expect(
@@ -123,8 +135,11 @@ void main() {
         hasLength(2),
       );
 
-      await tester.tap(find.byKey(const ValueKey('subscription-primary')));
+      await tester.tap(card);
       await tester.pumpAndSettle();
+      expect(badge, findsNothing);
+      expect(tester.getCenter(actions.first), detailsCenter);
+      expect(tester.getCenter(actions.last), updateCenter);
       expect(gateway.changes, [('primary', false)]);
       expect(subscriptionCard(tester, 'primary').profile.enabled, isFalse);
       expect(subscriptionCard(tester, 'backup').profile.enabled, isTrue);
@@ -133,7 +148,7 @@ void main() {
         'jp-1',
       );
 
-      await tester.tap(find.byKey(const ValueKey('subscription-primary')));
+      await tester.tap(card);
       await tester.pumpAndSettle();
       expect(
         container.read(proxiesProvider).selectedGroup?.nodes,
@@ -162,19 +177,6 @@ void main() {
       );
     },
   );
-
-  testWidgets('pending changes cannot be submitted twice', (tester) async {
-    final gateway = _ProfilesGateway()..changeGate = Completer<void>();
-    await mount(tester, gateway);
-    await tester.tap(find.byKey(const ValueKey('subscription-primary')));
-    await tester.pump();
-    expect(subscriptionCard(tester, 'primary').busy, isTrue);
-    expect(subscriptionCard(tester, 'primary').profile.enabled, isTrue);
-    expect(gateway.changes, hasLength(1));
-    gateway.changeGate!.complete();
-    await tester.pumpAndSettle();
-    expect(subscriptionCard(tester, 'primary').profile.enabled, isFalse);
-  });
 
   testWidgets('disabling the selected source never selects another node', (
     tester,
@@ -230,9 +232,28 @@ void main() {
       container.read(proxiesProvider).selectedGroup?.selectedNodeId,
       isNull,
     );
-    await tester.ensureVisible(find.byKey(const ValueKey('node-jp-1')));
-    await tester.tap(find.byKey(const ValueKey('node-jp-1')));
+    final card = find.byKey(const ValueKey('node-jp-1'));
+    final action = find.descendant(
+      of: card,
+      matching: find.byType(prism.TextButton),
+    );
+    await tester.ensureVisible(card);
     await tester.pumpAndSettle();
+    final title = find.descendant(
+      of: card,
+      matching: find.text(tester.widget<ProxyCard>(card).proxy.displayName),
+    );
+    final cardCenter = tester.getCenter(card);
+    final actionPosition = tester.getCenter(action);
+    expect(tester.getCenter(title).dx, closeTo(cardCenter.dx, 1));
+    expect(actionPosition.dx, closeTo(cardCenter.dx, 1));
+    expect(
+      (tester.getTopLeft(title).dy + tester.getBottomLeft(action).dy) / 2,
+      closeTo(cardCenter.dy, 1),
+    );
+    await tester.tap(title);
+    await tester.pumpAndSettle();
+    expect(tester.getCenter(action), actionPosition);
     expect(
       container.read(proxiesProvider).selectedGroup?.selectedNodeId,
       'jp-1',
@@ -270,6 +291,77 @@ void main() {
       container.read(proxiesProvider).selectedGroup?.selectedNodeId,
       'jp-1',
     );
+  });
+
+  testWidgets('node pool streams latency results and cancels pending probes', (
+    tester,
+  ) async {
+    final gateway = _ProfilesGateway();
+    final container = await mount(tester, gateway, page: const NodePoolPage());
+    final card = find.byKey(const ValueKey('node-sg-1'));
+    final single = find.descendant(
+      of: card,
+      matching: find.byType(prism.TextButton),
+    );
+    Finder toolbar(String tooltip) => find.byWidgetPredicate(
+      (widget) => widget is prism.IconButton && widget.tooltip == tooltip,
+    );
+
+    await tester.ensureVisible(card);
+    await tester.pump();
+    await tester.tap(single);
+    await tester.pump();
+    expect(gateway.latencyRequests.single, ['sg-1']);
+    expect(
+      container.read(proxiesProvider).selectedGroup?.selectedNodeId,
+      isNull,
+    );
+    gateway.latencyResults.add(
+      const CoreLatencyResult(
+        outboundId: 'sg-1',
+        status: CoreLatencyStatus.success,
+        delayMilliseconds: 42,
+      ),
+    );
+    unawaited(gateway.latencyResults.close());
+    await tester.pumpAndSettle();
+    expect(find.text('42 ms'), findsOneWidget);
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: tester.getCenter(single));
+    await tester.pumpAndSettle();
+    final tooltip = find.byElementPredicate((element) {
+      final widget = element.widget;
+      return widget is Text &&
+          widget.data == 'Test latency' &&
+          element.findAncestorWidgetOfExactType<prism.TextButton>() == null;
+    });
+    expect(
+      tester.getTopLeft(tooltip).dy,
+      greaterThan(tester.getCenter(single).dy),
+    );
+    await mouse.removePointer();
+
+    await tester.pump();
+    expect(container.read(proxiesProvider).testing, isFalse);
+    await tester.tap(toolbar('Test all nodes').first);
+    await tester.pump();
+    expect(gateway.latencyRequests.last, unorderedEquals(['sg-1', 'jp-1']));
+    gateway.latencyResults.add(
+      const CoreLatencyResult(
+        outboundId: 'sg-1',
+        status: CoreLatencyStatus.failed,
+      ),
+    );
+    await tester.pump();
+    expect(find.text('Failed'), findsOneWidget);
+    expect(find.text('42 ms'), findsNothing);
+    expect(container.read(proxiesProvider).testingNodeIds, {'jp-1'});
+
+    await tester.tap(toolbar('Cancel').first);
+    await tester.pumpAndSettle();
+    expect(gateway.latencyResults.hasListener, isFalse);
+    expect(container.read(proxiesProvider).testingNodeIds, isEmpty);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets(
@@ -320,8 +412,9 @@ class _ProfilesGateway extends UnavailableCoreGateway {
   final runtimeChanges = StreamController<CoreSnapshot>.broadcast(sync: true);
   final enabled = {'primary': true, 'backup': true};
   final changes = <(String, bool)>[];
+  final latencyRequests = <List<String>>[];
+  late StreamController<CoreLatencyResult> latencyResults;
   bool failChange = false;
-  Completer<void>? changeGate;
 
   @override
   bool get isAvailable => true;
@@ -356,12 +449,18 @@ class _ProfilesGateway extends UnavailableCoreGateway {
   ];
 
   @override
+  Stream<CoreLatencyResult> testLatencies(Iterable<String> outboundIds) {
+    latencyRequests.add(outboundIds.toList());
+    latencyResults = StreamController<CoreLatencyResult>();
+    return latencyResults.stream;
+  }
+
+  @override
   Future<RuntimeSubscription> setSubscriptionEnabled(
     String id,
     bool value,
   ) async {
     changes.add((id, value));
-    if (changeGate != null) await changeGate!.future;
     if (failChange) throw StateError('Change rejected');
     enabled[id] = value;
     _subscriptionChanges.add(null);
@@ -398,6 +497,7 @@ class _ProfilesGateway extends UnavailableCoreGateway {
       throw UnimplementedError();
   @override
   Future<void> dispose() async {
+    if (latencyRequests.isNotEmpty) await latencyResults.close();
     await _subscriptionChanges.close();
     await runtimeChanges.close();
   }

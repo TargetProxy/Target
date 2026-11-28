@@ -77,10 +77,10 @@ packages:
     dependency: transitive
     description:
       name: cnativeapi
-      sha256: "510107ee007a7b4a01aa1eaec3ed097007d65760be6b272f093c4ca34a0d12ff"
+      sha256: "49662734cdf3dd1707b1ee35102ac1754e0ab3d450a2d30b066730f219dacc86"
       url: "https://pub.dev"
     source: hosted
-    version: "0.6.1"
+    version: "0.6.2"
   code_assets:
     dependency: transitive
     description:
@@ -433,10 +433,10 @@ packages:
     dependency: "direct main"
     description:
       name: material_ui
-      sha256: "474c135fd46b56ff1d35ca982155e8863d28fbc6464d1192acf4ee53a738680e"
+      sha256: a6b19012df437a356cbc01f8ea22a105e07194c47c9a6009da0032a0ce35c4ab
       url: "https://pub.dev"
     source: hosted
-    version: "1.11.0"
+    version: "1.11.1"
   meta:
     dependency: transitive
     description:
@@ -457,18 +457,18 @@ packages:
     dependency: "direct main"
     description:
       name: nativeapi
-      sha256: c0c566cf6788a6b6a32ce2666f02364b7fb50133f07a744bc1e793b5b8bb2c78
+      sha256: "339b7a91a27ce5c33659cab92cf8e76736142985433652f91a63cc5348135bfb"
       url: "https://pub.dev"
     source: hosted
-    version: "0.6.1"
+    version: "0.6.2"
   nativeapi_flutter:
     dependency: transitive
     description:
       name: nativeapi_flutter
-      sha256: "3bb647f299932a4a19aa066051aabc6872f6876fa50c38a0ef132da414e9db26"
+      sha256: b0507253748ba9690a295bc162208a91d348809185409e5aee7b09e77ab5d8a3
       url: "https://pub.dev"
     source: hosted
-    version: "0.6.1"
+    version: "0.6.2"
   objective_c:
     dependency: transitive
     description:
@@ -742,18 +742,18 @@ packages:
     dependency: transitive
     description:
       name: syncfusion_flutter_core
-      sha256: de2496525b2ff5e4493fe1bd0da212e0500f35754a55090adf82cd9b7fa0c90f
+      sha256: "7f56deff02d596bbc83b35eb113052b4482934e8631202e98cac0354e4244e7d"
       url: "https://pub.dev"
     source: hosted
-    version: "35.2.12"
+    version: "35.2.13"
   syncfusion_flutter_maps:
     dependency: "direct main"
     description:
       name: syncfusion_flutter_maps
-      sha256: "116621ee9ba3d5b366f7f23d04388a3c583918dae9e62cb042054f20987aeed0"
+      sha256: "0727e5d60c2723feb4b45dbb059341d975d681a65381bb9a34382a52a191152f"
       url: "https://pub.dev"
     source: hosted
-    version: "35.2.12"
+    version: "35.2.13"
   talker:
     dependency: "direct main"
     description:
@@ -797,10 +797,10 @@ packages:
     dependency: "direct main"
     description:
       name: tray_manager
-      sha256: "7618880ee07c93dc46b1c21288018d9b76f9b2b3b340e9f298ffc17d494fbcc8"
+      sha256: "3a6ceacfdbe35e42049bb34334f30d73e5f1e73f5f04495b299a8c10b6ec5217"
       url: "https://pub.dev"
     source: hosted
-    version: "0.9.0"
+    version: "0.9.1"
   typed_data:
     dependency: transitive
     description:
@@ -845,10 +845,10 @@ packages:
     dependency: "direct main"
     description:
       name: window_manager
-      sha256: "43fc05da6cf670b456a758c88b60e2c1371fc32e1030aac308d0087d87c9368d"
+      sha256: "9504ae37e618d31524e337ad3cf9600d252acf11fffa3ddb9b0b5ced634542d9"
       url: "https://pub.dev"
     source: hosted
-    version: "0.7.0"
+    version: "0.7.1"
   xdg_directories:
     dependency: transitive
     description:

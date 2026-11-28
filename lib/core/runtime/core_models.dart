@@ -34,7 +34,7 @@ class TrafficSnapshot {
   static const zero = TrafficSnapshot();
 }
 
-enum CoreLatencyStatus { success, failed, timeout, notFound }
+enum CoreLatencyStatus { success, failed, timeout, notFound, notReady }
 
 @immutable
 class CoreLatencyResult {

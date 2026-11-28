@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:prism_ui/prism_ui.dart' as prism;
 
@@ -8,7 +8,6 @@ import '../core/ui/prism_theme.dart';
 import '../core/ui/ui_localizations.dart';
 
 import '../core/logging/app_logger.dart';
-import '../core/theme/app_theme.dart';
 import '../core/platform/app_platform.dart';
 import '../core/platform/desktop_system_proxy.dart';
 import '../core/platform/desktop_tray.dart';
@@ -104,16 +103,11 @@ class _TargetAppViewState extends ConsumerState<_TargetAppView> {
       );
     });
 
-    return MaterialApp.router(
+    return WidgetsApp.router(
       title: AppIdentity.displayName,
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
-      themeMode: _themeModeFor(settings.themeMode),
-      localizationsDelegates: [
-        AppLocalizations.delegate,
-        ...GlobalMaterialLocalizations.delegates,
-      ],
+      color: PrismTheme.light.colorScheme.primary,
+      localizationsDelegates: targetLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       localeResolutionCallback: (locale, supportedLocales) {
         if (locale == null) return const Locale('en');
@@ -128,16 +122,10 @@ class _TargetAppViewState extends ConsumerState<_TargetAppView> {
         theme: PrismTheme.light,
         darkTheme: PrismTheme.dark,
         liquidGlass: prism.LiquidGlassQuality.standard,
-        themeMode: Theme.of(context).brightness == Brightness.dark
-            ? prism.ThemeMode.dark
-            : prism.ThemeMode.light,
+        themeMode: _themeModeFor(settings.themeMode),
         locale: Localizations.localeOf(context),
         supportedLocales: AppLocalizations.supportedLocales,
-        localizationsDelegates: [
-          AppLocalizations.delegate,
-          TargetUiLocalizations.delegate,
-          ...GlobalMaterialLocalizations.delegates,
-        ],
+        localizationsDelegates: targetLocalizationsDelegates,
         builder: (context, _) {
           final size = MediaQuery.sizeOf(context);
           return prism.ViewScope(
@@ -151,11 +139,11 @@ class _TargetAppViewState extends ConsumerState<_TargetAppView> {
     );
   }
 
-  ThemeMode _themeModeFor(ThemeModeOption mode) {
+  prism.ThemeMode _themeModeFor(ThemeModeOption mode) {
     return switch (mode) {
-      ThemeModeOption.system => ThemeMode.system,
-      ThemeModeOption.light => ThemeMode.light,
-      ThemeModeOption.dark => ThemeMode.dark,
+      ThemeModeOption.system => prism.ThemeMode.system,
+      ThemeModeOption.light => prism.ThemeMode.light,
+      ThemeModeOption.dark => prism.ThemeMode.dark,
     };
   }
 

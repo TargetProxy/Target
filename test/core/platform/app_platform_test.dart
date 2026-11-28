@@ -1,41 +1,37 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:target/core/platform/app_platform.dart';
+import 'package:target/core/platform/platform_settings_policy.dart';
+import 'package:target/data/models/app_settings.dart';
 
 void main() {
-  group('AppCapabilities', () {
-    for (final platform in [AppPlatform.android, AppPlatform.ios]) {
-      test('$platform exposes only the mobile VPN runtime', () {
-        final capabilities = AppCapabilities(platform);
+  const cases = [
+    ('android', AppPlatform.android, RuntimeHost.mobileVpn),
+    ('ios', AppPlatform.ios, RuntimeHost.mobileVpn),
+    ('windows', AppPlatform.windows, RuntimeHost.desktopService),
+    ('macos', AppPlatform.macos, RuntimeHost.desktopService),
+    ('linux', AppPlatform.linux, RuntimeHost.desktopService),
+    ('fuchsia', AppPlatform.unsupported, RuntimeHost.unsupported),
+  ];
 
-        expect(capabilities.runtimeHost, RuntimeHost.mobileVpn);
-        expect(capabilities.vpnOnly, isTrue);
-        expect(capabilities.supportsMixedProxy, isFalse);
-        expect(capabilities.supportsManagedService, isFalse);
-      });
-    }
+  for (final (operatingSystem, platform, host) in cases) {
+    test('$operatingSystem resolves its runtime and system proxy policy', () {
+      final resolved = AppPlatform.fromOperatingSystem(operatingSystem);
+      expect(resolved, platform);
 
-    for (final platform in [
-      AppPlatform.windows,
-      AppPlatform.macos,
-      AppPlatform.linux,
-    ]) {
-      test('$platform exposes the desktop runtime', () {
-        final capabilities = AppCapabilities(platform);
+      final capabilities = AppCapabilities(resolved);
+      final vpnOnly = host == RuntimeHost.mobileVpn;
+      final desktop = host == RuntimeHost.desktopService;
+      expect(capabilities.runtimeHost, host);
+      expect(capabilities.vpnOnly, vpnOnly);
+      expect(capabilities.supportsMixedProxy, desktop);
+      expect(capabilities.supportsManagedService, desktop);
 
-        expect(capabilities.runtimeHost, RuntimeHost.desktopService);
-        expect(capabilities.vpnOnly, isFalse);
-        expect(capabilities.supportsMixedProxy, isTrue);
-        expect(capabilities.supportsManagedService, isTrue);
-      });
-    }
-  });
-
-  test('maps Dart operating-system names', () {
-    expect(AppPlatform.fromOperatingSystem('android'), AppPlatform.android);
-    expect(AppPlatform.fromOperatingSystem('ios'), AppPlatform.ios);
-    expect(AppPlatform.fromOperatingSystem('windows'), AppPlatform.windows);
-    expect(AppPlatform.fromOperatingSystem('macos'), AppPlatform.macos);
-    expect(AppPlatform.fromOperatingSystem('linux'), AppPlatform.linux);
-    expect(AppPlatform.fromOperatingSystem('fuchsia'), AppPlatform.unsupported);
-  });
+      const settings = AppSettings(systemProxy: true);
+      final normalized = PlatformSettingsPolicy.normalize(
+        settings,
+        capabilities,
+      );
+      expect(normalized.systemProxy, !vpnOnly);
+    });
+  }
 }

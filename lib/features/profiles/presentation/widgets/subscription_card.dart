@@ -9,8 +9,6 @@ import '../../../../l10n/app_localizations.dart';
 class SubscriptionCard extends StatelessWidget {
   const SubscriptionCard({
     required this.profile,
-    required this.busy,
-    required this.isUpdating,
     required this.onToggle,
     required this.onUpdate,
     required this.onDetails,
@@ -18,8 +16,6 @@ class SubscriptionCard extends StatelessWidget {
   });
 
   final Subscription profile;
-  final bool busy;
-  final bool isUpdating;
   final VoidCallback onToggle;
   final VoidCallback onUpdate;
   final VoidCallback onDetails;
@@ -27,16 +23,20 @@ class SubscriptionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isSelected = profile.enabled;
+    final isUpdating = profile.updateStatus == SubscriptionUpdateStatus.updating;
+    final actionSize = Theme.of(context).tapTargetSize == TapTargetSize.padded
+        ? 48.0
+        : 40.0;
     return ContextMenuRegion(
       menuItems: [
-        PopupMenuItem(glyph: AppGlyphs.refresh, label: AppLocalizations.of(context).updateSubscription, onPressed: busy ? null : onUpdate),
+        PopupMenuItem(glyph: AppGlyphs.refresh, label: AppLocalizations.of(context).updateSubscription, onPressed: onUpdate),
         PopupMenuItem(glyph: AppGlyphs.info, label: AppLocalizations.of(context).subscriptionDetails, onPressed: onDetails),
       ],
       child: Card(
         enterActionsOnRight: true,
         radius: AppCorner.xl,
         isSelected: isSelected,
-        onPressed: busy ? null : onToggle,
+        onPressed: onToggle,
         child: ListRow(
           key: Key(profile.id.toString()),
           minHeight: 88,
@@ -46,17 +46,30 @@ class SubscriptionCard extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             spacing: 8,
             children: [
-              IconButton(
-                tooltip: AppLocalizations.of(context).subscriptionDetails,
-                onPressed: onDetails,
-                icon: const GlyphIcon(AppGlyphs.info, size: 20),
+              Flexible(
+                child: IconButton(
+                  tooltip: AppLocalizations.of(context).subscriptionDetails,
+                  onPressed: onDetails,
+                  icon: const GlyphIcon(AppGlyphs.info, size: 20),
+                ),
               ),
-              IconButton(
-                tooltip: AppLocalizations.of(context).updateSubscription,
-                onPressed: busy ? null : onUpdate,
-                icon: isUpdating ? const ActivityIndicator(size: 20) : const GlyphIcon(AppGlyphs.refresh, size: 20),
+              Flexible(
+                child: IconButton(
+                  tooltip: AppLocalizations.of(context).updateSubscription,
+                  onPressed: onUpdate,
+                  icon: isUpdating
+                      ? const ActivityIndicator(size: 20)
+                      : const GlyphIcon(AppGlyphs.refresh, size: 20),
+                ),
               ),
-              if (isSelected) const SelectionBadge(size: 24),
+              Flexible(
+                child: SizedBox.square(
+                  dimension: actionSize,
+                  child: isSelected
+                      ? const Center(child: SelectionBadge(size: 24))
+                      : null,
+                ),
+              ),
             ],
           ),
           title: _ProfileCardTitle(

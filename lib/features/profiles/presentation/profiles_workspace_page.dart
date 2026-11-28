@@ -24,7 +24,6 @@ class ProfilesWorkspacePage extends ConsumerWidget {
     final state = ref.watch(subscriptionsProvider);
     final notifier = ref.read(subscriptionsProvider.notifier);
     final l10n = AppLocalizations.of(context);
-    final busy = state.busy || state.changingIds.isNotEmpty;
     final nodeCount = ref
         .watch(proxyCatalogProvider)
         .groups
@@ -37,7 +36,7 @@ class ProfilesWorkspacePage extends ConsumerWidget {
       primaryAction: IconButtonData(
         glyph: AppGlyphs.add,
         tooltip: l10n.addSubscription,
-        onPressed: busy ? null : () => _addSubscription(context, ref),
+        onPressed: () => _addSubscription(context, ref),
       ),
       body: Builder(
         builder: (context) => ListView(
@@ -73,9 +72,7 @@ class ProfilesWorkspacePage extends ConsumerWidget {
                   label: l10n.profiles,
                   description: l10n.noSubscriptionsHint,
                   action: FilledButton(
-                    onPressed: busy
-                        ? null
-                        : () => _addSubscription(context, ref),
+                    onPressed: () => _addSubscription(context, ref),
                     child: Text(l10n.addSubscription),
                   ),
                 ),
@@ -86,15 +83,7 @@ class ProfilesWorkspacePage extends ConsumerWidget {
                 child: SubscriptionCard(
                   key: ValueKey('subscription-${subscription.id}'),
                   profile: subscription,
-                  busy: busy,
-                  isUpdating:
-                      state.changingIds.contains(subscription.id) ||
-                      subscription.updateStatus ==
-                          SubscriptionUpdateStatus.updating,
-                  onToggle: () => notifier.setEnabled(
-                    subscription.id,
-                    !subscription.enabled,
-                  ),
+                  onToggle: () => notifier.toggleSubscription(subscription.id),
                   onUpdate: () => notifier.updateSubscription(subscription.id),
                   onDetails: () => _showDetails(context, subscription),
                 ),

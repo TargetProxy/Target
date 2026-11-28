@@ -13,30 +13,19 @@ import '../../proxies/application/proxy_catalog.dart';
 
 @immutable
 class SubscriptionsState {
-  const SubscriptionsState({
-    this.subscriptions = const [],
-    this.busy = false,
-    this.lastError,
-    this.changingIds = const {},
-  });
+  const SubscriptionsState({this.subscriptions = const [], this.lastError});
 
   final List<Subscription> subscriptions;
-  final bool busy;
   final String? lastError;
-  final Set<String> changingIds;
 
   SubscriptionsState copyWith({
     List<Subscription>? subscriptions,
-    bool? busy,
     String? lastError,
     bool clearError = false,
-    Set<String>? changingIds,
   }) {
     return SubscriptionsState(
       subscriptions: subscriptions ?? this.subscriptions,
-      busy: busy ?? this.busy,
       lastError: clearError ? null : lastError ?? this.lastError,
-      changingIds: changingIds ?? this.changingIds,
     );
   }
 }
@@ -45,6 +34,7 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
   CoreGateway? _gateway;
   StreamSubscription<void>? _changes;
   Future<void> _operationTail = Future<void>.value();
+  final _subscriptionTasks = <String, Future<void>>{};
 
   Future<void> get ready => _operationTail;
 
@@ -79,13 +69,7 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
           for (final item in remote)
             _subscriptionFromRuntime(item, previous[item.id]),
         ];
-        state = state.copyWith(
-          subscriptions: subscriptions,
-          busy: subscriptions.any(
-            (item) => item.updateStatus == SubscriptionUpdateStatus.updating,
-          ),
-          clearError: true,
-        );
+        state = state.copyWith(subscriptions: subscriptions, clearError: true);
         final catalog = ref.read(proxyCatalogProvider.notifier);
         // NodePool is assembled by TargetLib from all enabled subscriptions.
         // Use it as the single source of truth for the unified node list.
@@ -117,7 +101,6 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
         }
       } on Object catch (error) {
         state = state.copyWith(
-          busy: false,
           lastError: 'Failed to load TargetLib subscriptions: $error',
         );
       }
@@ -143,7 +126,7 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
           : normalizedName,
       url: trimmedUrl,
     );
-    state = state.copyWith(busy: true, clearError: true);
+    state = state.copyWith(clearError: true);
     try {
       final created = await gateway.addSubscription(
         id: subscription.id,
@@ -165,104 +148,112 @@ class SubscriptionsNotifier extends Notifier<SubscriptionsState> {
             if (item.id != added.id) item,
           added,
         ],
-        busy: false,
         clearError: true,
       );
       await _loadSubscriptions();
       return true;
     } on Object catch (error) {
-      state = state.copyWith(
-        busy: false,
-        lastError: 'Failed to add subscription: $error',
-      );
+      state = state.copyWith(lastError: 'Failed to add subscription: $error');
       return false;
     }
   }
 
-  Future<void> setEnabled(String id, bool enabled) async {
-    final gateway = _gateway;
-    if (gateway == null) {
-      _failUnavailable();
-      return;
-    }
-    if (state.changingIds.contains(id)) return;
-    final existing = state.subscriptions.where((item) => item.id == id);
-    if (existing.isEmpty || existing.first.enabled == enabled) return;
-    state = state.copyWith(
-      changingIds: {...state.changingIds, id},
-      clearError: true,
-    );
-    try {
-      await gateway.setSubscriptionEnabled(id, enabled);
-      await _loadSubscriptions();
-    } on Object catch (error) {
-      state = state.copyWith(
-        lastError: 'Failed to change subscription: $error',
-      );
-    } finally {
-      state = state.copyWith(changingIds: {...state.changingIds}..remove(id));
-    }
-  }
+  Future<void> toggleSubscription(String id) => _setEnabled(id, null);
 
-  Future<void> updateSubscription(String id) async {
-    final index = state.subscriptions.indexWhere((item) => item.id == id);
-    if (index < 0) return;
-    final gateway = _gateway;
-    if (gateway == null) {
-      _failUnavailable();
-      return;
-    }
-    state = state.copyWith(
-      busy: true,
-      subscriptions: [
-        for (var i = 0; i < state.subscriptions.length; i++)
-          i == index
-              ? state.subscriptions[i].copyWith(
-                  updateStatus: SubscriptionUpdateStatus.updating,
-                  lastError: '',
-                )
-              : state.subscriptions[i],
-      ],
-    );
-    try {
-      final result = await gateway.updateSubscription(id);
-      _logConfigComparison(result);
-      Subscription? current;
-      for (final item in state.subscriptions) {
-        if (item.id == id) {
-          current = item;
-          break;
+  Future<void> setEnabled(String id, bool enabled) => _setEnabled(id, enabled);
+
+  Future<void> _setEnabled(String id, bool? enabled) =>
+      _changeSubscription(id, () async {
+        final gateway = _gateway;
+        if (gateway == null) {
+          _failUnavailable();
+          return;
         }
+        final current = state.subscriptions
+            .where((item) => item.id == id)
+            .firstOrNull;
+        if (current == null || current.enabled == enabled) return;
+        try {
+          final updated = await gateway.setSubscriptionEnabled(
+            id,
+            enabled ?? !current.enabled,
+          );
+          state = state.copyWith(
+            subscriptions: [
+              for (final item in state.subscriptions)
+                item.id == id ? item.copyWith(enabled: updated.enabled) : item,
+            ],
+            clearError: true,
+          );
+          await _loadSubscriptions();
+        } on Object catch (error) {
+          state = state.copyWith(
+            lastError: 'Failed to change subscription: $error',
+          );
+        }
+      });
+
+  Future<void> updateSubscription(String id) =>
+      _changeSubscription(id, () async {
+        if (!state.subscriptions.any((item) => item.id == id)) return;
+        final gateway = _gateway;
+        if (gateway == null) {
+          _failUnavailable();
+          return;
+        }
+        try {
+          final result = await gateway.updateSubscription(id);
+          _logConfigComparison(result);
+          Subscription? current;
+          for (final item in state.subscriptions) {
+            if (item.id == id) {
+              current = item;
+              break;
+            }
+          }
+          final subscription = _subscriptionFromRuntime(
+            result.subscription,
+            current,
+            notModified: result.notModified,
+          );
+          state = state.copyWith(
+            subscriptions: [
+              for (final item in state.subscriptions)
+                if (item.id == id) subscription else item,
+            ],
+            clearError: true,
+          );
+          await _loadSubscriptions();
+        } on Object catch (error) {
+          state = state.copyWith(
+            subscriptions: [
+              for (final item in state.subscriptions)
+                if (item.id == id)
+                  item.copyWith(
+                    updateStatus: SubscriptionUpdateStatus.failed,
+                    lastError: error.toString(),
+                  )
+                else
+                  item,
+            ],
+            lastError: 'Failed to update subscription: $error',
+          );
+        }
+      });
+
+  Future<void> _changeSubscription(
+    String id,
+    Future<void> Function() change,
+  ) async {
+    // Refresh writes a full subscription, including its enabled flag.
+    final previous = _subscriptionTasks[id] ?? Future<void>.value();
+    final task = _subscriptionTasks[id] = previous.then((_) => change());
+    try {
+      await task;
+    } finally {
+      if (identical(_subscriptionTasks[id], task)) {
+        _subscriptionTasks.remove(id);
       }
-      final subscription = _subscriptionFromRuntime(
-        result.subscription,
-        current,
-        notModified: result.notModified,
-      );
-      state = state.copyWith(
-        subscriptions: [
-          for (final item in state.subscriptions)
-            if (item.id == id) subscription else item,
-        ],
-        busy: false,
-        clearError: true,
-      );
-      await _loadSubscriptions();
-    } on Object catch (error) {
-      state = state.copyWith(
-        subscriptions: [
-          for (final item in state.subscriptions)
-            if (item.id == id)
-              item.copyWith(
-                updateStatus: SubscriptionUpdateStatus.failed,
-                lastError: error.toString(),
-              )
-            else
-              item,
-        ],
-        busy: false,
-        lastError: 'Failed to update subscription: $error',
-      );
     }
   }
 

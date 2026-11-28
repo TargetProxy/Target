@@ -1,5 +1,4 @@
 import 'package:flutter/widgets.dart';
-import 'package:material_ui/material_ui.dart' as material;
 import 'package:prism_ui/prism_ui.dart';
 import 'package:go_router/go_router.dart';
 
@@ -57,7 +56,10 @@ _NavigationItem _destinationItem(AppRoute route, AppLocalizations l10n) =>
       AppRoute.proxies => (label: l10n.profiles, glyph: AppGlyphs.profiles),
       AppRoute.nodes => (label: l10n.nodeSelection, glyph: AppGlyphs.proxies),
       AppRoute.rules => (label: l10n.rules, glyph: AppGlyphs.rules),
-      AppRoute.connections => (label: l10n.connections, glyph: AppGlyphs.connections),
+      AppRoute.connections => (
+        label: l10n.connections,
+        glyph: AppGlyphs.connections,
+      ),
       AppRoute.logs => (label: l10n.logs, glyph: AppGlyphs.logs),
     };
 
@@ -85,68 +87,82 @@ class _NavigationScaffoldState extends State<_NavigationScaffold> {
 
   @override
   Widget build(BuildContext context) {
-    return material.Scaffold(
-      body: Surface(
-        color: SurfaceLevel.page.colorOf(context.colorScheme),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isMobile = constraints.maxWidth <= 600;
-            if (!isMobile) {
-              final canExpand = constraints.maxWidth > 840;
-              return Row(
+    return Surface(
+      color: SurfaceLevel.page.colorOf(context.colorScheme),
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: MediaQuery.removeViewInsets(
+          context: context,
+          removeBottom: true,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isMobile = constraints.maxWidth <= 600;
+              if (!isMobile) {
+                final canExpand = constraints.maxWidth > 840;
+                return Row(
+                  children: [
+                    NavigationSidebar(
+                      destinations: [
+                        for (final item in widget.items)
+                          SidebarDestination(
+                            glyph: item.glyph,
+                            label: item.label,
+                          ),
+                      ],
+                      selectedIndex: widget.selectedIndex,
+                      expanded: canExpand && _expanded,
+                      onSelected: widget.onDestinationSelected,
+                      onToggle: canExpand
+                          ? () => setState(() => _expanded = !_expanded)
+                          : null,
+                    ),
+                    Expanded(child: widget.child),
+                  ],
+                );
+              }
+              return Stack(
                 children: [
-                  NavigationSidebar(
-                    destinations: [
-                      for (final item in widget.items)
-                        SidebarDestination(glyph: item.glyph, label: item.label),
-                    ],
-                    selectedIndex: widget.selectedIndex,
-                    expanded: canExpand && _expanded,
-                    onSelected: widget.onDestinationSelected,
-                    onToggle: canExpand
-                        ? () => setState(() => _expanded = !_expanded)
-                        : null,
-                  ),
-                  Expanded(child: widget.child),
-                ],
-              );
-            }
-            return Stack(
-              children: [
-                Positioned.fill(
-                  child: BottomInsetScope(
-                    inset: widget.scrollUnderDock ? NavigationDock.insetOf(context) : 0,
-                    child: MediaQuery.removePadding(
-                      context: context,
-                      removeBottom: true,
-                      child: Padding(
-                        padding: EdgeInsets.only(
-                          bottom: widget.scrollUnderDock ? 0 : NavigationDock.insetOf(context),
+                  Positioned.fill(
+                    child: BottomInsetScope(
+                      inset: widget.scrollUnderDock
+                          ? NavigationDock.insetOf(context)
+                          : 0,
+                      child: MediaQuery.removePadding(
+                        context: context,
+                        removeBottom: true,
+                        child: Padding(
+                          padding: EdgeInsets.only(
+                            bottom: widget.scrollUnderDock
+                                ? 0
+                                : NavigationDock.insetOf(context),
+                          ),
+                          child: widget.child,
                         ),
-                        child: widget.child,
                       ),
                     ),
                   ),
-                ),
-                PositionedDirectional(
-                  start: 0,
-                  end: 0,
-                  bottom: 0,
-                  child: NavigationDock(
-                    destinations: [
-                      for (final item in widget.items)
-                        NavigationDockDestination(
-                          glyph: item.glyph,
-                          label: item.label,
-                        ),
-                    ],
-                    selectedIndex: widget.selectedIndex,
-                    onSelected: widget.onDestinationSelected,
+                  PositionedDirectional(
+                    start: 0,
+                    end: 0,
+                    bottom: 0,
+                    child: NavigationDock(
+                      destinations: [
+                        for (final item in widget.items)
+                          NavigationDockDestination(
+                            glyph: item.glyph,
+                            label: item.label,
+                          ),
+                      ],
+                      selectedIndex: widget.selectedIndex,
+                      onSelected: widget.onDestinationSelected,
+                    ),
                   ),
-                ),
-              ],
-            );
-          },
+                ],
+              );
+            },
+          ),
         ),
       ),
     );

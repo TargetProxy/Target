@@ -182,6 +182,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get testLatency => 'Test latency';
 
   @override
+  String get testAllLatency => 'Test all nodes';
+
+  @override
+  String get latencyTestFailed => 'Failed';
+
+  @override
   String get rules => 'Rules';
 
   @override

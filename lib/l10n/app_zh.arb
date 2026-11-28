@@ -60,7 +60,9 @@
       "nodeCount": {"type": "int"}
     }
   },
-  "testLatency": "测试延迟"
+  "testLatency": "测试延迟",
+  "testAllLatency": "测试全部节点",
+  "latencyTestFailed": "失败"
   ,"rules": "规则"
   ,"defaultNode": "默认节点"
   ,"selectDefaultNode": "选择默认节点"

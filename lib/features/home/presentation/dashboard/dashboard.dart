@@ -497,7 +497,7 @@ class _StatusCard extends ConsumerWidget {
                   child: Center(
                     child: StartToggle(
                       size: metrics.buttonSize,
-                      enabled: core.available && !core.busy,
+                      enabled: core.available,
                       running: core.showStop,
                       onToggle: onAction,
                     ),

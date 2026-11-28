@@ -174,6 +174,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get testLatency => '测试延迟';
 
   @override
+  String get testAllLatency => '测试全部节点';
+
+  @override
+  String get latencyTestFailed => '失败';
+
+  @override
   String get rules => '规则';
 
   @override

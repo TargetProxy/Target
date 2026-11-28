@@ -60,7 +60,9 @@
       "nodeCount": {"type": "int"}
     }
   },
-  "testLatency": "Test latency"
+  "testLatency": "Test latency",
+  "testAllLatency": "Test all nodes",
+  "latencyTestFailed": "Failed"
   ,"rules": "Rules"
   ,"defaultNode": "Default node"
   ,"selectDefaultNode": "Choose default node"

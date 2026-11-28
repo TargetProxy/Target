@@ -63,7 +63,6 @@ class _TakeoverRow extends StatelessWidget {
         ? '${core.settings.mixedPort}'
         : appLocalizations.enabled;
     void change(bool value) {
-      if (core.busy) return;
       if (systemProxy) {
         onSystemProxyChanged(value);
       } else {
@@ -72,7 +71,7 @@ class _TakeoverRow extends StatelessWidget {
     }
 
     final enabled = systemProxy || supportsMixedProxy;
-    final row = DashboardSwitchRow(
+    return DashboardSwitchRow(
       glyph: systemProxy ? AppGlyphs.shuffle : AppGlyphs.vpn,
       title: title,
       subtitle: metrics.subtitle
@@ -91,7 +90,6 @@ class _TakeoverRow extends StatelessWidget {
       onTap: enabled ? () => change(!value) : null,
       onChanged: enabled ? change : null,
     );
-    return AbsorbPointer(absorbing: core.busy, child: row);
   }
 }
 

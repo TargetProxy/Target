@@ -142,8 +142,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         onProxyModeChanged: _changeProxyMode,
         onRouteModeChanged: _changeRouteMode,
         onSystemProxyChanged: _changeSystemProxy,
-        onServiceAction: () =>
-            core.showStop ? ref.read(coreProvider.notifier).stop() : _connect(),
+        onServiceAction: _toggleConnection,
         ipInfo: _ipInfo,
         ipLoading: _ipLoading,
         ipError: _ipError,
@@ -181,9 +180,7 @@ class _HomePageState extends ConsumerState<HomePage> {
             ? (_serviceStatus == TargetLibServiceStatus.stopped
                   ? _startTargetLibService
                   : _checkTargetLibService)
-            : () => core.showStop
-                  ? ref.read(coreProvider.notifier).stop()
-                  : _connect(),
+            : _toggleConnection,
         header:
             capabilities.supportsManagedService &&
                 !_serviceChecking &&
@@ -210,6 +207,10 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
+  Future<void> _toggleConnection() => ref.read(coreProvider).showStop
+      ? ref.read(coreProvider.notifier).stop()
+      : _connect();
+
   Future<void> _connect() async {
     final notifier = ref.read(coreProvider.notifier);
     await notifier.start();
@@ -232,7 +233,6 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   void _changeSystemProxy(bool value) {
-    if (ref.read(coreProvider).busy) return;
     ref
         .read(settingsProvider.notifier)
         .updateSettings((settings) => settings.copyWith(systemProxy: value));
@@ -255,7 +255,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   Future<void> _updateRuntimeConfig(
     runtime_models.RuntimeSettings? settings,
   ) async {
-    if (settings == null || ref.read(coreProvider).busy) return;
+    if (settings == null) return;
     await ref.read(coreProvider.notifier).updateRuntimeConfig(settings);
     if (!mounted) return;
     final core = ref.read(coreProvider);

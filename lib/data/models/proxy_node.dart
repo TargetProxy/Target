@@ -14,6 +14,7 @@ class ProxyNode {
     this.port = 0,
     this.latencyMs,
     this.latencyTimedOut = false,
+    this.latencyFailed = false,
     this.isAvailable = true,
     this.enabled = true,
     this.excluded = false,
@@ -34,6 +35,7 @@ class ProxyNode {
   final int port;
   final int? latencyMs;
   final bool latencyTimedOut;
+  final bool latencyFailed;
   final bool isAvailable;
   final bool enabled;
   final bool excluded;
@@ -51,7 +53,8 @@ class ProxyNode {
 
   String get effectiveRegion => effectiveCountryCode;
 
-  bool get hasLatencyResult => latencyMs != null || latencyTimedOut;
+  bool get hasLatencyResult =>
+      latencyMs != null || latencyTimedOut || latencyFailed;
 
   ProxyNode copyWith({
     String? name,
@@ -61,6 +64,7 @@ class ProxyNode {
     String? observedCountryCode,
     int? latencyMs,
     bool? latencyTimedOut,
+    bool? latencyFailed,
     bool? isAvailable,
     bool? enabled,
     bool? excluded,
@@ -77,8 +81,11 @@ class ProxyNode {
       observedCountryCode: observedCountryCode ?? this.observedCountryCode,
       server: server,
       port: port,
-      latencyMs: latencyMs ?? this.latencyMs,
+      latencyMs: latencyTimedOut == true || latencyFailed == true
+          ? null
+          : latencyMs ?? this.latencyMs,
       latencyTimedOut: latencyTimedOut ?? this.latencyTimedOut,
+      latencyFailed: latencyFailed ?? this.latencyFailed,
       isAvailable: isAvailable ?? this.isAvailable,
       enabled: enabled ?? this.enabled,
       excluded: excluded ?? this.excluded,

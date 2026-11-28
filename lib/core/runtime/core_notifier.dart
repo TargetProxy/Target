@@ -25,7 +25,7 @@ class CoreState {
     this.requestedSettings,
     this.traffic = TrafficSnapshot.zero,
     this.connections = const [],
-    this.busy = false,
+    this.requestedRunning,
     this.available = false,
     this.backendName = 'TargetLib',
   });
@@ -36,18 +36,18 @@ class CoreState {
   final RuntimeSettings? requestedSettings;
   final TrafficSnapshot traffic;
   final List<CoreConnection> connections;
-  final bool busy;
+  final bool? requestedRunning;
   final bool available;
   final String backendName;
 
   bool get running => lifecycle == CoreLifecycle.running;
 
-  // Configuration reloads report the same transitions as a manual start/stop.
-  bool get showStop => switch (lifecycle) {
-    CoreLifecycle.running => true,
-    CoreLifecycle.starting || CoreLifecycle.stopping => !busy,
-    _ => false,
-  };
+  // A reload's intermediate lifecycle events keep the Stop action available.
+  bool get showStop =>
+      requestedRunning ??
+      (running ||
+          lifecycle == CoreLifecycle.starting ||
+          lifecycle == CoreLifecycle.stopping);
 
   RuntimeSettings get selectedSettings => requestedSettings ?? settings;
 
@@ -67,9 +67,10 @@ class CoreState {
     RuntimeSettings? requestedSettings,
     TrafficSnapshot? traffic,
     List<CoreConnection>? connections,
-    bool? busy,
+    bool? requestedRunning,
     bool clearMessage = false,
     bool clearRequestedSettings = false,
+    bool clearRequestedRunning = false,
   }) {
     return CoreState(
       lifecycle: lifecycle ?? this.lifecycle,
@@ -80,7 +81,9 @@ class CoreState {
           : requestedSettings ?? this.requestedSettings,
       traffic: traffic ?? this.traffic,
       connections: connections ?? this.connections,
-      busy: busy ?? this.busy,
+      requestedRunning: clearRequestedRunning
+          ? null
+          : requestedRunning ?? this.requestedRunning,
       available: available,
       backendName: backendName,
     );
@@ -92,6 +95,7 @@ class CoreNotifier extends Notifier<CoreState> {
   StreamSubscription<CoreSnapshot>? _subscription;
   Future<void> Function()? _startupBarrier;
   Future<void>? _configurationTask;
+  Future<void>? _connectionTask;
   int _configurationRevision = 0;
 
   @override
@@ -114,9 +118,11 @@ class CoreNotifier extends Notifier<CoreState> {
   Future<void> updateRuntimeConfig(RuntimeSettings settings) async {
     if (!state.available) return;
     _configurationRevision++;
-    final task = _configurationTask ??= Future<void>.microtask(
-      _applyPendingRuntimeConfig,
-    );
+    final connectionTask = _connectionTask;
+    final task = _configurationTask ??= Future<void>.microtask(() async {
+      await connectionTask;
+      await _applyPendingRuntimeConfig();
+    });
     state = state.copyWith(requestedSettings: settings);
     await task;
   }
@@ -165,34 +171,31 @@ class CoreNotifier extends Notifier<CoreState> {
     }
   }
 
-  Future<void> start() async {
-    if (!state.available) return;
-    AppLogger.info('Connect requested using ${state.backendName}');
-    await _run(() async {
-      await _configurationTask;
+  Future<void> start() => _changeConnection(
+    () async {
+      AppLogger.info('Connect requested using ${state.backendName}');
       await _startupBarrier?.call();
       await _gateway!.start();
-    }, operationName: 'connect');
-  }
+    },
+    'connect',
+    running: true,
+  );
 
-  Future<void> stop() async {
-    if (!state.available) return;
-    await _run(() async {
-      await _configurationTask;
-      await _gateway!.stop();
-    }, operationName: 'disconnect');
-  }
+  Future<void> stop() =>
+      _changeConnection(() => _gateway!.stop(), 'disconnect', running: false);
 
   Future<void> selectNode(String nodeId) async {
     if (!state.available) return;
-    state = state.copyWith(busy: true);
     try {
       await _gateway!.selectNode(nodeId);
     } on Object catch (error, stackTrace) {
-      _setFailure(error, stackTrace, operationName: 'select node');
+      _setFailure(
+        error,
+        stackTrace,
+        operationName: 'select node',
+        affectsLifecycle: false,
+      );
       rethrow;
-    } finally {
-      state = state.copyWith(busy: false);
     }
   }
 
@@ -287,18 +290,33 @@ class CoreNotifier extends Notifier<CoreState> {
     );
   }
 
-  Future<void> _run(
-    Future<void> Function() operation, {
-    String operationName = 'core operation',
+  Future<void> _changeConnection(
+    Future<void> Function() operation,
+    String operationName, {
+    required bool running,
   }) async {
-    state = state.copyWith(busy: true);
+    if (!state.available) return;
+    final connectionTask = _connectionTask;
+    final configurationTask = _configurationTask;
+    // Each operation waits only for work that was queued before it.
+    final task = _connectionTask = Future<void>.microtask(() async {
+      try {
+        await connectionTask;
+        await configurationTask;
+        await operation();
+        AppLogger.info('Core $operationName completed');
+      } on Object catch (error, stackTrace) {
+        _setFailure(error, stackTrace, operationName: operationName);
+      }
+    });
+    state = state.copyWith(requestedRunning: running);
     try {
-      await operation();
-      AppLogger.info('Core $operationName completed');
-    } on Object catch (error, stackTrace) {
-      _setFailure(error, stackTrace, operationName: operationName);
+      await task;
     } finally {
-      state = state.copyWith(busy: false);
+      if (identical(_connectionTask, task)) {
+        _connectionTask = null;
+        state = state.copyWith(clearRequestedRunning: true);
+      }
     }
   }
 
@@ -306,16 +324,18 @@ class CoreNotifier extends Notifier<CoreState> {
     Future<T> Function() operation, {
     required String operationName,
   }) async {
-    state = state.copyWith(busy: true);
     try {
       final value = await operation();
       AppLogger.info('Core $operationName completed');
       return value;
     } on Object catch (error, stackTrace) {
-      _setFailure(error, stackTrace, operationName: operationName);
+      _setFailure(
+        error,
+        stackTrace,
+        operationName: operationName,
+        affectsLifecycle: false,
+      );
       return null;
-    } finally {
-      state = state.copyWith(busy: false);
     }
   }
 
@@ -323,6 +343,7 @@ class CoreNotifier extends Notifier<CoreState> {
     Object error,
     StackTrace stackTrace, {
     required String operationName,
+    bool affectsLifecycle = true,
   }) {
     AppLogger.error(
       'Core $operationName failed',
@@ -330,13 +351,9 @@ class CoreNotifier extends Notifier<CoreState> {
       error: error,
       stackTrace: stackTrace,
     );
-    _applySnapshot(
-      CoreSnapshot(
-        lifecycle: CoreLifecycle.failed,
-        message: error.toString(),
-        traffic: state.traffic,
-        connections: state.connections,
-      ),
+    state = state.copyWith(
+      lifecycle: affectsLifecycle ? CoreLifecycle.failed : null,
+      message: error.toString(),
     );
   }
 

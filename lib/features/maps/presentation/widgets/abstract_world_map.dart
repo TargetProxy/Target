@@ -1,9 +1,12 @@
 import 'dart:math' as math;
 
 import 'package:country_flags/country_flags.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
+import 'package:material_ui/material_ui.dart' as material;
+import 'package:prism_ui/prism_ui.dart';
 import 'package:syncfusion_flutter_maps/maps.dart';
 
+import '../../../../core/ui/app_glyphs.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../../data/models/proxy_node.dart';
 import '../../application/proxy_country_map.dart';
@@ -141,39 +144,60 @@ class _AbstractWorldMapState extends State<AbstractWorldMap> {
                   horizontal: 12,
                   vertical: 8,
                 ),
-                child: SfMaps(
-                  layers: [
-                    MapShapeLayer(
-                      key: ValueKey(_nodeSignature),
-                      source: _source,
-                      controller: _mapController,
-                      color: land,
-                      strokeColor: coast,
-                      strokeWidth: 0.35,
-                      initialMarkersCount: widget.nodes.length,
-                      zoomPanBehavior: _zoomPanBehavior,
-                      markerBuilder: (context, index) {
-                        final node = widget.nodes[index];
-                        final selected = node.countryCode == widget.selectedId;
-                        return MapMarker(
-                          latitude: node.latitude,
-                          longitude: node.longitude,
-                          size: const Size.square(44),
-                          child: _CountryMarker(
-                            node: node,
-                            selected: selected,
-                            onTap: widget.onSelect == null
-                                ? null
-                                : () => widget.onSelect!(node.countryCode),
-                            onDrop: widget.onDrop == null
-                                ? null
-                                : (data) =>
-                                      widget.onDrop!(node.countryCode, data),
+                child: Localizations.override(
+                  context: context,
+                  delegates: material.GlobalMaterialLocalizations.delegates,
+                  child: material.Theme(
+                    data: material.ThemeData(
+                      colorScheme:
+                          material.ColorScheme.fromSeed(
+                            seedColor: colorScheme.primary,
+                            brightness: theme.brightness,
+                          ).copyWith(
+                            surface: colorScheme.surface,
+                            onSurface: colorScheme.onSurface,
+                            primary: colorScheme.primary,
+                            onPrimary: colorScheme.onPrimary,
                           ),
-                        );
-                      },
                     ),
-                  ],
+                    child: SfMaps(
+                      layers: [
+                        MapShapeLayer(
+                          key: ValueKey(_nodeSignature),
+                          source: _source,
+                          controller: _mapController,
+                          color: land,
+                          strokeColor: coast,
+                          strokeWidth: 0.35,
+                          initialMarkersCount: widget.nodes.length,
+                          zoomPanBehavior: _zoomPanBehavior,
+                          markerBuilder: (context, index) {
+                            final node = widget.nodes[index];
+                            final selected =
+                                node.countryCode == widget.selectedId;
+                            return MapMarker(
+                              latitude: node.latitude,
+                              longitude: node.longitude,
+                              size: const Size.square(44),
+                              child: _CountryMarker(
+                                node: node,
+                                selected: selected,
+                                onTap: widget.onSelect == null
+                                    ? null
+                                    : () => widget.onSelect!(node.countryCode),
+                                onDrop: widget.onDrop == null
+                                    ? null
+                                    : (data) => widget.onDrop!(
+                                        node.countryCode,
+                                        data,
+                                      ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -233,10 +257,10 @@ class _MapToolbar extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final colorScheme = Theme.of(context).colorScheme;
-    return Material(
+    return Surface(
       color: colorScheme.surface.withValues(alpha: 0.94),
       elevation: 2,
-      borderRadius: BorderRadius.circular(6),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
       child: DecoratedBox(
         decoration: BoxDecoration(
           border: Border.all(color: colorScheme.outlineVariant),
@@ -246,17 +270,17 @@ class _MapToolbar extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             _MapToolButton(
-              icon: Icons.add,
+              icon: AppGlyphs.add,
               tooltip: l10n.zoomIn,
               onPressed: onZoomIn,
             ),
             _MapToolButton(
-              icon: Icons.remove,
+              icon: AppGlyphs.remove,
               tooltip: l10n.zoomOut,
               onPressed: onZoomOut,
             ),
             _MapToolButton(
-              icon: Icons.center_focus_strong,
+              icon: AppGlyphs.target,
               tooltip: l10n.fitMapToNodes,
               onPressed: onFit,
             ),
@@ -274,7 +298,7 @@ class _MapToolButton extends StatelessWidget {
     required this.onPressed,
   });
 
-  final IconData icon;
+  final Glyph icon;
   final String tooltip;
   final VoidCallback onPressed;
 
@@ -286,7 +310,7 @@ class _MapToolButton extends StatelessWidget {
       iconSize: 18,
       tooltip: tooltip,
       onPressed: onPressed,
-      icon: Icon(icon),
+      icon: GlyphIcon(icon),
     ),
   );
 }
@@ -384,8 +408,9 @@ class _CountryMarker extends StatelessWidget {
                         ),
                         child: Text(
                           '${node.nodeCount}',
-                          style: Theme.of(context).textTheme.labelSmall
-                              ?.copyWith(
+                          style: AppTextStyle.caption2
+                              .of(context)
+                              .copyWith(
                                 color: colorScheme.onPrimary,
                                 fontSize: 9,
                                 height: 1,
@@ -442,15 +467,16 @@ class _DragFeedback extends StatelessWidget {
   final String label;
 
   @override
-  Widget build(BuildContext context) => Material(
+  Widget build(BuildContext context) => Surface(
+    color: context.colorScheme.surface,
     elevation: 6,
-    borderRadius: BorderRadius.circular(20),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
     child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.dns_outlined, size: 18),
+          const GlyphIcon(AppGlyphs.dns, size: 18),
           const SizedBox(width: 6),
           Text(label),
         ],

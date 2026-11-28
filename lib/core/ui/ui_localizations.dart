@@ -1,6 +1,16 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    show GlobalWidgetsLocalizations;
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:prism_ui/prism_ui.dart';
+
+import '../../l10n/app_localizations.dart';
+
+const targetLocalizationsDelegates = <LocalizationsDelegate<dynamic>>[
+  AppLocalizations.delegate,
+  TargetUiLocalizations.delegate,
+  GlobalWidgetsLocalizations.delegate,
+];
 
 class TargetUiLocalizations extends UiLocalizations {
   TargetUiLocalizations(this.locale);
@@ -70,15 +80,19 @@ class TargetUiLocalizations extends UiLocalizations {
   String get submit => _zh ? '提交' : 'Submit';
 }
 
-class _TargetUiLocalizationsDelegate extends LocalizationsDelegate<UiLocalizations> {
+class _TargetUiLocalizationsDelegate
+    extends LocalizationsDelegate<UiLocalizations> {
   const _TargetUiLocalizationsDelegate();
 
   @override
-  bool isSupported(Locale locale) => const ['en', 'zh'].contains(locale.languageCode);
+  bool isSupported(Locale locale) =>
+      const ['en', 'zh'].contains(locale.languageCode);
 
   @override
-  Future<UiLocalizations> load(Locale locale) =>
-      SynchronousFuture(TargetUiLocalizations(locale));
+  Future<UiLocalizations> load(Locale locale) async {
+    await initializeDateFormatting();
+    return TargetUiLocalizations(locale);
+  }
 
   @override
   bool shouldReload(_TargetUiLocalizationsDelegate old) => false;
